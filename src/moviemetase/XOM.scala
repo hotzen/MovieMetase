@@ -38,21 +38,8 @@ object XOM {
     }
   }
 
-  implicit def ImplicitNode(node: Node): RichNode = new RichNode(node)
-  class RichNode(node: Node) {
-    
-    
-    // XPath
-//    def \(xp: String): List[Element] =
-//      xpath(node, "child::"+xp, None)
-//    def \(xp: String, ctx: XPathContext): List[Element] =
-//      xpath(node, "child::"+xp, Some(ctx))
-//    
-//    def \\(xp: String): List[Element] =
-//      xpath(node, "descendant::"+xp, None)  
-//    def \\(xp: String, ctx: XPathContext): List[Element] =
-//      xpath(node, "descendant::"+xp, Some(ctx))
-
+  implicit def ImplicitNode(node: Node): RichNode = RichNode(node)
+  case class RichNode(node: Node) {
     def xpath[A](xp: String, ctx: Option[XPathContext]): List[Node] = {
       val res = ctx match {
         case Some(ctx) => node.query(xp, ctx)
@@ -60,18 +47,34 @@ object XOM {
       }
       res.toList
     }
-    
-    
+
     // http://www.xom.nu/faq.xhtml#d0e452
     def namespaces: List[Namespace] =
       node.query("namespace::node()").collect({ case n:Namespace => n }).toList
+      
+      // namespace-uri-for-prefix()
   }
 
   
-  implicit def ImplicitElement(elem: Element): RichElement = new RichElement(elem)
-  class RichElement(val elem: Element) extends RichNode(elem) {
-    
+  implicit def ImplicitElement(elem: Element): RichElement = RichElement(elem)
+  case class RichElement(elem: Element) extends RichNode(elem) {
+        
+    def name: String = elem.getLocalName
     def text = elem.getValue
+    
+    def attributes = new Iterable[Attribute] {
+      var i = 0
+      def iterator = new Iterator[Attribute] {
+        def hasNext = (i < elem.getAttributeCount)
+        def next = {
+          val e = elem.getAttribute(i)
+          i = i + 1
+          e
+        }
+        override def hasDefiniteSize = true
+        override def isTraversableAgain = true
+      }
+    }
     
     def attribute(name: String): Option[String] = {
       val attr = elem.getAttribute(name)
@@ -79,7 +82,6 @@ object XOM {
       else              Some( attr.getValue )
     }
     
-    def name: String = elem.getLocalName
     
     def filterChildren(p: Element => Boolean): List[Element] =
       elem.getChildElements.
@@ -93,4 +95,11 @@ object XOM {
     }
 
   } // EndOf RichElement
+  
+  implicit def ImplicitAttribut(attrib: Attribute): RichAttribute = RichAttribute(attrib)
+  case class RichAttribute(attrib: Attribute) extends RichNode(attrib) {
+    
+    def name = attrib.getLocalName
+    def value = attrib.getValue
+  }
 }

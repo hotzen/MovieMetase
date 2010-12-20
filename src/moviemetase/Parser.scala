@@ -18,21 +18,18 @@ object SourceParser {
 //      where xhtml is namespace http://www.w3.org/1999/xhtml
 //"""
     
-    val test = """
-TRACE search IMDB for Movies
-  using http://www.imdb.com/find?s=tt&q=%term in HTML
-    extract "
-      for
-        $a in //xhtml:a[starts-with(@href, '/title/')]
-      where
-        count( local:sub-elements( $a ) ) eq 0 (: only links containing no sub-elements :) 
-      return
-        <movie>
-          <title>{ local:clean-text( $a ) }</title>
-          <page>http://www.imdb.com{data($a/@href)}</page>
-        </movie>"
-      where xhtml is namespace http://www.w3.org/1999/xhtml
-"""
+//      extract "
+//      for
+//        $a in //xhtml:a[starts-with(@href, '/title/')]
+//      where
+//        count($a/*) = 0 
+//      return
+//        <movie>
+//          <title>{ local:clean-text( $a ) }</title>
+//          <page>http://www.imdb.com{data($a/@href)}</page>
+//        </movie>"
+//      where xhtml is namespace http://www.w3.org/1999/xhtml
+//"""
        
 //    val clazzes = List(
 //        "Movie"
@@ -45,6 +42,23 @@ TRACE search IMDB for Movies
 //    }
 //    System.exit(0)
       
+    
+    val test = """
+TRACE search IMDB for Movies
+  using http://www.imdb.com/find?s=tt&q=%term in HTML
+    restrict
+      // <div id="pagecontent"> // <table> // <td> as $CTX
+       / <a href="/title/tt*"> as $LINK
+    extract
+      Movie.Title = text of $LINK
+      
+      if attribute "href" of $LINK matches "/title/tt[0-9]+" then
+        Movie.Page = "http://www.imdb.com" + attribute "href" of $LINK
+      endif
+
+      Movie.AlternativeTitle = text of each $CTX // <p class="find-aka">
+"""
+
     val p = new SourceParser
     
     println(test.trim)
@@ -70,14 +84,124 @@ TRACE search IMDB for Movies
   }
 }
 
+trait RestrictionPathComponent {
+  def toXPath: String
+}
+
+case class RestrictionAxis(axis: String) extends RestrictionPathComponent {
+  def toXPath: String = axis
+}
+
+case class RestrictionPredicateAttribute(name: String, value: Option[String]) {
+  
+  def toXPath: String = {
+    val xp = new StringBuilder
+    value match {
+      case Some(v) => {
+        if (v.startsWith("*") && v.endsWith("*")) {
+          val vs = v.split('*')
+          xp append "contains("
+          xp append "@" append name
+          xp append ", "
+          xp append "'" append vs(1) append "'"
+          xp append ")"
+        } else if (v.startsWith("*")) {
+          val vs = v.split('*')
+          xp append "starts-with("
+          xp append "@" append name
+          xp append ", "
+          xp append "'" append vs(1) append "'"
+          xp append ")"
+        } else if (v.endsWith("*")) {
+          val vs = v.split('*')
+          xp append "ends-with(" //XXX does not exist?
+          xp append "@" append name
+          xp append ", "
+          xp append "'" append vs(1) append "'"
+          xp append ")"
+        } else {
+          xp append "@" append name
+          xp append "="
+          xp append "'" append v append "'"
+        }
+      }
+      case None => {
+        xp append "@"
+        xp append name
+      }
+    }
+    xp.toString
+  }
+}
+
+case class RestrictionPredicate(elem: String, attribs: List[RestrictionPredicateAttribute]) extends RestrictionPathComponent {
+  def toXPath: String = {
+    val xp = new StringBuilder
+    xp append elem
+    
+    if (!attribs.isEmpty) {
+      xp append "["
+      xp append attribs.map(_.toXPath).mkString(" and ")
+      xp append "]"
+    }
+    
+    xp.toString
+  }
+}
+
+case class Restriction(path: List[RestrictionPathComponent], varName: String) {
+  def toXPath: String = path.map(_.toXPath).mkString(" ")
+}
+
+//
+//case class ElementPredicate(name: String) extends Function[String,Boolean] {
+//  def isWildcard: Boolean = (name == "*")
+//  
+//  override def apply(x: String): Boolean = isWildcard || (x == name)
+//}
+//
+//case class AttributePredicate(name: String, p: String => Boolean) extends PartialFunction[String,Function[String,Boolean]] {
+//  def isWildcard: Boolean = (name == "*")
+//  
+//  override def isDefinedAt(x: String): Boolean = isWildcard || (x == name)
+//  
+//  override def apply(x: String): Function[String, Boolean] = {
+//    if (!isDefinedAt(x)) throw new Exception(this + " is not defined at " + x)
+//    p
+//  }
+//}
+//
+//case class RestrictionPredicate(pElem: ElementPredicate, pAttribs: List[AttributePredicate]) {
+//  def apply(elem: nu.xom.Element): Boolean = {
+//    import XOM._
+//    
+//    if (!pElem(elem.name))
+//      return false
+//    
+//    // check each attribute with each predicate
+//    elem.attributes.forall(attrib => pAttribs.forall(p => {
+//      
+//      // predicate is defined for this attribute
+//      if (p.isDefinedAt(attrib.name))
+//        p(attrib.name)(attrib.value)
+//      
+//      // predicate is undefined for this attribute
+//      else
+//        true
+//    }))
+//  }
+//}
+
+
+
 class SourceParser extends RegexParsers {
   
   def pQuoted: Parser[String]   = "\"" ~> """[^"]+""".r <~ "\""
   def pUnquoted: Parser[String] = """[^\s]+""".r
   
-  def pExpr: Parser[String] = pQuoted | pUnquoted
+  //def pExpr: Parser[String] = pQuoted | pUnquoted
   def pURL: Parser[String] = pQuoted | pUnquoted
-    
+  
   def pSourceCategory: Parser[String] = pQuoted | pUnquoted
   def pSourceName: Parser[String] = pQuoted | pUnquoted
 
@@ -89,59 +213,60 @@ class SourceParser extends RegexParsers {
   
   def pQuality: Parser[Int] = "of" ~> "quality" ~> """[0-9]+""".r ^^ (x => x.toInt) 
   
-  def pNamespacePrefix: Parser[String] = pQuoted | pUnquoted
-  def pNamespaceURI: Parser[String] = pQuoted | pUnquoted
+  def pRestrPredElemName: Parser[String] = """[a-zA-Z0-9-_]+""".r
   
-  def pNamespaceContext: Parser[List[(String,String)]] =
-    repsep( pNamespacePrefix ~ "is" ~ opt("namespace") ~ pNamespaceURI ^^ { case prefix ~ _is ~ _namespace ~ uri => (prefix, uri) }, "and")
-   
+  def pRestrPredAttribName: Parser[String] = """[^\s=>]+""".r
+  def pRestrPredAttribValue: Parser[String] = pQuoted
   
-  def pXPath: Parser[XPathT] = pExpr ~ opt("where" ~> pNamespaceContext) ^^ {
-      case expr ~ optCtx => {
-        val ctx = optCtx match {
-          case Some(xs) => xs
-          case None     => Nil
-        }
-        XPathT(expr, ctx)
-      }
-    }
- 
-  def pXQuery: Parser[XQueryT] = pExpr ~ opt("where" ~> pNamespaceContext) ^^ {
-      case expr ~ optCtx => {
-        val ctx = optCtx match {
-          case Some(xs) => xs
-          case None     => Nil
-        }
-        XQueryT(expr, ctx)
-      }
-    }
+  def pRestrPredAttrib: Parser[RestrictionPredicateAttribute] = (pRestrPredAttribName ~ opt("=" ~> pRestrPredAttribValue)) ^^ {
+    case name ~ optValue =>
+      RestrictionPredicateAttribute(name, optValue)
+  }
+    
+  def pRestrPredicate: Parser[RestrictionPredicate] = ("<" ~> pRestrPredElemName ~ rep(pRestrPredAttrib) <~ ">") ^^ {
+    case elem ~ attribs =>
+      RestrictionPredicate(elem, attribs)
+  }
+    
+  def pRestrAxis: Parser[RestrictionAxis] = ("//" | "/") ^^ {
+//    case "/" =>
+//      RestrictionAxisChildren
+//    
+//    case "//" =>
+//    
+    case axis =>
+      RestrictionAxis(axis)
+  }
   
-  def pRestrictions: Parser[List[XPathT]] =
-    opt("restrict" ~> "to" ~> repsep(pXPath, "then")) ^^ {
-      case Some(restricts) => restricts
-      case None            => Nil
-    }
   
-  def pExtraction: Parser[XQueryT] = "extract" ~> pXQuery
+  def pRestrAxisPredicate: Parser[List[RestrictionPathComponent]] = pRestrAxis ~ pRestrPredicate ^^ {
+    case axis ~ pred =>
+      axis :: pred :: Nil
+  }
   
-//  def pModelName: Parser[String] = pQuoted | pUnquoted
-//  def pModel
-      
-//  def pBindings: Parser[List[ModelBinding]] = "fetch" ~> 
-      
-      
-//  def pDefinition: Parser[]
-      
+  def pRestrVarName: Parser[String] = "as" ~> "$" ~> """[A-Z0-9_]+""".r
+    
+  def pRestriction: Parser[Restriction] = rep(pRestrAxisPredicate) ~ pRestrVarName ^^ {
+    case axisPreds ~ varName =>
+      Restriction( axisPreds.flatten, varName )
+  }
+  
+  def pRestrictions: Parser[List[Restriction]] = "restrict" ~> rep( pRestriction )
+  def pExtractions: Parser[String] = "extract" ~> """.*""".r
+  
   def pSourceConfig: Parser[SourceConfiguration] = (
       pURL ~ "in" ~ opt(pContentEncoding) ~ pContentHandler
     ~ opt(pQuality)
     ~ pRestrictions
-    ~ pExtraction
+    ~ pExtractions
     ) ^^ {
-      case url ~ _in ~ optEnc ~ handler ~ optQuality ~ restricts ~ extract => {
+      case url ~ _in ~ optEnc ~ handler ~ optQuality ~ restricts ~ extracts => {
         handler.encoding = optEnc
-        val transforms = restricts ++ List(extract)
-        SourceConfiguration(url, handler, optQuality, transforms)
+        
+        println("Restrictions: " + restricts.mkString("\n"))
+        System.exit(0)
+        
+        SourceConfiguration(url, handler, optQuality, null)
     }}
   
   def pSource: Parser[Source] =

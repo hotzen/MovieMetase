@@ -54,11 +54,15 @@ case class XPathT(expr: String, context: List[(String,String)]) extends Transfor
 object XQueryT {
   val Predef = """
     declare variable $QUOTE := '"';
-    declare function local:clean-text($node) {
-      let $txt := $node / text()
-      return if ( contains($txt, $QUOTE) )
+	declare function local:unquote($txt AS xs:string) AS xs:string {
+	  return
+        if ( contains($txt, $QUOTE) )
         then substring-before(substring-after($txt, $QUOTE), $QUOTE)
         else $txt
+    }
+    declare function local:clean-text($node) {
+      let $txt := $node / text()
+      return local:unquote($txt)
     };
     declare function local:sub-elements($node) {
       let $subElems := $node / * 
@@ -146,7 +150,7 @@ case class SourceConfiguration(urlTpl: String, handler: ContentHandler, presetQu
     
     val doc = handler.load( is )
     //trace.println("XML:\n" + doc.toXML + "\n<<<END")
-    
+        
     // start with document-node to apply refinements
     var nodes: List[Node] = doc :: Nil
     
@@ -186,19 +190,8 @@ case class Source(name: String, configs: List[SourceConfiguration], category: St
     }
   
   def createSearcher(q: Query, proxy: Option[Proxy]) = new Callable[List[Movie]] {
-    def call(): List[Movie] = {
-      import XOM._
-      
-      val (cfg, url) = generateURL(q) match {
-        case Some( tpl ) => tpl 
-        case None => throw new Exception("no applicable URL could be generated for " + q)
-      }
-      
-      val fis = new java.io.FileInputStream( "C:\\Users\\kmeder\\Desktop\\imdb-result.html" )
-      cfg.process( fis )
-      
-      /*
-      trace.println("using %s".format(cfg))
+        
+    def loadURL(url: URL): InputStream = {
       trace.println("loading %s ...".format(url))
       
       val conn = proxy match {
@@ -216,17 +209,25 @@ case class Source(name: String, configs: List[SourceConfiguration], category: St
       conn.setRequestProperty("User-Agent", "Mozilla/5.0") // (Windows; U; Windows NT 6.1; en-US) AppleWebKit/534.7 (KHTML, like Gecko) Chrome/7.0.517.44 Safari/534.7")
 
       conn.connect
-      val is = conn.getInputStream
+      conn.getInputStream
+    }
+        
+    def call(): List[Movie] = {
+      val (srcCfg, url) = generateURL(q) match {
+        case Some( tpl ) => tpl 
+        case None => throw new Exception("no applicable URL could be generated for " + q)
+      }
+      trace.println("using %s".format(srcCfg))
+      
+      val is = loadURL(url)
       
       trace.println("processing input-stream ...")
-      cfg.process( is )
-      */
+      srcCfg.process( is )
     }
   }
   
   def createFetcher(m: Movie) = new Callable[Option[Movie]] {
     def call(): Option[Movie] = {
-      
       //TODO
       None
     }

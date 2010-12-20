@@ -19,14 +19,17 @@ object App {
   def resource(path: String): java.net.URL =
     this.getClass.getResource(path)
 
-  def resourceFromUserDirectory(path: String): java.io.File =
-    new java.io.File(util.Properties.userDir, path)
+//  def userDir: java.io.File = 
+//	  new java.io.File( util.Properties.userDir )
+//    
+//  def resourceFromUserDirectory(path: String): java.io.File =
+//    new java.io.File(userDir, path)
   
-  def classExists(qname: String): Boolean =
-    try {
-      Class.forName(qname, false, null)
-      true
-    } catch {
-      case e:ClassNotFoundException => false
-    }
+  def configDir: java.io.File = {
+    val userDir = util.Properties.userDir
+    val f = new java.io.File(userDir, "MovieMetase")
+    if (!f.exists)
+      f.mkdir()
+    f
+  }
 }
