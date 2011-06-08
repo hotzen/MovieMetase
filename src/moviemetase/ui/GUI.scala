@@ -70,15 +70,15 @@ class GUI extends Reactor {
           
           val movieFile =
             if (file.isDirectory) {
-              File(file.getAbsolutePath, file.getName, "")
+              FileInfo(file.getAbsolutePath, file.getName, "")
             } else {
               val dir = file.getParentFile
-              File(dir.getAbsolutePath, dir.getName, file.getName)
+              FileInfo(dir.getAbsolutePath, dir.getName, file.getName)
             }
           
           val analyzed = Analyzer.analyze( movieFile )
           
-          QueryManager.query( analyzed )
+//          QueryManager.query( analyzed )
                     
           //QueryPanel.tblModel.clearRows
           

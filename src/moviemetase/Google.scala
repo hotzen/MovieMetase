@@ -1,68 +1,63 @@
-//package moviemetase
-//
-//import java.util.concurrent.Callable
-//import java.net.URL
-//
-//object Google {
-//  val APIKey = "AIzaSyAeeLMANIJTh5H2aZTusm1_iUyudRMQABc"
-//  val BaseURL = "https://www.googleapis.com/customsearch/v1?key=" + APIKey + "&num=10&alt=atom&safe=off&prettyprint=true"
-//}
-//
-//object GoogleCSE {
-//  // http://www.google.com/cse/panel/sites?cx=011282045967305256347:ere22gz0l-w&sig=__owv3JFsJ7skOA4UJNXvsl8cSpTQ=
-//  
-//  val MainSites = "011282045967305256347:uxnvlsnwltc" // IMDB + TMDB
-//  val IMDB = "011282045967305256347:dyc6spozqnc"
-//  val TMDB = "011282045967305256347:6gzcajg3evm"
-//  val Subtitles = "011282045967305256347:bmstxyqkjim"
-//  
-//  //val Movies = "011282045967305256347:ere22gz0l-w"
-//    
-//  //val IMDB = "011282045967305256347:dyc6spozqnc"
-//  //val TMDB = "011282045967305256347:6gzcajg3evm"
-//}
-//
-//sealed trait GoogleQuery {
-//  def queryParam: String
-//  def extraParams: String = ""
-//  def genURL: URL = new URL( Google.BaseURL + "&q=" + queryParam + extraParams )
-//}
-//
-//object GoogleQuery {
-//  // NICHT MEHR MOEGLICH MIT CUSTOM GOOGLE SEARCH
-////  case class Query(term: String) extends GoogleQuery {
-////    def queryParam = Util.URLEncode(term)
-////  }
-////  case class Site(term: String, site: String) extends GoogleQuery {
-////    def queryParam = Util.URLEncode(term) + "+site:" + Util.URLEncode(site)
-////  }
-////  case class Related(url: String) extends GoogleQuery {
-////    def queryParam = "related:" + Util.URLEncode("url")
-////  }
-//  case class Scoped(term: String, CSE: String) extends GoogleQuery {
-//    def queryParam = java.net.URLEncoder.encode(term, "UTF-8")
-//    override def extraParams = "&cx=" + CSE
-//  }
-//}
-//
-//case class GoogleResult(url: String, title: String, snippet: String)
-//
-//case class GoogleSearch(q: GoogleQuery) extends Callable[List[GoogleResult]] {
-//  def call(): List[GoogleResult] = {
-//    
-//    val url = q.genURL
-//    
-//    println("GoogleSearch.call URL=" + url)
-//    
-//    val conn = url.openConnection()
-//    conn setUseCaches false
-//    conn setAllowUserInteraction false
-//    conn setDoInput true
-//    conn setDoOutput false
-//    conn.connect
-//    
-//    val doc = scala.xml.XML.load( conn.getInputStream )
-//
+package moviemetase
+
+import java.util.concurrent.Callable
+import java.net.URL
+
+object GoogleCSE {
+  val APIKey  = "AIzaSyAeeLMANIJTh5H2aZTusm1_iUyudRMQABc"
+  val BaseURL = "https://www.googleapis.com/customsearch/v1"
+}
+
+
+sealed trait GoogleQuery {
+  def cseID: String
+  def cseParams: String = "num=10&alt=atom&safe=off&prettyprint=true"
+  
+  def query: String
+  
+  def genURL: URL = {
+    val q = java.net.URLEncoder.encode(query, "UTF-8")
+    
+    val urlBuilder = new StringBuilder( GoogleCSE.BaseURL )
+    urlBuilder append "?key=" append GoogleCSE.APIKey
+    urlBuilder append "&cx="  append cseID
+    urlBuilder append "&"     append cseParams
+    urlBuilder append "&q="   append q
+    
+    new URL( urlBuilder.toString )
+  }
+}
+
+object GoogleQuery {
+  case class Subtitles(query: String) extends GoogleQuery {
+    def cseID = "011282045967305256347:bmstxyqkjim"
+  }
+  
+  case class IMDB(query: String) extends GoogleQuery {
+    def cseID = "011282045967305256347:dyc6spozqnc"    
+  }
+}
+
+case class GoogleResult(url: String, title: String, snippet: String)
+
+case class GoogleSearch(q: GoogleQuery) extends Callable[List[GoogleResult]] {
+  def call(): List[GoogleResult] = {
+    
+    val url = q.genURL
+    
+    println("GoogleSearch.call URL=" + url)
+    
+    val conn = url.openConnection()
+    conn setUseCaches false
+    conn setAllowUserInteraction false
+    conn setDoInput true
+    conn setDoOutput false
+    conn.connect
+    
+    val doc = scala.xml.XML.load( conn.getInputStream )
+    
+    println( doc.toString )
+    
 //    { for (entry <- doc \ "entry") yield
 //        GoogleResult(
 //          (entry \ "link" \ "@href").head.text,
@@ -72,5 +67,6 @@
 //          (entry \ "summary").head.text
 //        )
 //    }.toList
-//  }
-//}
+    Nil
+  }
+}

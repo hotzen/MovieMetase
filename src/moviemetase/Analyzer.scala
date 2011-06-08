@@ -2,7 +2,7 @@ package moviemetase
 
 
 
-case class AnalyzedFile(dir: Splitted, file: Splitted, same: Splitted, all: Splitted) {
+case class AnalyzedFile(dir: Chopped, file: Chopped, same: Chopped, all: Chopped) {
   override def toString: String = {
     "AnalyzedFile(\n" +
     "  Dir:  " + dir + "\n" +
@@ -19,7 +19,7 @@ object Analyzer {
   lazy val Tags = loadRes("/res/tags.txt")
   lazy val Exts = loadRes("/res/exts.txt")
   
-  def analyze(f: File): AnalyzedFile = {
+  def analyze(f: FileInfo): AnalyzedFile = {
     val dirParts  = split(f.dirName)
     val fileParts = split(f.fileName)
     val (sameParts, allParts) = getInterUnion(dirParts, fileParts)
@@ -31,7 +31,7 @@ object Analyzer {
     )
   }
   
-  def split(s: String): Splitted = {
+  def split(s: String): Chopped = {
     var ps = s.split(SepChars).toList
       .map(_.trim)
       .filter(_.length > 0)
@@ -52,15 +52,15 @@ object Analyzer {
     val tags = if (!ps.isEmpty) ps
                else             List[String]()
                
-    Splitted(names.reverse, tags, year)
+    Chopped(names.reverse, tags, year)
   }
      
   
   // fst = same
   // snd = all
-  def getInterUnion(s1: Splitted, s2: Splitted): (Splitted, Splitted) = {
+  def getInterUnion(s1: Chopped, s2: Chopped): (Chopped, Chopped) = {
     
-    val same = Splitted(
+    val same = Chopped(
       (s1.names intersect s2.names).distinct,
       (s1.tags intersect s2.tags).distinct,
       s1.year match {
@@ -74,7 +74,7 @@ object Analyzer {
       }
     )
     
-    val all = Splitted(
+    val all = Chopped(
       (s1.names union s2.names).distinct,
       (s1.tags union s2.tags).distinct,
       s1.year match {
