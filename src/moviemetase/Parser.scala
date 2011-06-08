@@ -58,6 +58,19 @@ TRACE search IMDB for Movies
 
       Movie.AlternativeTitle = text of each $CTX // <p class="find-aka">
 """
+      
+// DSL-VERSUCH 2011-03-02, nicht funktionsfähig
+     val test2 = """
+search "IMDB" for "Movies"
+  fetch    http://www.imdb.com/find?s=tt&q=$TERM
+  restrict // <div id="pagecontent"> // <table> // <td>    as <<TD>>
+            / <a href="/title/tt*">                        as <<A>>
+  extract
+    <<A>>[Movie.Title]<</A>>
+    <<A href="Movie.Page">> prepend "http://www.imdb.com"
+    
+    <<TD>> // <p class="find-aka">[Movie.AlternativeTitle]</p> 
+"""
 
     val p = new SourceParser
     

@@ -100,22 +100,23 @@ object QueryVars {
   val IND = "%"
   
   def gen(q: Query): List[(String,Option[String])] = {
-    val phs = new scala.collection.mutable.ListBuffer[(String,Option[String])]
+    val vs = new scala.collection.mutable.ListBuffer[(String,Option[String])]
     
     val term = q.term
     val year = q.year4C
     
-    phs append ("%term" -> Some(term))
-    phs append ("%year" -> year)
-    phs append ("%termYear" -> {year match {
+    vs append ("$TERM" -> Some(term))
+    vs append ("$YEAR" -> year)
+    vs append ("$TERM_YEAR" -> {year match {
       case Some(y) => Some( term + " " + y )
       case None    => None
     }})
-    phs append ("%termParensYear" -> {year match {
+    // year in parens
+    vs append ("$TERM_PYEAR" -> {year match {
       case Some(y) => Some( term + " (" + y + ")" )
       case None    => None
     }})
-    phs.toList
+    vs.toList
   }
 }
 

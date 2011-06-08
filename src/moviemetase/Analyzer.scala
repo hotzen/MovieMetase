@@ -1,5 +1,7 @@
 package moviemetase
 
+
+
 case class AnalyzedFile(dir: Splitted, file: Splitted, same: Splitted, all: Splitted) {
   override def toString: String = {
     "AnalyzedFile(\n" +
@@ -12,7 +14,7 @@ case class AnalyzedFile(dir: Splitted, file: Splitted, same: Splitted, all: Spli
 
 object Analyzer {
   
-  val SepChars = " ._-,;()[]{}<>#+*".toCharArray
+  val SepChars = " ._-,;()[]{}<>#+*" //.toCharArray
     
   lazy val Tags = loadRes("/res/tags.txt")
   lazy val Exts = loadRes("/res/exts.txt")
