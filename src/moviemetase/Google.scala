@@ -5,24 +5,27 @@ import java.net.URL
 import nu.xom._
 import org.xml.sax.helpers.XMLReaderFactory
 import java.io.InputStream
+import java.io.BufferedReader
+import scala.io.Source
+import scala.util.parsing.json.JSON
 
 
-object Google {
+// FUCKING HELL, no results
+/*object Google {
   val BASE_URL = "http://www.google.com/search"
+  
+  case class Query(query: String, extra: String = "") extends GoogleQuery {
     
-  case class Query(query: String) extends GoogleQuery {
     // http://code.google.com/intl/de/apis/searchappliance/documentation/46/xml_reference.html#request_parameters
     // http://googlesystem.blogspot.com/2007/04/how-to-disable-google-personalized.html
-    
-    // output=xml => HTTP 403 since this is against TOS :(
-    def params: String = "ie=utf8&oe=utf8&filter=0&safe=0&pws=0&lr=lang_en|lang_de"
+    def params: String = "ie=utf8&oe=utf8&filter=0&safe=0&pws=0&complete=0&instant=off&hl=en&lr=lang_en|lang_de"
     
     def url: URL = {
       val q = java.net.URLEncoder.encode(query, "UTF-8")
       
       val urlBuilder = new StringBuilder( Google.BASE_URL )
       urlBuilder append "?"   append params
-      urlBuilder append "&q=" append q
+      urlBuilder append "&q=" append q append extra
             
       new URL( urlBuilder.toString )
     }
@@ -34,10 +37,48 @@ object Google {
     val tagsoup = XMLReaderFactory.createXMLReader("org.ccil.cowan.tagsoup.Parser")
     val builder = new Builder( tagsoup )
     val doc = builder build in
-        
+    
+    println( doc.toXML )
+    
+    Nil
+  }
+}*/
+
+object GoogleAjax {
+  val BASE_URL = "http://ajax.googleapis.com/ajax/services/search/web"
+  
+  case class Query(query: String, extra: String = "") extends GoogleQuery {
+    def params: String = "v=1.0"
+    
+    def url: URL = {
+      val q = java.net.URLEncoder.encode(query, "UTF-8")
+      
+      val urlBuilder = new StringBuilder( GoogleAjax.BASE_URL )
+      urlBuilder append "?"   append params
+      urlBuilder append "&q=" append q append extra
+            
+      new URL( urlBuilder.toString )
+    }
+    
+    def parser = parse _
+  }
+    
+  def parse(q: GoogleQuery, in: InputStream): List[GoogleResult] = {
+    
+    val s = Source.fromInputStream(in).mkString
+    
+    println( s )
+    
+    JSON.parse( s ) match {
+      case None => println("NIX")
+      case c@Some(elems) => println( c.mkString("\n") ) 
+    }
+    
     Nil
   }
 }
+
+
 
 object GoogleCSE {
   val API_KEY  = "AIzaSyAeeLMANIJTh5H2aZTusm1_iUyudRMQABc"
@@ -161,6 +202,15 @@ case class GoogleSearch(q: GoogleQuery) extends Callable[List[GoogleResult]] {
     conn setAllowUserInteraction false
     conn setDoInput true
     conn setDoOutput false
+  
+    //conn setRequestProperty ("Accept", "text/xml;q=0.9,application/xml;q=0.8,application/xhtml+xml;q=0.7,text/html;q=0.3,text/*;q=0.1")
+    //conn setRequestProperty ("Accept-Charset", "utf-8;q=0.9,ISO-8859-1;q=0.5,*;q=0.1")
+    conn setRequestProperty ("Accept-Encoding", "identity")
+    //conn setRequestProperty ("Accept-Language", "en-US;q=0.9,de-DE;q=0.5")
+    
+    conn setRequestProperty ("Referer", "http://stackoverflow.com/questions/tagged/google")
+    conn setRequestProperty ("User-Agent", "Mozilla/5.0") // (Windows NT 6.1; WOW64) AppleWebKit/534.30 (KHTML, like Gecko) Chrome/12.0.742.91 Safari/534.30") 
+    
     conn.connect
     
     val parse = q.parser
