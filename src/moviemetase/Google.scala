@@ -47,16 +47,22 @@ import scala.util.parsing.json.JSON
 object GoogleAjax {
   val BASE_URL = "http://ajax.googleapis.com/ajax/services/search/web"
   
-  case class Query(query: String, extra: String = "") extends GoogleQuery {
-    def params: String = "v=1.0"
-    
+  case class Query(query: String, page: Int = 1) extends GoogleQuery {
+    def params: String = "v=1.0&rsz=large&hl=en"
+    def limit: Int = 8
+      
     def url: URL = {
       val q = java.net.URLEncoder.encode(query, "UTF-8")
       
       val urlBuilder = new StringBuilder( GoogleAjax.BASE_URL )
       urlBuilder append "?"   append params
-      urlBuilder append "&q=" append q append extra
-            
+      urlBuilder append "&start=" append ((page-1)*limit)
+      urlBuilder append "&q=" append q
+      
+      // do not escape extra-query, but replace spaces
+      //if (extraQuery.length > 0)
+      //  urlBuilder append extraQuery.replace(" ", "+")
+      
       new URL( urlBuilder.toString )
     }
     

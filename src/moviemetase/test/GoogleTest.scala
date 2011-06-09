@@ -15,7 +15,7 @@ object GoogleTest {
     
     { // Raw Search "Inception.1080p.BluRay.x264-REFiNED" link:imdb.com/title/tt*
       val title = "Inception.1080p.BluRay.x264-REFiNED"
-      val q = GoogleAjax.Query(title, "+link:imdb.com/title/")
+      val q = GoogleAjax.Query(title + "+link:imdb.com/title/")
       val s = GoogleSearch(q)
       
       println( q.url.toString )
