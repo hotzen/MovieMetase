@@ -6,13 +6,6 @@ import nu.xom._
 import org.xml.sax.helpers.XMLReaderFactory
 
 
-sealed trait GoogleQuery {
-  def query: String
-  def url: URL
-  def isCSE: Boolean
-}
-
-
 object Google {
   
   def parse(q: GoogleQuery, doc: Document): List[GoogleResult] = {
@@ -80,10 +73,10 @@ object GoogleCSE {
           attribs.put(attrName, attrVal)
         }
         
-        (dataType -> GooglePageMap.Data(dataType, attribs.toMap))
+        (dataType -> GooglePageMapData(dataType, attribs.toMap))
       }
       
-      GoogleResult(url, title, snippet, data.toMap, q)
+      GoogleResult(url, title, snippet, GooglePageMap(data.toMap), q)
     }
     
     results.toList
@@ -112,17 +105,24 @@ object GoogleCSE {
 }
 
 
-// http://code.google.com/intl/de-DE/apis/customsearch/docs/structured_data.html#pagemaps
-object GooglePageMap {
-  type Ty = Map[String, Data]
-
-  case class Data(dataType: String, data: Map[String,String]) {
-    def names: Iterable[String] = data.keys
-    def value(name: String): Option[String] = data.get(name)
-  }
+sealed trait GoogleQuery {
+  def query: String
+  def url: URL
+  def isCSE: Boolean
 }
 
-case class GoogleResult(url: URL, title: String, snippet: String, pageMap: GooglePageMap.Ty, query: GoogleQuery)
+
+// http://code.google.com/intl/de-DE/apis/customsearch/docs/structured_data.html#pagemaps
+case class GooglePageMap(data: Map[String, GooglePageMapData]) {
+  def dataTypes: Iterable[String] = data.keys
+  def get(dataType: String): Option[GooglePageMapData] = data.get(dataType)
+}
+case class GooglePageMapData(dataType: String, data: Map[String,String]) {
+  def names: Iterable[String] = data.keys
+  def get(name: String): Option[String] = data.get(name)
+}
+
+case class GoogleResult(url: URL, title: String, snippet: String, pageMap: GooglePageMap, query: GoogleQuery)
 
 
 case class GoogleSearch(q: GoogleQuery) extends Callable[List[GoogleResult]] {
