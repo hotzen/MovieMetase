@@ -4,23 +4,19 @@ package test
 object GoogleTest {
   def main(args: Array[String]) = {
     
-    println("hello world")
+    { // CSE IMDB Search
+      val title = "Terminator"
+      val cse = "011282045967305256347:dyc6spozqnc"
+      val q = GoogleCSE.Query(title, cse)
+      val s = GoogleSearch(q)
+      val r = s.call()
+      println( r.mkString("\n\n") )
+    }
     
-    //val title = "Little.Fockers.720p.BluRay.x264-TWiZTED"
-    val title = "Terminator"
-    
-    val cse = "011282045967305256347:dyc6spozqnc"
+    { // Raw Search "Inception.1080p.BluRay.x264-REFiNED" link:imdb.com/title/tt*
+      val title = "Inception.1080p.BluRay.x264-REFiNED"
       
-    val imdb = GoogleCSE.Query(title, cse)
-   // val subs = GoogleQuery.Subtitles(title)
-    
-    val s1 = GoogleSearch(imdb)
-    //val s2 = GoogleSearch(subs)
-    
-    val r = s1.call()
-    //s2.call()
-    
-    println( r.mkString("\n\n") )
+    }
     
     ()
   }

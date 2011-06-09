@@ -4,17 +4,38 @@ import java.util.concurrent.Callable
 import java.net.URL
 import nu.xom._
 import org.xml.sax.helpers.XMLReaderFactory
+import java.io.InputStream
 
 
 object Google {
-  
-  def parse(q: GoogleQuery, doc: Document): List[GoogleResult] = {
-    Nil
-  }
-  
+  val BASE_URL = "http://www.google.com/search"
+    
   case class Query(query: String) extends GoogleQuery {
-    def url = new URL("http://foobar.net")
-    def isCSE = false
+    // http://code.google.com/intl/de/apis/searchappliance/documentation/46/xml_reference.html#request_parameters
+    // http://googlesystem.blogspot.com/2007/04/how-to-disable-google-personalized.html
+    
+    // output=xml => HTTP 403 since this is against TOS :(
+    def params: String = "ie=utf8&oe=utf8&filter=0&safe=0&pws=0&lr=lang_en|lang_de"
+    
+    def url: URL = {
+      val q = java.net.URLEncoder.encode(query, "UTF-8")
+      
+      val urlBuilder = new StringBuilder( Google.BASE_URL )
+      urlBuilder append "?"   append params
+      urlBuilder append "&q=" append q
+            
+      new URL( urlBuilder.toString )
+    }
+    
+    def parser = parse _
+  }
+    
+  def parse(q: GoogleQuery, in: InputStream): List[GoogleResult] = {
+    val tagsoup = XMLReaderFactory.createXMLReader("org.ccil.cowan.tagsoup.Parser")
+    val builder = new Builder( tagsoup )
+    val doc = builder build in
+        
+    Nil
   }
 }
 
@@ -27,7 +48,32 @@ object GoogleCSE {
   val NS_OS   = "http://a9.com/-/spec/opensearch/1.1/"
   val NS_GD   = "http://schemas.google.com/g/2005"
 
-  def parse(q: GoogleQuery, doc: Document): List[GoogleResult] = {
+  case class Query(query: String, cse: String, page: Int = 1) extends GoogleQuery {
+    def params: String = "alt=atom&prettyprint=true&safe=off"
+    def limit: Int = 10
+    
+    def url: URL = {
+      val q = java.net.URLEncoder.encode(query, "UTF-8")
+      
+      val urlBuilder = new StringBuilder( GoogleCSE.BASE_URL )
+      urlBuilder append "?key="   append GoogleCSE.API_KEY
+      urlBuilder append "&cx="    append cse
+      urlBuilder append "&"       append params
+      urlBuilder append "&num="   append limit
+      urlBuilder append "&start=" append (page + (page-1)*limit)
+      urlBuilder append "&q="     append q
+      
+      new URL( urlBuilder.toString )
+    }
+
+    def parser = parse _
+  }
+    
+  def parse(q: GoogleQuery, in: InputStream): List[GoogleResult] = {
+
+    val builder = new Builder()
+    val doc = builder build in
+    
     def removeTags(s: String) = """</?.*?>""".r.replaceAllIn(s, "")
     def removeEntities(s: String) = """&[a-z]+;""".r.replaceAllIn(s, "")
     
@@ -82,33 +128,15 @@ object GoogleCSE {
     results.toList
   }
   
-  case class Query(query: String, cse: String, page: Int = 1) extends GoogleQuery {
-    def isCSE = true
-    
-    def params: String = "alt=atom&safe=off&prettyprint=true"
-    def limit: Int = 10
-    
-    def url: URL = {
-      val q = java.net.URLEncoder.encode(query, "UTF-8")
-      
-      val urlBuilder = new StringBuilder( GoogleCSE.BASE_URL )
-      urlBuilder append "?key="   append GoogleCSE.API_KEY
-      urlBuilder append "&cx="    append cse
-      urlBuilder append "&"       append params
-      urlBuilder append "&num="   append limit
-      urlBuilder append "&start=" append (page + (page-1)*limit)
-      urlBuilder append "&q="     append q
-      
-      new URL( urlBuilder.toString )
-    }
-  }
+  
 }
 
 
 sealed trait GoogleQuery {
   def query: String
   def url: URL
-  def isCSE: Boolean
+
+  def parser: ( (GoogleQuery, InputStream) => List[GoogleResult] )
 }
 
 
@@ -135,14 +163,7 @@ case class GoogleSearch(q: GoogleQuery) extends Callable[List[GoogleResult]] {
     conn setDoOutput false
     conn.connect
     
-    val in = conn.getInputStream
-    
-    val builder = if (q.isCSE) new Builder()
-                  else         new Builder( XMLReaderFactory.createXMLReader("org.ccil.cowan.tagsoup.Parser") )
-        
-    val doc = builder build in
-    
-    if (q.isCSE) GoogleCSE.parse(q, doc)
-    else         Google.parse(q, doc)
+    val parse = q.parser
+    parse( q, conn.getInputStream )
   }
 }
