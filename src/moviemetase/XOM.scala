@@ -5,17 +5,6 @@ import org.xml.sax.helpers.XMLReaderFactory
 
 object XOM {
   
-  def parseXML(in: java.io.InputStream): Document = {
-    val parser = new Builder()
-    parser build in
-  }
-  
-  def parseHTML(in: java.io.InputStream): Document = {
-    val tagsoup = XMLReaderFactory.createXMLReader("org.ccil.cowan.tagsoup.Parser");
-    val parser = new Builder(tagsoup);
-    parser build in;
-  }  
-  
   def NodeToElement(n: Node): Option[Element] =
     if (n.isInstanceOf[Element])
       Some(n.asInstanceOf[Element])

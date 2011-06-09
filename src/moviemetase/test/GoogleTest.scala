@@ -9,7 +9,9 @@ object GoogleTest {
     //val title = "Little.Fockers.720p.BluRay.x264-TWiZTED"
     val title = "Terminator"
     
-    val imdb = GoogleQuery.IMDB(title)
+    val cse = "011282045967305256347:dyc6spozqnc"
+      
+    val imdb = GoogleCSE.Query(title, cse)
    // val subs = GoogleQuery.Subtitles(title)
     
     val s1 = GoogleSearch(imdb)
