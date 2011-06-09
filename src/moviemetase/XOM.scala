@@ -1,9 +1,21 @@
 package moviemetase
 
 import nu.xom._
+import org.xml.sax.helpers.XMLReaderFactory
 
 object XOM {
-    
+  
+  def parseXML(in: java.io.InputStream): Document = {
+    val parser = new Builder()
+    parser build in
+  }
+  
+  def parseHTML(in: java.io.InputStream): Document = {
+    val tagsoup = XMLReaderFactory.createXMLReader("org.ccil.cowan.tagsoup.Parser");
+    val parser = new Builder(tagsoup);
+    parser build in;
+  }  
+  
   def NodeToElement(n: Node): Option[Element] =
     if (n.isInstanceOf[Element])
       Some(n.asInstanceOf[Element])
@@ -82,18 +94,6 @@ object XOM {
       else              Some( attr.getValue )
     }
     
-    
-    def filterChildren(p: Element => Boolean): List[Element] =
-      elem.getChildElements.
-        flatMap(child => if (p(child)) Some(child) else None).
-        toList
-    
-    def findChild(p: Element => Boolean): Option[Element] = {
-      for (child <- elem.getChildElements)
-        if (p(child)) return Some(child)
-      None
-    }
-
   } // EndOf RichElement
   
   implicit def ImplicitAttribut(attrib: Attribute): RichAttribute = RichAttribute(attrib)
