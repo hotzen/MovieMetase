@@ -58,11 +58,7 @@ object GoogleAjax {
       urlBuilder append "?"   append params
       urlBuilder append "&start=" append ((page-1)*limit)
       urlBuilder append "&q=" append q
-      
-      // do not escape extra-query, but replace spaces
-      //if (extraQuery.length > 0)
-      //  urlBuilder append extraQuery.replace(" ", "+")
-      
+            
       new URL( urlBuilder.toString )
     }
     
@@ -70,17 +66,26 @@ object GoogleAjax {
   }
     
   def parse(q: GoogleQuery, in: InputStream): List[GoogleResult] = {
+    import Util._
     
-    val s = Source.fromInputStream(in).mkString
+    val str = Source.fromInputStream(in).mkString
+    val json = JSON.parse( str ).head
     
-    println( s )
-    
-    JSON.parse( s ) match {
-      case None => println("NIX")
-      case c@Some(elems) => println( c.mkString("\n") ) 
+    for ( (k1:String,resp:List[Any]) <- json if k1 == "responseData";
+          (k2:String,ress:List[Any]) <- resp if k2 == "results";
+          resAny                     <- ress) yield {
+      
+      def get(Key: String): List[String] = resAny match {
+        case tpls:List[(String,String)] => tpls.collect({ case (Key,v) => v })
+        case _ => Nil
+      }
+            
+      val url     = get("unescapedUrl").head
+      val title   = get("titleNoFormatting").head
+      val snippet = get("content").map( _.rmTags ).map( _.rmEntities ).head
+      
+      GoogleResult(new URL(url), title, snippet, GooglePageMap.Empty, q)
     }
-    
-    Nil
   }
 }
 
@@ -121,10 +126,8 @@ object GoogleCSE {
     val builder = new Builder()
     val doc = builder build in
     
-    def removeTags(s: String) = """</?.*?>""".r.replaceAllIn(s, "")
-    def removeEntities(s: String) = """&[a-z]+;""".r.replaceAllIn(s, "")
-    
     import XOM._
+    import Util._
     
     val results = for (entry <- doc.getRootElement.getChildElements("entry", NS_ATOM)) yield {
 
@@ -132,23 +135,22 @@ object GoogleCSE {
       val url = entry.
         getChildElements("link", NS_ATOM).
         map( _.getAttributeValue("href") ).
-        map( new URL(_) ).
         head // XXX might fail
         
       // <title type="html">The &lt;b&gt;Terminator&lt;/b&gt; (1984) - IMDb</title>
       val title = entry.
         getChildElements("title", NS_ATOM).
         map( _.getValue ).
-        map( removeTags(_) ).
-        map( removeEntities(_) ).
+        map( _.rmTags ).
+        map( _.rmEntities ).
         head // XXX might fail
       
       // <summary type="html">Cast/credits plus other information about the film.</summary>
       val snippet = entry.
         getChildElements("summary", NS_ATOM).
         map( _.getValue ).
-        map( removeTags(_) ).
-        map( removeEntities(_) ).
+        map( _.rmTags ).
+        map( _.rmEntities ).
         head // XXX might fail
       
       // collect data-objects
@@ -169,7 +171,7 @@ object GoogleCSE {
         (dataType -> GooglePageMapData(dataType, attribs.toMap))
       }
       
-      GoogleResult(url, title, snippet, GooglePageMap(data.toMap), q)
+      GoogleResult(new URL(url), title, snippet, GooglePageMap(data.toMap), q)
     }
     
     results.toList
@@ -188,6 +190,10 @@ sealed trait GoogleQuery {
 
 
 // http://code.google.com/intl/de-DE/apis/customsearch/docs/structured_data.html#pagemaps
+object GooglePageMap {
+  val Empty = GooglePageMap( Map() )
+}
+
 case class GooglePageMap(data: Map[String, GooglePageMapData]) {
   def dataTypes: Iterable[String] = data.keys
   def get(dataType: String): Option[GooglePageMapData] = data.get(dataType)

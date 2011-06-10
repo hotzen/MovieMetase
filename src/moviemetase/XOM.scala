@@ -52,8 +52,6 @@ object XOM {
     // http://www.xom.nu/faq.xhtml#d0e452
     def namespaces: List[Namespace] =
       node.query("namespace::node()").collect({ case n:Namespace => n }).toList
-      
-      // namespace-uri-for-prefix()
   }
 
   
@@ -87,8 +85,26 @@ object XOM {
   
   implicit def ImplicitAttribut(attrib: Attribute): RichAttribute = RichAttribute(attrib)
   case class RichAttribute(attrib: Attribute) extends RichNode(attrib) {
-    
     def name = attrib.getLocalName
     def value = attrib.getValue
+  }
+  
+  
+  case class QName(name: String, ns: String) {
+    // get prefix of this QName valid in the context of the passed Node
+    def prefix(ctx: Node): Option[String] =
+      ctx.namespaces.find(x => x.getValue == ns && x.getPrefix.length > 0) match {
+        case Some(x) => Some(x.getPrefix) 
+        case None    => None
+      }
+    
+    // get prefixed, qualified name "prefix:name"
+    def prefixed(ctx: Node): String =
+      prefix(ctx) match {
+        case Some(p) => p + ":" + name
+        case None    => name
+      }
+    
+    override def toString: String = "%s{%s}".format(name, ns)
   }
 }

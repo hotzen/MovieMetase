@@ -1,5 +1,17 @@
 package moviemetase
 
+object Util {
+    implicit def ImplicitHtmlString(s: String): HtmlString = HtmlString(s)
+  
+    //def removeTags(s: String) = """</?.*?>""".r.replaceAllIn(s, "")
+    //def removeEntities(s: String) = """&[a-z]+;""".r.replaceAllIn(s, "")
+}
+
+case class HtmlString(val s: String) {
+  def rmTags     = """</?.*?>""".r.replaceAllIn(s, "")
+  def rmEntities = """&[a-z]+;""".r.replaceAllIn(s, "")
+}
+
 //object Util {
 //
 //  def URLEncode(s: String): String = 
