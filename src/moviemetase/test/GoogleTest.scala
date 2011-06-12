@@ -6,23 +6,19 @@ object GoogleTest {
     
     { // CSE IMDB Search
       val title = "Terminator"
-      val cse = "011282045967305256347:dyc6spozqnc"
-      val q = GoogleCSE.Query(title, cse)
+      val IMDB = "011282045967305256347:dyc6spozqnc"
+      val q = GoogleCSE.Query(IMDB, title)
       val s = GoogleSearch(q)
-//      val r = s.call()
-//      println( r.mkString("\n\n") )
+      println ( s.call() )
     }
     
-    { // Raw Search "Inception.1080p.BluRay.x264-REFiNED" link:imdb.com/title/tt*
+    { // Ajax Search
       val title = "Inception.1080p.BluRay.x264-REFiNED"
       val q = GoogleAjax.Query(title + " link:imdb.com/title/")
       val s = GoogleSearch(q)
-      
-      println( q.url.toString )
-      val r = s.call()
-      println( r.mkString("\n--\n") )
+      println ( s.call() )
     }
-    
+
     ()
   }
 }

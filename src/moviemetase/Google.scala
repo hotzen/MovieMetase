@@ -55,9 +55,9 @@ object GoogleAjax {
       val q = java.net.URLEncoder.encode(query, "UTF-8")
       
       val urlBuilder = new StringBuilder( GoogleAjax.BASE_URL )
-      urlBuilder append "?"   append params
+      urlBuilder append "?"       append params
       urlBuilder append "&start=" append ((page-1)*limit)
-      urlBuilder append "&q=" append q
+      urlBuilder append "&q="     append q
             
       new URL( urlBuilder.toString )
     }
@@ -90,7 +90,6 @@ object GoogleAjax {
 }
 
 
-
 object GoogleCSE {
   val API_KEY  = "AIzaSyAeeLMANIJTh5H2aZTusm1_iUyudRMQABc"
   val BASE_URL = "https://www.googleapis.com/customsearch/v1"
@@ -100,7 +99,7 @@ object GoogleCSE {
   val NS_OS   = "http://a9.com/-/spec/opensearch/1.1/"
   val NS_GD   = "http://schemas.google.com/g/2005"
 
-  case class Query(query: String, cse: String, page: Int = 1) extends GoogleQuery {
+  case class Query(cseID: String, query: String, page: Int = 1) extends GoogleQuery {
     def params: String = "alt=atom&prettyprint=true&safe=off"
     def limit: Int = 10
     
@@ -109,7 +108,7 @@ object GoogleCSE {
       
       val urlBuilder = new StringBuilder( GoogleCSE.BASE_URL )
       urlBuilder append "?key="   append GoogleCSE.API_KEY
-      urlBuilder append "&cx="    append cse
+      urlBuilder append "&cx="    append cseID
       urlBuilder append "&"       append params
       urlBuilder append "&num="   append limit
       urlBuilder append "&start=" append (page + (page-1)*limit)
