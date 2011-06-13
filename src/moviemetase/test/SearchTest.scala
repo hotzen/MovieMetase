@@ -1,6 +1,7 @@
 package moviemetase
 package test
 import java.net.URL
+import scala.collection.mutable.ListBuffer
 
 object SearchTest {
   def main(args: Array[String]) {
@@ -29,7 +30,9 @@ object SearchTest {
     println("found " + purls.length + " different IMDB-links: " + purls.mkString(", "))
     
     val ms = purls.map(queryIMDB(_))
-          
+         
+    println(ms.mkString("\n\n"))
+    
     ()
   }
   
@@ -50,39 +53,83 @@ object SearchTest {
       println("Checking CSE-PageMap of Result " + r.url)
       
       val pageMapData = r.pageMap.get(dataType).head
+      val infos = new ListBuffer[MovieInfo]
       
       dataType.toLowerCase match {
+        // MOVIE
         case "movie" => {
-          println("PageMap Movie")
-                    
+          pageMapData.get("image") match {
+            case Some(url) => infos append MovieInfos.Thumbnail( url )
+            case _ =>
+          }
+          pageMapData.get("director") match {
+            case Some(name) => infos append MovieInfos.Director( name.trim )
+            case _ =>
+          }
+          pageMapData.get("title") match {
+            case Some(t) => {
+              val TitleRegex = """(.+?)\(([0-9]+)\)""".r
+              
+              TitleRegex.findFirstMatchIn( t ) match {
+                case Some(m) => {
+                  infos append MovieInfos.Title( m.group(1).trim )
+                  infos append MovieInfos.Release( m.group(2).trim.toInt )
+                }
+                case None => {
+                  infos append MovieInfos.Title( t.trim )
+                }
+              }
+            }
+            case _ =>
+          }
         }
+        // REVIEW
         case "moviereview" => {
-          println("PageMap MovieReview")
-         
+          pageMapData.get("genre") match {
+            case Some(gs) => {
+              for (g <- gs.split("/")) {
+                infos append MovieInfos.Genre( g.trim )
+              }
+            }
+            case _ =>
+          }
+          pageMapData.get("starring") match {
+            case Some(actors) => {
+              for (actor <- actors.split(",")) {
+                infos append MovieInfos.Actor( actor.trim )
+              }
+            }
+            case _ =>
+          }
+          pageMapData.get("image_href") match {
+            case Some(url) => infos append MovieInfos.SmallPoster( url )
+            case _ =>
+          }
+          pageMapData.get("originalrating") match {
+            case Some(r) => infos append MovieInfos.ImdbRating( r.trim.toDouble )
+            case _ =>
+          }
+          pageMapData.get("summary") match {
+            case Some(s) => infos append MovieInfos.Summary( s.trim )
+            case _ =>
+          }
         }
+        // IMAGE
         case "image" => {
-          println("PageMap Image")
-          
+          pageMapData.get("src") match {
+            case Some(url) => infos append MovieInfos.SmallPoster( url )
+            case _ =>
+          }
         }
         case x => {
-          println("Unknown PageMap DataType '" + x + "'")
-          
+          //prtln("Unknown PageMap DataType '" + x + "'")
         }
       }
-      
-      for ((k,v) <- pageMapData.data) {
-        println("[ " + k + " ] " + v)
-      }
-      
-      println("--")
-  
-      
-      
-      // TODO
-      MovieInfos.Title(r.title)
+            
+      infos.toList
     }
     
-    Movie.fromInfos(infos)
+    Movie.fromInfos( infos.flatten )
   }
   
   def transformIMDB(pageMap: GooglePageMap): Movie = {
