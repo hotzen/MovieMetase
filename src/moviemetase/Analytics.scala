@@ -1,5 +1,23 @@
 package moviemetase
 
+object FileInfo {
+  def fromPath(path: String): FileInfo = {
+    val f = new java.io.File(path);
+    FileInfo(path, f.getParent, f.getName)
+  }
+}
+case class FileInfo(path: String, dirName: String, fileName: String)
+
+case class Chopped(names: List[String], tags: List[String], year: Option[Int]) {
+  def name: String = names.mkString(" ")
+  
+  override def toString: String = {
+    "Chopped(" + name + "; "
+    "names[" + names.mkString(", ") + "] " +
+    "tags[" + tags.mkString(", ") + "] " +
+    "year=" + year + ")"
+  }
+}
 
 
 case class AnalyzedFile(dir: Chopped, file: Chopped, same: Chopped, all: Chopped) {

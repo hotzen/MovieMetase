@@ -3,27 +3,9 @@ package moviemetase
 import java.net.URI
 import java.util.Date
 
-object FileInfo {
-  def fromPath(path: String): FileInfo = {
-    val f = new java.io.File(path);
-    FileInfo(path, f.getParent, f.getName)
-  }
-}
-case class FileInfo(path: String, dirName: String, fileName: String)
-
-case class Chopped(names: List[String], tags: List[String], year: Option[Int]) {
-  def name: String = names.mkString(" ")
-  
-  override def toString: String = {
-    "Chopped(" + name + "; "
-    "names[" + names.mkString(", ") + "] " +
-    "tags[" + tags.mkString(", ") + "] " +
-    "year=" + year + ")"
-  }
-}
 
 object Movie {
-  def fromInfos(infos: List[MovieInfo]): Option[Movie] = {
+  def fromInfos(infos: Traversable[MovieInfo]): Option[Movie] = {
     val t = infos.collect({ case MovieInfos.Title(t) => t   })   
     val y = infos.collect({ case MovieInfos.Release(d) => d })
     
@@ -33,7 +15,7 @@ object Movie {
     val title = t.head
     val year  = if (y.isEmpty) 0 else y.head
     
-    Some( Movie(title, year, infos) )
+    Some( Movie(title, year, infos.toList) )
   }
 }
 
@@ -74,10 +56,10 @@ object MovieInfos {
   case class Trailer(url: String) extends MovieInfo
   case class Subtitle(url: String, lang: String) extends MovieInfo
   
-  case class Thumbnail(url: String) extends MovieInfo
-  case class SmallPoster(url: String) extends MovieInfo
-  case class Poster(url: String) extends MovieInfo
-  case class Backdrop(url: String) extends MovieInfo
+  //case class Thumbnail(url: String) extends MovieInfo
+  //case class SmallPoster(url: String) extends MovieInfo
+  case class Poster(url: String, preview: Option[String] = None) extends MovieInfo
+  case class Backdrop(url: String, preview: Option[String] = None) extends MovieInfo
   
   case class Extra(name: String, value: String) extends MovieInfo
 }
