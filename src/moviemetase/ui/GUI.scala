@@ -6,7 +6,6 @@ import scala.swing.event._
 import javax.swing.JOptionPane
 
 class GUI extends Reactor {
-
   val Title = "MovieMetase"
   
   def start(): Unit = {
@@ -48,39 +47,31 @@ class GUI extends Reactor {
   }
   
   object DropLabel extends Label {
-    
     override lazy val peer: javax.swing.JLabel = new JImageLabel( App.image("/res/drop.png") )
         
     val dropHandler = new FileDropHandler
     listenTo(dropHandler)
     peer.setTransferHandler(dropHandler)
     
-    border = EtchedBorder
+    border  = EtchedBorder
     tooltip = "DROP FILE HERE"
     
     reactions += {
       case FileDropHandler.FilesDropped(files) => {
         
         if (files.isEmpty) {
-          JOptionPane.showMessageDialog(null, "No File/Dir was dropped", "Dropped Files", JOptionPane.ERROR_MESSAGE);
+          JOptionPane.showMessageDialog(null, "Invalid File", "Dropped Files", JOptionPane.ERROR_MESSAGE);
         } else if (!files.tail.isEmpty) {
           JOptionPane.showMessageDialog(null, "Please drop exactly 1 File", "Dropped Files", JOptionPane.ERROR_MESSAGE);
+        } else if (files.head.isDirectory) {
+          JOptionPane.showMessageDialog(null, "Please drop exactly one File, no Directory", "Dropped Files", JOptionPane.ERROR_MESSAGE);
         } else {
           val file = files.head
+          val fileInfo = FileInfo.create( file )
+          val disFileInfo = fileInfo.dissect() 
           
-          val movieFile =
-            if (file.isDirectory) {
-              FileInfo(file.getAbsolutePath, file.getName, "")
-            } else {
-              val dir = file.getParentFile
-              FileInfo(dir.getAbsolutePath, dir.getName, file.getName)
-            }
-          
-          val analyzed = Analyzer.analyze( movieFile )
-          
-//          QueryManager.query( analyzed )
-                    
-          //QueryPanel.tblModel.clearRows
+//          val s = new MovieSearch
+//          s.search( fileInfo )
           
           //val queries = MovieQueryGenerator generateFrom movieFile
 

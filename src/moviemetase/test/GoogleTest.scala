@@ -8,14 +8,14 @@ object GoogleTest {
       val title = "Terminator"
       val IMDB = "011282045967305256347:dyc6spozqnc"
       val q = GoogleCSE.Query(IMDB, title)
-      val s = QueryExecutor(q)
+      val s = q.task()
       println ( s.call() )
     }
     
     { // Ajax Search
       val title = "Inception.1080p.BluRay.x264-REFiNED"
       val q = GoogleAjax.Query(title + " link:imdb.com/title/")
-      val s = QueryExecutor(q)
+      val s = q.task()
       println ( s.call() )
     }
 

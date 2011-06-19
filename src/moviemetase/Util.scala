@@ -1,18 +1,36 @@
 package moviemetase
 
 object Util {
-    implicit def ImplicitHtmlString(s: String): HtmlString = HtmlString(s)
+    implicit def stringUtils[A](s: String) = new StringUtils(s)
+    implicit def listUtils[A](ls: List[A]) = new ListUtils[A](ls)
 }
 
-case class HtmlString(val s: String) {
+class StringUtils(val s: String) {
   def urlEncode  = java.net.URLEncoder.encode(s, "UTF-8")
   def noTags     = """<.*?>""".r.replaceAllIn(s, "")
   def noEntities = """&.+?;""".r.replaceAllIn(s, "")
 }
 
+class ListUtils[A](val ls: List[A]) {
+
+  // Tuple(occurrence, distinct-list-element)
+  def packed: List[(Int,A)] = {
+    def packIt(xs: List[A], ys: List[(Int,A)]): List[(Int,A)] = xs match {
+      case Nil   => ys
+      case x::tail => {
+        val newXs = tail.remove(_ == x)
+        val count = tail.count(_ == x) + 1
+        val newYs = (count,x) :: ys
+        packIt(newXs, newYs)
+      }
+    }
+    packIt(ls, Nil).reverse
+  }
+}
+
 //trait Tracer {
 //  val name: String
-//  def trace(s: String): Unit
+//  def trace(s: => String): Unit
 //}
 //
 //class FileTracer(val name: String) extends Tracer {

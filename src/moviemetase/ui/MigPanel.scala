@@ -5,7 +5,6 @@ import scala.swing.{Panel, Component, LayoutContainer}
 import net.miginfocom.swing.MigLayout
 
 object MigPanel {
-
   var SeparatorColor = new scala.swing.Color(0, 70, 213)
   
   def addSeparatorTo(panel: MigPanel, label: String): MigPanel = {
@@ -19,8 +18,7 @@ object MigPanel {
     panel.add(lbl, "gapbottom 1, span, split 2, aligny center")
     panel.add(sep, "gapleft rel, growx")
     panel
-  }
-  
+  }  
 }
 
 class MigPanel(

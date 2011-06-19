@@ -1,18 +1,23 @@
 package moviemetase
+import java.io.File
 
 object FileInfo {
-  def fromPath(path: String): FileInfo = {
-    val f = new java.io.File(path);
-    FileInfo(path, f.getParent, f.getName)
-  }
+  def create(f: File): FileInfo =
+    FileInfo(f.getAbsolutePath, f.getParent, f.getName)
+    
+  def fromPath(path: String): FileInfo =
+    create( new File(path) )
 }
-case class FileInfo(path: String, dirName: String, fileName: String)
 
-case class Chopped(names: List[String], tags: List[String], year: Option[Int]) {
+case class FileInfo(path: String, dirName: String, fileName: String) {
+  def dissect(): DissectedFileInfo = Analyzer.dissect(this)
+}
+
+case class Dissected(names: List[String], tags: List[String], year: Option[Int]) {
   def name: String = names.mkString(" ")
   
   override def toString: String = {
-    "Chopped(" + name + "; "
+    "Dissected(" + name + "; "
     "names[" + names.mkString(", ") + "] " +
     "tags[" + tags.mkString(", ") + "] " +
     "year=" + year + ")"
@@ -20,9 +25,9 @@ case class Chopped(names: List[String], tags: List[String], year: Option[Int]) {
 }
 
 
-case class AnalyzedFile(dir: Chopped, file: Chopped, same: Chopped, all: Chopped) {
+case class DissectedFileInfo(info: FileInfo, dir: Dissected, file: Dissected, same: Dissected, all: Dissected) {
   override def toString: String = {
-    "AnalyzedFile(\n" +
+    "DissectedFileInfo(" + info.path + "\n"
     "  Dir:  " + dir + "\n" +
     "  File: " + file + "\n" + 
     "  Same: " + same + "\n" +
@@ -37,11 +42,12 @@ object Analyzer {
   lazy val Tags = loadRes("/res/tags.txt")
   lazy val Exts = loadRes("/res/exts.txt")
   
-  def analyze(f: FileInfo): AnalyzedFile = {
+  def dissect(f: FileInfo): DissectedFileInfo = {
     val dirParts  = split(f.dirName)
     val fileParts = split(f.fileName)
     val (sameParts, allParts) = getInterUnion(dirParts, fileParts)
-    AnalyzedFile(
+    DissectedFileInfo(
+      f,
       dirParts,
       fileParts,
       sameParts,
@@ -49,7 +55,7 @@ object Analyzer {
     )
   }
   
-  def split(s: String): Chopped = {
+  def split(s: String): Dissected = {
     var ps = s.split(SepChars).toList
       .map(_.trim)
       .filter(_.length > 0)
@@ -70,15 +76,15 @@ object Analyzer {
     val tags = if (!ps.isEmpty) ps
                else             List[String]()
                
-    Chopped(names.reverse, tags, year)
+    Dissected(names.reverse, tags, year)
   }
      
   
   // fst = same
   // snd = all
-  def getInterUnion(s1: Chopped, s2: Chopped): (Chopped, Chopped) = {
+  def getInterUnion(s1: Dissected, s2: Dissected): (Dissected, Dissected) = {
     
-    val same = Chopped(
+    val same = Dissected(
       (s1.names intersect s2.names).distinct,
       (s1.tags intersect s2.tags).distinct,
       s1.year match {
@@ -92,7 +98,7 @@ object Analyzer {
       }
     )
     
-    val all = Chopped(
+    val all = Dissected(
       (s1.names union s2.names).distinct,
       (s1.tags union s2.tags).distinct,
       s1.year match {

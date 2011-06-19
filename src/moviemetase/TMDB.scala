@@ -24,7 +24,7 @@ object TMDB {
       new URL( urlBuilder.toString )
     }
     
-    def parse(in: InputStream): List[Movie] = {
+    def process(in: InputStream): List[Movie] = {
       import XOM._
       
       val builder = new Builder()
@@ -66,7 +66,8 @@ object TMDB {
             map( _.getValue ).
             head
         )
-        
+       
+        // collect genres
         for (elemCats <- elemMovie.getChildElements("categories");
              elemCat  <- elemCats.getChildElements("category") if elemCat.getAttributeValue("type") == "genre") {
           
@@ -78,6 +79,7 @@ object TMDB {
         case class Image(id: String, url: String, size: String, imgType: String)
         val imgMap = new HashMap[String,List[Image]]
         
+        // collect images of different sizes in a map
         for (elemImgs <- elemMovie.getChildElements("images");
              elemImg  <- elemImgs.getChildElements("image")) {
                     
@@ -94,6 +96,7 @@ object TMDB {
           }
         }
         
+        // process images
         for ( (_,imgs) <- imgMap) {
           
           val img     = imgs.find(img => img.size == "original").head
@@ -106,8 +109,8 @@ object TMDB {
           else
             assert(false, "unknown TMDB image-type: " + img.imgType)
         }
-                
-        Movie.fromInfos( infos ).head
+        
+        Movie.create( infos ).head
       }
       
       movies.toList

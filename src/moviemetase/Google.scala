@@ -28,7 +28,7 @@ object GoogleAjax {
       new URL( urlBuilder.toString )
     }
     
-    def parse(in: InputStream): List[GoogleResult] = {
+    def process(in: InputStream): List[GoogleResult] = {
       import Util._
       
       val str = Source.fromInputStream(in).mkString
@@ -79,7 +79,7 @@ object GoogleCSE {
       new URL( urlBuilder.toString )
     }
 
-    def parse(in: InputStream): List[GoogleResult] = {
+    def process(in: InputStream): List[GoogleResult] = {
       import XOM._
       
       val builder = new Builder()
@@ -87,23 +87,20 @@ object GoogleCSE {
       
       val results = for (entry <- doc.getRootElement.getChildElements("entry", NS_ATOM)) yield {
   
-        // <link href="http://www.imdb.com/title/tt0088247/" title="www.imdb.com" />
         val url = entry.
           getChildElements("link", NS_ATOM).
           map( _.getAttributeValue("href") ).
-          head // XXX might fail
-          
-        // <title type="html">The &lt;b&gt;Terminator&lt;/b&gt; (1984) - IMDb</title>
+          head
+  
         val title = entry.
           getChildElements("title", NS_ATOM).
           map( _.getValue.noTags.noEntities ).
-          head // XXX might fail
-        
-        // <summary type="html">Cast/credits plus other information about the film.</summary>
+          head
+  
         val snippet = entry.
           getChildElements("summary", NS_ATOM).
           map( _.getValue.noTags.noEntities ).
-          head // XXX might fail
+          head
         
         // collect data-objects
         val data = for (pageMap    <- entry.getChildElements("PageMap", NS_CSE);
@@ -144,7 +141,7 @@ case class GoogleResult(url: URL, title: String, snippet: String, pageMap: Map[S
 
 
 
-// FUCKING HELL, no results
+// FOCKIN HELL, no results
 /*object Google {
   val BASE_URL = "http://www.google.com/search"
   

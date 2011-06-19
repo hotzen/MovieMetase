@@ -5,7 +5,7 @@ import java.util.Date
 
 
 object Movie {
-  def fromInfos(infos: Traversable[MovieInfo]): Option[Movie] = {
+  def create(infos: Traversable[MovieInfo]): Option[Movie] = {
     val t = infos.collect({ case MovieInfos.Title(t) => t   })   
     val y = infos.collect({ case MovieInfos.Release(d) => d })
     
@@ -15,23 +15,27 @@ object Movie {
     val title = t.head
     val year  = if (y.isEmpty) 0 else y.head
     
-    Some( Movie(title, year, infos.toList) )
+    Some( Movie(title, year, infos.toList.distinct) )
   }
 }
 
 case class Movie(title: String, year: Int, infos: List[MovieInfo] = Nil) {
   override def toString: String = {
     val s = new StringBuffer
-    s append "Movie _" append title append "_ (" append year append ")\n"
+    s append "Movie(_" append title append "_/" append year append "){\n"
     for (info <- infos) {
-      s append "  - " append info.toString append "\n"
+      s append "  " append info.toString append "\n"
     }
-    s append "--\n"
+    s append "}"
     s.toString
   }
 }
 
-sealed trait MovieInfo
+sealed trait MovieInfo {
+  var origin: String = ""
+}
+
+
 object MovieInfos {
   case class Title(name: String) extends MovieInfo
   case class Release(year: Int) extends MovieInfo
