@@ -24,7 +24,8 @@ case class Movie(title: String, year: Int, infos: List[MovieInfo] = Nil) {
     val s = new StringBuffer
     s append "Movie(_" append title append "_/" append year append "){\n"
     for (info <- infos) {
-      s append "  " append info.toString append "\n"
+      val infoStr = info.toString.grouped(150).mkString("\n    ")
+      s append "  " append infoStr append "\n"
     }
     s append "}"
     s.toString

@@ -1,9 +1,13 @@
 package moviemetase
 package ui
 
-import scala.swing._, Swing._
+import scala.swing._
 import scala.swing.event._
 import javax.swing.JOptionPane
+import javax.imageio.ImageIO
+import java.net.URL
+import java.awt.image.BufferedImage
+import javax.swing.border.EtchedBorder
 
 class GUI extends Reactor {
   val Title = "MovieMetase"
@@ -32,121 +36,129 @@ class GUI extends Reactor {
     override def closeOperation = App.shutdown()
   }
   
-  object Main extends MigPanel("wrap 2", "[fill][grow,fill]", "[fill][fill][min!]") {
+  object Main extends MigPanel("", "[fill][grow,fill]", "[grow,fill][][]") {
     border = Swing.EmptyBorder(5, 5, 5, 5)
     
-    add(DropLabel)
-    add(QueryPanel, "grow, span")
+    add(DropTarget, "cell 0 0")
+    add(Query, "cell 1 0")
     
-    add(StatusBar, "dock south, span")
+    val split = new SplitPane(
+      Orientation.Vertical,
+      Results,
+      ImgPreview
+    )
+    add(split, "cell 0 1 2 1")
+    
+    //add(ImgPreview, "cell 2 0 1 2")
+    //add(Results, "cell 0 1 2 1")
+    add(StatusBar, "cell 0 2 3 1")
   }
   
-  object StatusBar extends MigPanel() {
-    add(new Label("Fooo"))
-    
-  }
   
-  object DropLabel extends Label {
+  
+  object DropTarget extends Label {
     override lazy val peer: javax.swing.JLabel = new JImageLabel( App.image("/res/drop.png") )
         
     val dropHandler = new FileDropHandler
     listenTo(dropHandler)
     peer.setTransferHandler(dropHandler)
     
-    border  = EtchedBorder
+//    border  = EtchedBorder
     tooltip = "DROP FILE HERE"
     
-    reactions += {
-      case FileDropHandler.FilesDropped(files) => {
-        
-        if (files.isEmpty) {
-          JOptionPane.showMessageDialog(null, "Invalid File", "Dropped Files", JOptionPane.ERROR_MESSAGE);
-        } else if (!files.tail.isEmpty) {
-          JOptionPane.showMessageDialog(null, "Please drop exactly 1 File", "Dropped Files", JOptionPane.ERROR_MESSAGE);
-        } else if (files.head.isDirectory) {
-          JOptionPane.showMessageDialog(null, "Please drop exactly one File, no Directory", "Dropped Files", JOptionPane.ERROR_MESSAGE);
-        } else {
-          val file = files.head
-          val fileInfo = FileInfo.create( file )
-          val disFileInfo = fileInfo.dissect() 
-          
-//          val s = new MovieSearch
-//          s.search( fileInfo )
-          
-          //val queries = MovieQueryGenerator generateFrom movieFile
+    reactions += { case FileDropHandler.FilesDropped(files) => {
 
-//          for ( (q,i) <- queries.zipWithIndex) {
-//            QueryPanel.tblModel.addRow(
-//              QueryPanel.QueryRow(i, q)
-//            )
-//          }
-          
-          
-        } // else isEmpty
-      } // FileDropHandler.FilesDropped
-    } // reactions
-  }
-    
-  object QueryPanel extends ScrollPane {
-    
-    verticalScrollBarPolicy   = ScrollPane.BarPolicy.AsNeeded
-    horizontalScrollBarPolicy = ScrollPane.BarPolicy.Never
-    
-    val ColNum      = 0
-    val ColQuery    = 1
-    val ColProgress = 2
-    
-//    case class QueryRow(num: Int, query: MovieQuery) {
-//      var progress = new ProgressBar {
-//        indeterminate = true
-//      }
-//    }
-//    
-//    val tblModel = new javax.swing.table.AbstractTableModel {
-//      val colNames = Array("#", "Term", "Progress")
-//      val rows = new scala.collection.mutable.ArrayBuffer[QueryRow]()
-//      
-//      def getColumnCount() = colNames.length
-//      override def getColumnName(col: Int) = colNames(col)
-//            
-//      def getRowCount() = rows.length
-//      
-//      def getValueAt(rowNum: Int, colNum: Int): AnyRef = {
-//        val row = rows(rowNum)
-//        colNum match {
-//          case ColNum      => row.num.asInstanceOf[AnyRef]
-//          case ColQuery    => row.query.term
-//          case ColProgress => row.progress 
-//        }
-//      }
-//      
-//      def clearRows(): Unit = {
-//        rows.clear
-//      }
-//      
-//      def addRow(row: QueryRow): Unit = {
-//        rows += row
-//        val rowNum = rows.length-1
-//        fireTableRowsInserted(rowNum, rowNum)
-//      }
-//    }
-//    
-//    val tbl = new Table {
-//      preferredViewportSize = new Dimension(500, 70)
-//      model = tblModel
-//      
-//      override protected def rendererComponent(isSelected: Boolean, focused: Boolean, row: Int, col: Int): Component = {
-//        if (col == ColProgress) { new Component {
-//          override lazy val peer = new ProgressBarCellRenderer
-//        }} else {
-//          super.rendererComponent(isSelected, focused, row, col)              
-//        }
-//      }
-//    }
-//    
-//    contents = tbl
+      if (files.isEmpty)
+        JOptionPane.showMessageDialog(null, "Invalid File", "Dropped Files", JOptionPane.ERROR_MESSAGE);
+      else if (!files.tail.isEmpty)
+        JOptionPane.showMessageDialog(null, "Please drop exactly 1 File", "Dropped Files", JOptionPane.ERROR_MESSAGE);
+      else if (files.head.isDirectory)
+        JOptionPane.showMessageDialog(null, "Please drop exactly one File, no Directory", "Dropped Files", JOptionPane.ERROR_MESSAGE);
+      
+      else {
+        val s: SearchSupervisor[Movie] = new MovieSearch
+        val res = s.searchByFile( FileInfo.create( files.head ) )
+        publish( Events.Results(res) )
+      }
+    }}
   }
   
+  object Query extends MigPanel() {
+    add(new Label("Query"))
+  }
+  
+  object Results extends ScrollPane {
+    
+    case class Row(score: Double, title: String, year: Int) extends TableModelRow {
+      def value(i: Int): AnyRef = { i match {
+        case 0 => score
+        case 1 => title
+        case 2 => year
+      }}.asInstanceOf[AnyRef]
+    }
+    
+    val cols =
+      TableModel.Col("Score", Some(50)) ::
+      TableModel.Col("Title") ::
+      TableModel.Col("Year", Some(50)) ::
+      Nil
+    
+    val mdl = TableModel(cols)
+    
+    val tbl = new Table {
+      model    = mdl
+      showGrid = true
+    }
+    contents = tbl
+    
+    mdl.registerColWidth(tbl)
+        
+    listenTo( DropTarget )
+    reactions += { case Events.Results(res) => {
+      for ( (score, movie) <- res) {
+        println(score + "/" + movie)
+        mdl addRow Row(score, movie.title, movie.year)
+        
+        val img = movie.infos.collect({ case MovieInfos.Poster(_,optPreviewUrl) => optPreviewUrl }).flatten.head
+        ImgPreview.display( new URL(img) )
+      }
+    }}
+  }
+  
+  
+  object ImgPreview extends ScrollPane {
+    
+    var DefaultSize = new Dimension(300, 600)
+    var image: Option[BufferedImage] = None
+    
+    contents = new Label {
+      override def preferredSize(): Dimension = image match {
+        case Some(img) => new Dimension(img.getWidth(), img.getHeight())
+        case None      => DefaultSize
+      }
+            
+      override def paintComponent(g: Graphics2D): Unit = image match {
+        case Some(img) => g.drawImage(img, 0, 0, null)
+        case None      => ()
+      }
+    }
+    
+    def display(url: URL) {
+      WorkerPool submit { try {
+        image = Some( ImageIO.read( url ) )
+        contents.head.revalidate()
+        contents.head.repaint()
+      } catch { case e:Exception => {
+        image = None
+        e.printStackTrace()
+      }}}
+    }
+  }
+  
+  object StatusBar extends MigPanel() {
+    add(new Label("Status"))
+  }
+    
 //  object SamePartsPanel extends MigPanel("wrap 2", "[pref!][grow,fill]") {
 ////    border = EtchedBorder
 //        
@@ -200,4 +212,8 @@ class GUI extends Reactor {
 //    }
 //    add(txtYear)
 //  }
+  
+  object Events {
+    case class Results(res: List[(Double,Movie)]) extends Event
+  }
 }
