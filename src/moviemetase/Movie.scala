@@ -33,11 +33,42 @@ case class Movie(title: String, year: Int, infos: List[MovieInfo] = Nil) {
 }
 
 sealed trait MovieInfo {
-  var origin: String = ""
+  var source: String = ""
 }
 
 
 object MovieInfos {
+  trait Downloadable extends MovieInfo {
+    def url: String
+    
+    import java.io.File
+    import java.util.concurrent.Callable
+    
+    def createDownloader(target: File) = new Callable[(String,File)] {
+      import java.net.URL
+      import java.io._
+      import java.nio._
+      import java.nio.channels._
+          
+      def call(): (String,File) = {
+        val rbc: ReadableByteChannel = Channels.newChannel( new URL( url ).openStream() )
+        val fos: FileOutputStream    = new FileOutputStream( target )
+        fos.getChannel().transferFrom(rbc, 0, 1 << 24)
+        (url, target)
+      }
+    }
+  }
+  
+  trait Image extends MovieInfo with Downloadable {
+    def url: String
+    def preview: Option[String]
+  }
+  
+  trait Website extends MovieInfo {
+    def url: String
+  }
+  
+  
   case class Title(name: String) extends MovieInfo
   case class Release(year: Int) extends MovieInfo
   
@@ -55,16 +86,14 @@ object MovieInfos {
   case class Producer(name: String) extends MovieInfo
   case class Writer(name: String)   extends MovieInfo
     
-  case class IMDB(url: String) extends MovieInfo
-  case class TMDB(url: String) extends MovieInfo
-  //case class Page(url: String) extends MovieInfo
-  case class Trailer(url: String) extends MovieInfo
-  case class Subtitle(url: String, lang: String) extends MovieInfo
+  case class IMDB(url: String) extends MovieInfo with Website
+  case class TMDB(url: String) extends MovieInfo with Website
+    
+  case class Trailer(url: String) extends MovieInfo with Website
+  case class Subtitle(url: String, lang: String) extends MovieInfo with Downloadable
   
-  //case class Thumbnail(url: String) extends MovieInfo
-  //case class SmallPoster(url: String) extends MovieInfo
-  case class Poster(url: String, preview: Option[String] = None) extends MovieInfo
-  case class Backdrop(url: String, preview: Option[String] = None) extends MovieInfo
+  case class Poster(url: String, preview: Option[String] = None) extends MovieInfo with Image
+  case class Backdrop(url: String, preview: Option[String] = None) extends MovieInfo with Image
   
   case class Extra(name: String, value: String) extends MovieInfo
 }

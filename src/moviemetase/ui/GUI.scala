@@ -8,10 +8,16 @@ import javax.imageio.ImageIO
 import java.net.URL
 import java.awt.image.BufferedImage
 import javax.swing.border.EtchedBorder
+import javax.swing.BorderFactory
+import javax.swing.border.Border
+import java.awt.image.BufferedImageOp
+import java.awt.image.RescaleOp
 
 class GUI extends Reactor {
   val Title = "MovieMetase"
   
+  val DefaultTableHeight = 300
+    
   def start(): Unit = {
     import javax.swing.UIManager
     
@@ -30,40 +36,52 @@ class GUI extends Reactor {
     }
   }
   
-  val Top = new Frame {
+  def createBorder(label: String): Border = {
+    val b = BorderFactory.createEtchedBorder(EtchedBorder.LOWERED);
+    BorderFactory.createTitledBorder(b, label);
+  }
+  
+  lazy val Top = new Frame {
     title = Title
-    contents = Main
+    contents = MainPanel
     override def closeOperation = App.shutdown()
   }
   
-  object Main extends MigPanel("", "[fill][grow,fill]", "[grow,fill][][]") {
+  lazy val MainPanel = new MigPanel("fill") {
     border = Swing.EmptyBorder(5, 5, 5, 5)
+        
+    val top = new MigPanel() {
+      add(DropPanel)
+      add(SearchPanel, "grow")
+    }
+    add(top, "dock north")
     
-    add(DropTarget, "cell 0 0")
-    add(Query, "cell 1 0")
+    val imgSplit = new SplitPane(Orientation.Vertical, ImagesPanel, ImgPreviewPanel) {
+      resizeWeight = 0.5
+    }
     
-    val split = new SplitPane(
-      Orientation.Vertical,
-      Results,
-      ImgPreview
-    )
-    add(split, "cell 0 1 2 1")
+    val tabbed = new TabbedPane {
+      pages += new TabbedPane.Page("1.) Select one Movie", MoviesPanel)
+      pages += new TabbedPane.Page("2.) Select Images", imgSplit)
+      pages += new TabbedPane.Page("3.) Select Subtitles", SubtitlesPanel)
+      pages += new TabbedPane.Page("4.) Select additional Information", MovieInfosPanel)
+//      pages += new TabbedPane.Page("5.) Configure", MovieInfosPanel)
+    }
     
-    //add(ImgPreview, "cell 2 0 1 2")
-    //add(Results, "cell 0 1 2 1")
-    add(StatusBar, "cell 0 2 3 1")
+    add(tabbed, "grow")
+        
+    add(StatusPanel, "dock south")
   }
   
   
   
-  object DropTarget extends Label {
+  lazy val DropPanel = new Label {
     override lazy val peer: javax.swing.JLabel = new JImageLabel( App.image("/res/drop.png") )
         
     val dropHandler = new FileDropHandler
     listenTo(dropHandler)
     peer.setTransferHandler(dropHandler)
     
-//    border  = EtchedBorder
     tooltip = "DROP FILE HERE"
     
     reactions += { case FileDropHandler.FilesDropped(files) => {
@@ -78,74 +96,243 @@ class GUI extends Reactor {
       else {
         val s: SearchSupervisor[Movie] = new MovieSearch
         val res = s.searchByFile( FileInfo.create( files.head ) )
-        publish( Events.Results(res) )
+        publish( Events.MovieResults(res) )
       }
     }}
   }
   
-  object Query extends MigPanel() {
-    add(new Label("Query"))
+  lazy val SearchPanel = new MigPanel() {
+    add(new Label("Queryyyyyyy"))
   }
   
-  object Results extends ScrollPane {
+  lazy val MoviesPanel = new ScrollPane {
+    border = createBorder("Results")
     
-    case class Row(score: Double, title: String, year: Int) extends TableModelRow {
+    case class Row(score: Double, title: String, year: Int, imdb: String, tmdb: String, obj: Movie) extends TableModelRow {
       def value(i: Int): AnyRef = { i match {
         case 0 => score
         case 1 => title
         case 2 => year
+        case 3 => imdb
+        case 4 => tmdb
       }}.asInstanceOf[AnyRef]
     }
     
     val cols =
-      TableModel.Col("Score", Some(50)) ::
-      TableModel.Col("Title") ::
-      TableModel.Col("Year", Some(50)) ::
+      TableModel.Col("Score", 50)  ::
+      TableModel.Col("Title", 200) ::
+      TableModel.Col("Year",  50)  ::
+      TableModel.Col("IMDB",  250) ::
+      TableModel.Col("TMDB",  250) ::
       Nil
     
-    val mdl = TableModel(cols)
+    val mdl = TableModel[Row](cols)
+    
+    val tbl = new Table {
+      model    = mdl
+      showGrid = true
+      selection.intervalMode = Table.IntervalMode.Single
+    }
+    contents = tbl
+    mdl.setPrefSize(tbl, DefaultTableHeight)
+        
+    listenTo( DropPanel )
+    listenTo( tbl.selection )
+    
+    reactions += {
+      case Events.MovieResults(res) => {
+        mdl.clear
+        
+        for ( (score, movie) <- res) {
+          val imdb = {
+            val imdbs = movie.infos.collect({ case MovieInfos.IMDB(url) => url })
+            if (imdbs.isEmpty) ""
+            else imdbs.head
+          }
+
+          val tmdb = {
+            val tmdbs = movie.infos.collect({ case MovieInfos.TMDB(url) => url })
+            if (tmdbs.isEmpty) ""
+            else tmdbs.head
+          }
+          
+          mdl add Row(score, movie.title, movie.year, imdb, tmdb, movie)
+        }
+      }
+      case TableRowsSelected(src, rng, false) => {
+        for (rowIdx <- src.selection.rows) {
+          val row = mdl.rows(rowIdx)
+          publish( Events.SelectedMovieResult(row.obj) )
+        }
+      }
+    }
+  }
+  
+  lazy val ImagesPanel = new ScrollPane {
+    border = createBorder("Images")
+    
+    case class Row(var checked: Boolean, imgType: String, url: String, previewUrl: Option[String], obj: MovieInfos.Image) extends TableModelRow {
+      def value(i: Int): AnyRef = { i match {
+        case 0 => checked
+        case 1 => imgType
+        case 2 => url
+        case 3 => previewUrl
+      }}.asInstanceOf[AnyRef]
+    }
+    
+    val cols =
+      TableModel.CheckboxCol("") ::
+      TableModel.Col("Type", 100) ::
+      TableModel.Col("URL", 680) ::
+      Nil
+    
+    val mdl = TableModel[Row](cols)
     
     val tbl = new Table {
       model    = mdl
       showGrid = true
     }
     contents = tbl
+    mdl.setPrefSize(tbl, DefaultTableHeight)
+
+    listenTo( MoviesPanel )
+    listenTo( tbl.selection )
     
-    mdl.registerColWidth(tbl)
-        
-    listenTo( DropTarget )
-    reactions += { case Events.Results(res) => {
-      for ( (score, movie) <- res) {
-        println(score + "/" + movie)
-        mdl addRow Row(score, movie.title, movie.year)
-        
-        val img = movie.infos.collect({ case MovieInfos.Poster(_,optPreviewUrl) => optPreviewUrl }).flatten.head
-        ImgPreview.display( new URL(img) )
+    reactions += {
+      case Events.SelectedMovieResult(movie) => {
+        mdl.clear
+        for (img <- movie.infos.collect({ case img: MovieInfos.Image => img})) {
+          val imgType = img.getClass.getSimpleName
+          mdl add Row(false, imgType, img.url, img.preview, img)
+        }
       }
-    }}
-  }
-  
-  
-  object ImgPreview extends ScrollPane {
-    
-    var DefaultSize = new Dimension(300, 600)
-    var image: Option[BufferedImage] = None
-    
-    contents = new Label {
-      override def preferredSize(): Dimension = image match {
-        case Some(img) => new Dimension(img.getWidth(), img.getHeight())
-        case None      => DefaultSize
-      }
-            
-      override def paintComponent(g: Graphics2D): Unit = image match {
-        case Some(img) => g.drawImage(img, 0, 0, null)
-        case None      => ()
+      case TableRowsSelected(src, rng, false) => {
+        for (rowIdx <- src.selection.rows) {
+          val row = mdl.rows(rowIdx)
+          publish( Events.SelectedImage(row.obj) )
+        }
       }
     }
+  }
+  
+  lazy val SubtitlesPanel = new ScrollPane {
+    border = createBorder("Subtitles")
     
-    def display(url: URL) {
+    case class Row(var checked: Boolean, url: String, lang: String, obj: MovieInfos.Subtitle) extends TableModelRow {
+      def value(i: Int): AnyRef = { i match {
+        case 0 => checked
+        case 1 => url
+        case 2 => lang
+      }}.asInstanceOf[AnyRef]
+    }
+    
+    val cols =
+      TableModel.CheckboxCol("")      ::
+      TableModel.Col("URL", 630)      ::
+      TableModel.Col("Language", 100) ::
+      Nil
+    
+    val mdl = TableModel[Row](cols)
+    
+    val tbl = new Table {
+      model    = mdl
+      showGrid = true
+    }
+    mdl.setPrefSize(tbl, DefaultTableHeight)
+    contents = tbl
+    
+    listenTo( MoviesPanel )
+    //listenTo( tbl.selection )
+    
+    reactions += {
+      case Events.SelectedMovieResult(movie) => {
+        mdl.clear
+        for (sub <- movie.infos.collect({ case sub:MovieInfos.Subtitle => sub})) {
+          mdl add Row(false, sub.url, sub.lang, sub)
+        }
+      }
+      case TableRowsSelected(src, rng, false) => {
+        
+      }
+    }
+  }
+  
+  lazy val MovieInfosPanel = new ScrollPane {
+    border = createBorder("All Movie-Infos")
+    
+    case class Row(var checked: Boolean, infoType: String, info: String, source: String, obj: MovieInfo) extends TableModelRow {
+      def value(i: Int): AnyRef = { i match {
+        case 0 => checked
+        case 1 => infoType
+        case 2 => info
+        case 3 => source
+      }}.asInstanceOf[AnyRef]
+    }
+    
+    val cols =
+      TableModel.CheckboxCol("")    ::
+      TableModel.Col("Type", 100)   ::
+      TableModel.Col("Info", 530)   ::
+      TableModel.Col("Source", 100) ::
+      Nil
+    
+    val mdl = TableModel[Row](cols)
+    
+    val tbl = new Table {
+      model    = mdl
+      showGrid = true
+    }
+    mdl.setPrefSize(tbl, DefaultTableHeight)
+    contents = tbl
+    
+    listenTo( MoviesPanel )
+    //listenTo( tbl.selection )
+    
+    def infoSorter(a: MovieInfo, b: MovieInfo): Boolean = {
+      val aCl = a.getClass.getSimpleName
+      val bCl = b.getClass.getSimpleName
+      aCl <= bCl
+    }
+    
+    reactions += {
+      case Events.SelectedMovieResult(movie) => {
+        mdl.clear
+        for (info <- movie.infos.sortWith(infoSorter)) {
+          val infoType = info.getClass.getSimpleName
+          mdl add Row(false, infoType, info.toString, info.source, info)
+        }
+      }
+    }
+  }
+  
+  lazy val ImgPreviewPanel = new ScrollPane {
+    var DefaultSize = new Dimension(300, DefaultTableHeight)
+    var image: Option[BufferedImage] = None
+       
+//    def createScaler(img: BufferedImage, targetWidth: Int, targetHeight: Int): BufferedImageOp = new RescaleOp {
+//      null
+//    }
+    
+    val imgLbl = new Label {
+//      override def preferredSize(): Dimension = image match {
+//        case Some(img) => new Dimension(img.getWidth(), img.getHeight())
+//        case None      => DefaultSize
+//      }
+      override def paintComponent(g: Graphics2D): Unit = image match {
+        case Some(img) => {
+          val scaler = null // createScaler(img, 100, 200) 
+          g.drawImage(img, scaler, 0, 0)
+        }
+        case None => {
+          ()
+        }
+      }
+    }
+    contents = imgLbl
+    
+    def display(url: String) {
       WorkerPool submit { try {
-        image = Some( ImageIO.read( url ) )
+        image = Some( ImageIO.read( new URL(url) ) )
         contents.head.revalidate()
         contents.head.repaint()
       } catch { case e:Exception => {
@@ -153,9 +340,19 @@ class GUI extends Reactor {
         e.printStackTrace()
       }}}
     }
+    
+    listenTo( ImagesPanel )
+    reactions += {
+      case Events.SelectedImage(img) => {
+        if (img.preview.isEmpty)
+          display( img.url )
+        else
+          display( img.preview.head )
+      }
+    }
   }
   
-  object StatusBar extends MigPanel() {
+  lazy val StatusPanel = new MigPanel() {
     add(new Label("Status"))
   }
     
@@ -214,6 +411,8 @@ class GUI extends Reactor {
 //  }
   
   object Events {
-    case class Results(res: List[(Double,Movie)]) extends Event
+    case class MovieResults(res: List[(Double,Movie)]) extends Event
+    case class SelectedMovieResult(movie: Movie) extends Event
+    case class SelectedImage(img: MovieInfos.Image) extends Event
   }
 }
