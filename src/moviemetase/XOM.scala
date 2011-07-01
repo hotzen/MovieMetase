@@ -5,12 +5,11 @@ import org.xml.sax.helpers.XMLReaderFactory
 
 object XOM {
   
-  def NodeToElement(n: Node): Option[Element] =
-    if (n.isInstanceOf[Element])
-      Some(n.asInstanceOf[Element])
-    else
-      None 
-
+  object XPath {
+    val XHTML = new XPathContext("xhtml", "http://www.w3.org/1999/xhtml")
+    
+  }
+        
   implicit def NodesToIterable(nodes: Nodes): Iterable[Node] = new Iterable[Node] {
     var i = 0
     def iterator = new Iterator[Node] {
@@ -41,7 +40,12 @@ object XOM {
 
   implicit def ImplicitNode(node: Node): RichNode = RichNode(node)
   case class RichNode(node: Node) {
-    def xpath[A](xp: String, ctx: Option[XPathContext]): List[Node] = {
+    def toElement(): Option[Element] = node match {
+      case elem:Element => Some(elem)
+      case _ => None
+    }
+    
+    def xpath[A](xp: String, ctx: Option[XPathContext] = None): List[Node] = {
       val res = ctx match {
         case Some(ctx) => node.query(xp, ctx)
         case None      => node.query(xp)
@@ -52,6 +56,10 @@ object XOM {
     // http://www.xom.nu/faq.xhtml#d0e452
     def namespaces: List[Namespace] =
       node.query("namespace::node()").collect({ case n:Namespace => n }).toList
+      
+    def childElems: List[Element] = {
+      Nil
+    }
   }
 
   

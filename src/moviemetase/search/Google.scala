@@ -1,4 +1,5 @@
 package moviemetase
+package search
 
 import java.net.URL
 import nu.xom._
@@ -11,6 +12,25 @@ import scala.util.parsing.json.JSON
 import Util._
 
 sealed trait GoogleQuery extends Query[GoogleResult]
+
+object Google {
+  
+  val NonAlphaNumRegex = """[^a-zA-Z\d]+""".r
+  //val MultiMinusRegex  = """-{2,}""".r
+  val FirstMinusRegex  = """^-+""".r
+  val LastMinusRegex   = """-+$""".r
+  
+  def fuzzyTerm(t: String): String = {
+    val _1 = t.trim
+    val _2 = NonAlphaNumRegex.replaceAllIn(_1, "-")
+    val _3 = FirstMinusRegex.replaceFirstIn(_2, "")
+    val _4 = LastMinusRegex.replaceFirstIn(_3, "")
+    _4
+  }
+  
+  def strictTerm(t: String): String = "\"" + t.trim + "\""
+  def bothTerms(t1: String, t2: String): String = t1.trim + " | " + t2.trim
+}
 
 object GoogleAjax {
   val BASE_URL = "http://ajax.googleapis.com/ajax/services/search/web"

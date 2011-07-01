@@ -1,6 +1,8 @@
 package moviemetase
 package test
 
+import search._
+
 object GoogleTest {
   def main(args: Array[String]) = {
     

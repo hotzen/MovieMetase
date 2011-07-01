@@ -86,11 +86,14 @@ object MovieInfos {
   case class Producer(name: String) extends MovieInfo
   case class Writer(name: String)   extends MovieInfo
     
-  case class IMDB(url: String) extends MovieInfo with Website
-  case class TMDB(url: String) extends MovieInfo with Website
+  case class IMDB(id: String) extends MovieInfo
+  case class TMDB(id: String) extends MovieInfo
+  
+  case class ImdbSite(url: String) extends MovieInfo with Website
+  case class TmdbSite(url: String) extends MovieInfo with Website
     
-  case class Trailer(url: String) extends MovieInfo with Website
-  case class Subtitle(url: String, lang: String) extends MovieInfo with Downloadable
+  case class Trailer(label: String, url: String) extends MovieInfo with Website
+  case class Subtitle(label: String, lang: String, url: String) extends MovieInfo with Downloadable
   
   case class Poster(url: String, preview: Option[String] = None) extends MovieInfo with Image
   case class Backdrop(url: String, preview: Option[String] = None) extends MovieInfo with Image

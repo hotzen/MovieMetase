@@ -1,68 +1,9 @@
 package moviemetase
-import java.util.concurrent.Callable
-import java.util.concurrent.Future
-import java.util.concurrent.Executors
-import scala.collection.mutable.ListBuffer
+package search
+
 import Util._
-import java.io.PrintStream
-
-case class MovieSearch(val out: PrintStream = System.out) extends SearchSupervisor[Movie] {
-    
-  def searchTerm(term: String): List[(Double,Movie)] = {
-    val s = new TermWithImdbLinkSearch("FileNameWithImdbLink") with TmdbIntegrator
-    s.out = out
-    
-    val fut = s.execute( term )
-    val res = fut.get()
-    
-    filter(res)
-  }
-  
-  def searchByFile(fileInfo: FileInfo): List[(Double,Movie)] = {
-    
-    val fut1 = {
-      val t = fileInfo.fileName
-      val s = new TermWithImdbLinkSearch("FileNameWithImdbLink") with TmdbIntegrator
-      s.out = out
-      
-      s.execute( t )
-    }
-    
-    val fut2 = {
-      val t = fileInfo.dirName
-      val s = new TermWithImdbLinkSearch("DirNameWithImdbLink") with TmdbIntegrator
-      s.out = out
-      
-      s.execute( t )
-    }
-    
-    val res = {
-      fut1.get() :: fut2.get() :: Nil
-    }
-    
-    filter(res.flatten)
-  }
-}
-
-abstract class SearchSupervisor[A] {
-  type ScoredResult = (Double, A)
-
-  def filter(res: List[ScoredResult]): List[ScoredResult] = res.sortWith( (t1,t2) => t1._1 > t2._1 ).take(3)
-  
-  def searchTerm(term: String): List[ScoredResult]
-  def searchByFile(fileInfo: FileInfo): List[ScoredResult]
-}
-
-
-abstract class Search[A] {
-  var out: PrintStream = System.out
-  
-  def id: String
-  def execute(term: String): Future[List[(Double,A)]] // Tuple(Score,Result)
-
-  def trace(s: String): Unit =
-    out.println("[TRACE] {" + id + "} " + s)
-}
+import java.util.concurrent.Future
+import scala.collection.mutable.ListBuffer
 
 object IMDB {
   val CSE  = "011282045967305256347:dyc6spozqnc"
@@ -72,11 +13,10 @@ object IMDB {
   val IdRegex   = """tt[0-9]+""".r
 }
 
-class TermWithImdbLinkSearch(val id: String) extends Search[Movie] {
+class TermWithImdbLinkSearch(val id: String) extends Search[Movie] with Logging {
   
-  def execute(term: String): Future[List[(Double,Movie)]] =
-    WorkerPool submit { search(term) }
-  
+  val logID = id
+
   def search(term: String): List[(Double,Movie)] = {
     
     val q = term + " link:imdb.com/title/"
@@ -91,7 +31,7 @@ class TermWithImdbLinkSearch(val id: String) extends Search[Movie] {
     val imdbUrls = googleRes.flatMap(r => IMDB.UrlRegex.findFirstIn( r.snippet ) ).map( m => "http://www." + m + "/")
     
     // group by URL, count occurrence, sort by occurrence
-    val imdbPackedUrls = imdbUrls.packed.sort( (t1,t2) => t1._1 > t2._1 )
+    val imdbPackedUrls = imdbUrls.packed().sort( (t1,t2) => t1._1 > t2._1 )
     trace("found " + imdbPackedUrls.length + " distinct IMDB-URLs")
     
     // nothing found, abort
@@ -100,9 +40,9 @@ class TermWithImdbLinkSearch(val id: String) extends Search[Movie] {
     
     // get first found URL and the URL with most occurrence
     val firstImdbUrl = imdbUrls.head
-    val mostImdbCnt  = imdbPackedUrls.head._1
-    val mostImdbUrl  = imdbPackedUrls.head._2
-    
+    val mostImdbUrl  = imdbPackedUrls.head._1
+    val mostImdbCnt  = imdbPackedUrls.head._2
+        
     {
       if (firstImdbUrl == mostImdbUrl || mostImdbCnt == 1) {
         trace("IMDB-Lookup for first/most IMDB-URL: " + firstImdbUrl)
@@ -218,64 +158,5 @@ class TermWithImdbLinkSearch(val id: String) extends Search[Movie] {
     }
    
     infos.toList
-  }
-}
-
-
-trait TmdbIntegrator extends Search[Movie] { // self: Search[Movie] =>
-  abstract override def execute(term: String): Future[List[(Double,Movie)]] = WorkerPool submit {
-      
-    // execute actual search
-    val fut = super.execute(term)
-    val res = fut.get() // block
-    
-    // do TMDB-lookups for each result
-    val resFut = for ( (score, movie) <- res) yield {
-      val infos = movie.infos
-      
-      // search for IMDB-IDs
-      val ids = infos.collect({ case MovieInfos.IMDB(url) => IMDB.IdRegex.findFirstIn(url) }).flatten.
-                  packed.sortWith( (t1,t2) => t1._1 > t2._1 )
-      
-      if (ids.isEmpty) {
-        trace("TmdbIntegrator found no IMDB-ID, skipping " + movie)
-        (score, movie, None)
-      } else {
-        val imdbID = ids.head._2
-        val fut = TMDB.ImdbLookup(imdbID).execute()
-        (score, movie, Some(fut) )
-      }
-    }
-    
-    // join futures and integrate their result-infos
-    for ( (score, movie, futOpt) <- resFut) yield futOpt match {
-      case Some(fut) => {
-        val tmdbMovies = fut.get() // blocking wait
-        
-        if (tmdbMovies.isEmpty) {
-          trace("TMDB IMDB-Lookup returned NO movies, aborting augmentation")
-          (score, movie)
-        
-        } else {
-          if (!tmdbMovies.tail.isEmpty)
-            trace("TMDB IMDB-Lookup returned " + tmdbMovies.length + " movies, using only the first")
-          
-          val tmdbMovie = tmdbMovies.head
-          val tmdbInfos = tmdbMovie.infos
-          
-          // filter out existing title+release, trust TMDB
-          val filtInfos = movie.infos.filter( _ match {
-            case MovieInfos.Title(_)   => false
-            case MovieInfos.Release(_) => false
-            case _                     => true
-          })
-          
-          val newMovie = Movie.create(filtInfos ::: tmdbInfos).head
-          trace("successfully integrated TMDB-Information")
-          (score, newMovie)
-        }
-      }
-      case None => (score, movie)
-    }
   }
 }

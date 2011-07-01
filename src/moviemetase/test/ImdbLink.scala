@@ -1,5 +1,8 @@
 package moviemetase
 package test
+
+import search._
+
 import java.net.URL
 import scala.collection.mutable.ListBuffer
 

@@ -1,15 +1,17 @@
 package moviemetase
 package ui
 
+import search.{SearchManager, MovieSearch}
+
 import scala.swing._
 import scala.swing.event._
 import javax.swing.JOptionPane
 import javax.imageio.ImageIO
 import java.net.URL
 import java.awt.image.BufferedImage
+import javax.swing.border.Border
 import javax.swing.border.EtchedBorder
 import javax.swing.BorderFactory
-import javax.swing.border.Border
 import java.awt.image.BufferedImageOp
 import java.awt.image.RescaleOp
 
@@ -43,49 +45,45 @@ class GUI extends Reactor {
   
   lazy val Top = new Frame {
     title = Title
-    contents = MainPanel
+    
+    contents = new MigPanel("fill") {
+      border = Swing.EmptyBorder(5, 5, 5, 5)
+          
+      val top = new MigPanel() {
+        add(DropPanel)
+        add(SearchPanel, "grow")
+      }
+      add(top, "dock north")
+      
+      val imgSplit = new SplitPane(Orientation.Vertical, ImagesPanel, ImgPreviewPanel) {
+        resizeWeight = 0.5
+      }
+      
+      val tabbed = new TabbedPane {
+        pages += new TabbedPane.Page("1.) Select one Movie", MoviesPanel)
+        pages += new TabbedPane.Page("2.) Select Images", imgSplit)
+        pages += new TabbedPane.Page("3.) Select Subtitles", SubtitlesPanel)
+        pages += new TabbedPane.Page("4.) Select additional Information", MovieInfosPanel)
+      }
+      add(tabbed, "grow")
+          
+      add(StatusPanel, "dock south")
+    }
+    
     override def closeOperation = App.shutdown()
   }
   
-  lazy val MainPanel = new MigPanel("fill") {
-    border = Swing.EmptyBorder(5, 5, 5, 5)
-        
-    val top = new MigPanel() {
-      add(DropPanel)
-      add(SearchPanel, "grow")
-    }
-    add(top, "dock north")
-    
-    val imgSplit = new SplitPane(Orientation.Vertical, ImagesPanel, ImgPreviewPanel) {
-      resizeWeight = 0.5
-    }
-    
-    val tabbed = new TabbedPane {
-      pages += new TabbedPane.Page("1.) Select one Movie", MoviesPanel)
-      pages += new TabbedPane.Page("2.) Select Images", imgSplit)
-      pages += new TabbedPane.Page("3.) Select Subtitles", SubtitlesPanel)
-      pages += new TabbedPane.Page("4.) Select additional Information", MovieInfosPanel)
-//      pages += new TabbedPane.Page("5.) Configure", MovieInfosPanel)
-    }
-    
-    add(tabbed, "grow")
-        
-    add(StatusPanel, "dock south")
-  }
-  
-  
-  
   lazy val DropPanel = new Label {
     override lazy val peer: javax.swing.JLabel = new JImageLabel( App.image("/res/drop.png") )
-        
+    
+    tooltip = "DROP FILE HERE"
+      
     val dropHandler = new FileDropHandler
     listenTo(dropHandler)
     peer.setTransferHandler(dropHandler)
     
-    tooltip = "DROP FILE HERE"
-    
     reactions += { case FileDropHandler.FilesDropped(files) => {
-
+  
       if (files.isEmpty)
         JOptionPane.showMessageDialog(null, "Invalid File", "Dropped Files", JOptionPane.ERROR_MESSAGE);
       else if (!files.tail.isEmpty)
@@ -94,12 +92,13 @@ class GUI extends Reactor {
         JOptionPane.showMessageDialog(null, "Please drop exactly one File, no Directory", "Dropped Files", JOptionPane.ERROR_MESSAGE);
       
       else {
-        val s: SearchSupervisor[Movie] = new MovieSearch
+        val s: SearchManager[Movie] = new MovieSearch
         val res = s.searchByFile( FileInfo.create( files.head ) )
         publish( Events.MovieResults(res) )
       }
     }}
-  }
+  } 
+
   
   lazy val SearchPanel = new MigPanel() {
     add(new Label("Queryyyyyyy"))
@@ -409,10 +408,10 @@ class GUI extends Reactor {
 //    }
 //    add(txtYear)
 //  }
-  
-  object Events {
-    case class MovieResults(res: List[(Double,Movie)]) extends Event
-    case class SelectedMovieResult(movie: Movie) extends Event
-    case class SelectedImage(img: MovieInfos.Image) extends Event
-  }
+}
+
+object Events {
+  case class MovieResults(res: List[(Double,Movie)]) extends Event
+  case class SelectedMovieResult(movie: Movie) extends Event
+  case class SelectedImage(img: MovieInfos.Image) extends Event
 }
