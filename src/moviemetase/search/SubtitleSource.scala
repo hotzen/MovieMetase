@@ -49,37 +49,56 @@ object SubtitleSource {
           val fut = extract.execute()
           (score, fut)
         }
-
-      // join Futures
-      val scoredReleaseInfos =
-         for ( (score, fut) <- scoredReleaseInfosFuts;
-                link        <- fut.get() ) yield {
-           
-           trace("Subtitle-Page=" + link + "; Score=" + score)
-           (score, link)
-         }
       
+      // join Futures
+      val allScoredReleaseInfos =
+         for ( (score, fut) <- scoredReleaseInfosFuts;
+                link        <- fut.get() ) yield (score, link)      
 
-      // filter out duplicate Subtitle
+      // filter out duplicate Subtitle-Pages
       def eq(a: (Double, ReleasePageInfo), b: (Double, ReleasePageInfo)): Boolean =
         a._2.subtitlePage == b._2.subtitlePage
-      val scoredReleaseInfos2 = scoredReleaseInfos.packed(eq).sortWith( (a,b) => a._2 > b._2 ).map( p => p._1 )
-      
-      
+      val scoredReleaseInfos = allScoredReleaseInfos.countedDistinct(eq).sortByCount().noCount()
+            
       // extract Subtitle-page
-      val scoredSubtitleInfosFuts =
-        for ( (score, releaseInfo) <- scoredReleaseInfos2 ) yield {
+      val scoredInfosFuts =
+        for ( (score, releaseInfo) <- scoredReleaseInfos ) yield {
           val extract = SubtitlePageExtractor( releaseInfo.subtitlePage )
           val fut = extract.execute()
-          (score, fut)
+          (score, releaseInfo, fut)
         }
       
-      // join Futures of Movie-Infos
-      val scoredSubtitleInfos =
-        for ( (score, fut) <- scoredSubtitleInfosFuts) yield 
-          (score, fut.get())
+      // join Futures
+      val scoredInfos =
+        for ( (score, releaseInfo, fut) <- scoredInfosFuts) yield 
+          (score, releaseInfo, fut.get())
       
-      scoredSubtitleInfos
+      // generate MovieInfo
+      val infos =
+        for ( (score,releaseInfo,subInfoOpt) <- scoredInfos;
+              subInfo <- subInfoOpt) yield {
+        val movieInfos = new ListBuffer[MovieInfo]()
+        // ReleasePageInfo(releasePage: URL, subtitlePage: URL, label: String, lang: String)
+        // SubtitlePageInfo(subtitlePage: URL, downloadUrl: URL, moviePage: Option[MoviePageInfo])
+        // MoviePageInfo(moviePage: URL, imdbID: String)
+
+        movieInfos append MovieInfos.Subtitle(
+          releaseInfo.label,
+          releaseInfo.lang,
+          subInfo.downloadUrl
+        ).withSourceInfo( subInfo.subtitlePage.toString )
+        
+        if (!subInfo.moviePage.isEmpty) {
+          val moviePage = subInfo.moviePage.get
+          movieInfos append MovieInfos.IMDB(
+            moviePage.imdbID
+          ).withSourceInfo( moviePage.moviePage.toString )
+        }
+        
+        (score, movieInfos.toList)
+      }
+      
+      infos.toList
     }
   }
   
@@ -90,8 +109,6 @@ object SubtitleSource {
     val logID = "SubtitleSource_ReleasePageExtractor(" +  url.toString + ")"
 
     def process(doc: nu.xom.Document): List[ReleasePageInfo] = {
-      trace("extracting...")
-      
       val infos = new ListBuffer[ReleasePageInfo]
       val ctx = Some( XOM.XPath.XHTML )
       
@@ -124,58 +141,62 @@ object SubtitleSource {
     }
   }
   
-  case class SubtitlePageExtractor(url: URL) extends HtmlProcessor[List[MovieInfo]] with Logging {
+  case class SubtitlePageInfo(subtitlePage: URL, downloadUrl: URL, moviePage: Option[MoviePageInfo])
+  case class MoviePageInfo(moviePage: URL, imdbID: String)
+  
+  case class SubtitlePageExtractor(url: URL) extends HtmlProcessor[Option[SubtitlePageInfo]] with Logging {
     import XOM._
     val logID = "SubtitleSource_SubtitlePageExtractor(" +  url.toString + ")"
     
-    def process(doc: nu.xom.Document): List[MovieInfo] = {
-      trace("extracting...")
+    def process(doc: nu.xom.Document): Option[SubtitlePageInfo] = {
       
-      val infos = new ListBuffer[MovieInfo]
       val ctx = Some( XOM.XPath.XHTML )
       
-      var downloadLink: Option[String] = None
+      // all links of content-container
+      val allLinks = 
+        for (aNode <- doc.xpath("""//xhtml:div[@id="content-container"]//xhtml:a[@href]""", ctx);
+             aElem <- aNode.toElement;
+             href  <- aElem.attribute("href"))
+          yield (aElem, href)
       
-      // all links
-      for (aNode <- doc.xpath("""//xhtml:a[@href]""", ctx);
-           aElem <- aNode.toElement;
-           href  <- aElem.attribute("href")) {
-        
-        // link to SubtitleSource's Movie-Page. Contains the IMDB-ID, yay!
-        for (m <- Regex.MovieLink.findFirstMatchIn(href) ) {
+      def eq(a: (Element,String), b: (Element,String)): Boolean = a._2 == b._2 // equality on href
+      val links = allLinks.countedDistinct(eq).noCount()
+      
+      val allMoviePages = 
+        for ( (aElem, href) <- links;
+              m <- Regex.MovieLink.findFirstMatchIn(href) ) yield {
+
           val imdbID = m.group(1)
-          trace("MoviePage=" + href + "; ImdbID=" + imdbID)          
-          infos append MovieInfos.IMDB( imdbID )
+          trace("MoviePage=" + href + "; ImdbID=" + imdbID)
+          MoviePageInfo(href.toURL, imdbID)
         }
-        
-        // link to the ZIP-Download
-        for (m <- Regex.DownloadZipLink.findFirstIn(href) ) {
-          val url  = BaseUrl + m
+      val moviePages = allMoviePages.distinct
+      
+      if (moviePages.isEmpty)
+        warn("found no MoviePage on SubtitlePage " + url)
+      else if (!moviePages.tail.isEmpty)
+        warn("found " + moviePages.length + " MoviePages, using only first: " + moviePages.first)
+      val moviePage = moviePages.headOption
+      
+      
+      val allDownloadUrls = 
+        for ( (aElem, href) <- links;
+              m <- Regex.DownloadZipLink.findFirstIn(href) ) yield {
+          val url = BaseUrl + m
           trace("DownloadURL=" + url)
-          downloadLink = Some( url )
+          url.toURL
         }
+      val downloadUrls = allDownloadUrls.distinct     
+      
+      if (downloadUrls.isEmpty) {
+        warn("found no DownloadURL")
+        None
+      } else {
+        if (!downloadUrls.tail.isEmpty)
+          warn("found " + downloadUrls.length + " DownloadURLs, using only first: " + downloadUrls.first)
+        
+        Some( SubtitlePageInfo(url, downloadUrls.head, moviePage) )
       }
-      
-      // information-box containing the download-link (which we are not interested in, since it already has been extracted above)
-      // and the label and language of the subtitle
-//      for (boxNode <- doc.xpath("""//xhtml:div[@id="subtitle-information-box"]""", ctx);
-//           boxElem <- boxNode.toElement) {
-//        
-//        // no good heuristic to extract language on this page. it is only encoded in the alt/title attribute of the image
-//        // and the image-path itself is not unique either :/
-//        //val lang = ... 
-//        
-//        val label =
-//          for (h3Node <- boxElem.xpath("""//xhtml:h3""", ctx);
-//               aNode  <- h3Node.xpath("""//xhtml:a""", ctx);
-//               aElem  <- aNode.toElement)
-//            yield aElem.getValue
-//            
-//        println( contentElem.toXML )
-//        println("---\n\n")
-//      }
-      
-      infos.toList
     }
   }
 }

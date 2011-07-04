@@ -170,12 +170,12 @@ class GUI extends Reactor {
   lazy val ImagesPanel = new ScrollPane {
     border = createBorder("Images")
     
-    case class Row(var checked: Boolean, imgType: String, url: String, previewUrl: Option[String], obj: MovieInfos.Image) extends TableModelRow {
+    case class Row(var checked: Boolean, imgType: String, url: URL, previewUrl: Option[URL], obj: MovieInfos.Image) extends TableModelRow {
       def value(i: Int): AnyRef = { i match {
         case 0 => checked
         case 1 => imgType
-        case 2 => url
-        case 3 => previewUrl
+        case 2 => url.toString
+        case 3 => previewUrl.toString
       }}.asInstanceOf[AnyRef]
     }
     
@@ -247,7 +247,7 @@ class GUI extends Reactor {
       case Events.SelectedMovieResult(movie) => {
         mdl.clear
         for (sub <- movie.infos.collect({ case sub:MovieInfos.Subtitle => sub})) {
-          mdl add Row(false, sub.url, sub.lang, sub)
+          mdl add Row(false, sub.url.toString, sub.lang, sub)
         }
       }
       case TableRowsSelected(src, rng, false) => {
@@ -329,9 +329,9 @@ class GUI extends Reactor {
     }
     contents = imgLbl
     
-    def display(url: String) {
+    def display(url: URL) {
       WorkerPool submit { try {
-        image = Some( ImageIO.read( new URL(url) ) )
+        image = Some( ImageIO.read( url ) )
         contents.head.revalidate()
         contents.head.repaint()
       } catch { case e:Exception => {

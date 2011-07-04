@@ -2,6 +2,7 @@ package moviemetase
 package test
 
 import search._
+import Util._
 
 import java.net.URL
 import scala.collection.mutable.ListBuffer
@@ -86,7 +87,7 @@ object ImdbLink {
       // MOVIE
       case "movie" => {
         pageMapData.get("image") match {
-          case Some(url) => infos append MovieInfos.Poster( url )
+          case Some(url) => infos append MovieInfos.Poster( url.toURL )
           case _ =>
         }
         pageMapData.get("director") match {
@@ -129,7 +130,7 @@ object ImdbLink {
           case _ =>
         }
         pageMapData.get("image_href") match {
-          case Some(url) => infos append MovieInfos.Poster( url )
+          case Some(url) => infos append MovieInfos.Poster( url.toURL )
           case _ =>
         }
         pageMapData.get("originalrating") match {
@@ -144,7 +145,7 @@ object ImdbLink {
       // IMAGE
       case "image" => {
         pageMapData.get("src") match {
-          case Some(url) => infos append MovieInfos.Poster( url )
+          case Some(url) => infos append MovieInfos.Poster( url.toURL )
           case _ =>
         }
       }

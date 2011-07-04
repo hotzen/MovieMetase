@@ -104,9 +104,9 @@ object TMDB {
           val preview = imgs.find(img => img.size == "cover" || img.size == "poster")
                     
           if (img.imgType == "poster")
-            infos append MovieInfos.Poster(img.url, preview.map(p => p.url))    
+            infos append MovieInfos.Poster(img.url.toURL, preview.map(p => p.url.toURL))    
           else if (img.imgType == "backdrop")
-            infos append MovieInfos.Backdrop(img.url, preview.map(p => p.url))
+            infos append MovieInfos.Backdrop(img.url.toURL, preview.map(p => p.url.toURL))
           else
             assert(false, "unknown TMDB image-type: " + img.imgType)
         }
@@ -135,7 +135,7 @@ trait TmdbIntegrator extends Search[Movie] with Logging { // self: Search[Movie]
       
       // search for IMDB-IDs
       val ids = infos.collect({ case MovieInfos.IMDB(url) => IMDB.IdRegex.findFirstIn(url) }).flatten.
-                  packed().sortWith( (t1,t2) => t1._2 > t2._2 )
+                  countedDistinct().sortByCount()
       
       if (ids.isEmpty) {
         trace("TmdbIntegrator found no IMDB-ID, aborting")

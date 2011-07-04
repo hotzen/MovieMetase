@@ -31,7 +31,7 @@ class TermWithImdbLinkSearch(val id: String) extends Search[Movie] with Logging 
     val imdbUrls = googleRes.flatMap(r => IMDB.UrlRegex.findFirstIn( r.snippet ) ).map( m => "http://www." + m + "/")
     
     // group by URL, count occurrence, sort by occurrence
-    val imdbPackedUrls = imdbUrls.packed().sort( (t1,t2) => t1._1 > t2._1 )
+    val imdbPackedUrls = imdbUrls.countedDistinct().sortByCount()
     trace("found " + imdbPackedUrls.length + " distinct IMDB-URLs")
     
     // nothing found, abort
@@ -90,7 +90,7 @@ class TermWithImdbLinkSearch(val id: String) extends Search[Movie] with Logging 
       // MOVIE
       case "movie" => {
         pageMapData.get("image") match {
-          case Some(url) => infos append MovieInfos.Poster( url )
+          case Some(url) => infos append MovieInfos.Poster( url.toURL )
           case _ =>
         }
         pageMapData.get("director") match {
@@ -133,7 +133,7 @@ class TermWithImdbLinkSearch(val id: String) extends Search[Movie] with Logging 
           case _ =>
         }
         pageMapData.get("image_href") match {
-          case Some(url) => infos append MovieInfos.Poster( url )
+          case Some(url) => infos append MovieInfos.Poster( url.toURL )
           case _ =>
         }
         pageMapData.get("originalrating") match {
@@ -148,7 +148,7 @@ class TermWithImdbLinkSearch(val id: String) extends Search[Movie] with Logging 
       // IMAGE
       case "image" => {
         pageMapData.get("src") match {
-          case Some(url) => infos append MovieInfos.Poster( url )
+          case Some(url) => infos append MovieInfos.Poster( url.toURL )
           case _ =>
         }
       }
