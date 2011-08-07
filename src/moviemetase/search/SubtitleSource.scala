@@ -9,7 +9,7 @@ import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.HashMap
 import java.util.concurrent.Future
 
-sealed trait SubtitleSourceQuery extends Query[Movie]
+sealed trait SubtitleSourceQuery extends Query[List[Movie]] with UrlProcessor[List[Movie]]
 
 object SubtitleSource {
   
@@ -29,16 +29,16 @@ object SubtitleSource {
     
     val BaseScore = 0.95
     
-    def search(term: String): List[(Double,List[MovieInfo])] = {
+    def search(term: String): List[List[MovieInfo]] = {
       val fuzzy = Google.fuzzyTerm(term)
       trace("querying GoogleCSE with term '" + fuzzy + "'")
       
       val relQuery = GoogleCSE.Query(ReleaseCSE, term)
       val fut = relQuery.execute()
       val res = fut.get() // block
-      
+
       // extract Release-Page
-      val scoredReleaseInfosFuts =
+      val releaseFuts =
         for ( (r, idx) <- res.zipWithIndex;
                _       <- Regex.ReleaseLink.findFirstIn(r.url.toString) ) yield {
 
@@ -46,57 +46,53 @@ object SubtitleSource {
           trace("ResultIndex=" + idx + "; ReleasePage=" + r.url + "; Score=" + score)
           
           val extract = ReleasePageExtractor( r.url )
-          val fut = extract.execute()
-          (score, fut)
+          extract.logOut = logOut
+          extract.execute()
         }
       
       // join Futures
-      val allScoredReleaseInfos =
-         for ( (score, fut) <- scoredReleaseInfosFuts;
-                link        <- fut.get() ) yield (score, link)      
+      val allReleaseInfos = for ( fut  <- releaseFuts; link <- fut.get() ) yield link      
 
       // filter out duplicate Subtitle-Pages
-      def eq(a: (Double, ReleasePageInfo), b: (Double, ReleasePageInfo)): Boolean =
-        a._2.subtitlePage == b._2.subtitlePage
-      val scoredReleaseInfos = allScoredReleaseInfos.countedDistinct(eq).sortByCount().noCount()
+      val releaseInfos = allReleaseInfos.countedDistinct((a,b) => a.subtitlePage == b.subtitlePage).sortByCount().noCount()
             
       // extract Subtitle-page
-      val scoredInfosFuts =
-        for ( (score, releaseInfo) <- scoredReleaseInfos ) yield {
+      val combinedFuts =
+        for ( releaseInfo <- releaseInfos ) yield {
           val extract = SubtitlePageExtractor( releaseInfo.subtitlePage )
-          val fut = extract.execute()
-          (score, releaseInfo, fut)
+          extract.logOut = logOut
+          (releaseInfo, extract.execute())
         }
       
       // join Futures
-      val scoredInfos =
-        for ( (score, releaseInfo, fut) <- scoredInfosFuts) yield 
-          (score, releaseInfo, fut.get())
+      val combinedInfos =
+        for ( (releaseInfo, fut) <- combinedFuts) yield 
+          (releaseInfo, fut.get())
       
       // generate MovieInfo
       val infos =
-        for ( (score,releaseInfo,subInfoOpt) <- scoredInfos;
-              subInfo <- subInfoOpt) yield {
-        val movieInfos = new ListBuffer[MovieInfo]()
-        // ReleasePageInfo(releasePage: URL, subtitlePage: URL, label: String, lang: String)
-        // SubtitlePageInfo(subtitlePage: URL, downloadUrl: URL, moviePage: Option[MoviePageInfo])
-        // MoviePageInfo(moviePage: URL, imdbID: String)
-
-        movieInfos append MovieInfos.Subtitle(
-          releaseInfo.label,
-          releaseInfo.lang,
-          subInfo.downloadUrl
-        ).withSourceInfo( subInfo.subtitlePage.toString )
-        
-        if (!subInfo.moviePage.isEmpty) {
-          val moviePage = subInfo.moviePage.get
-          movieInfos append MovieInfos.IMDB(
-            moviePage.imdbID
-          ).withSourceInfo( moviePage.moviePage.toString )
+        for ( (releaseInfo,subInfoOpt) <- combinedInfos; subInfo <- subInfoOpt) yield {
+          val movieInfos = new ListBuffer[MovieInfo]()
+          // ReleasePageInfo(releasePage: URL, subtitlePage: URL, label: String, lang: String)
+          // SubtitlePageInfo(subtitlePage: URL, downloadUrl: URL, moviePage: Option[MoviePageInfo])
+          // MoviePageInfo(moviePage: URL, imdbID: String)
+  
+          movieInfos append MovieInfos.Subtitle(
+            releaseInfo.label,
+            releaseInfo.lang,
+            subInfo.subtitlePage,
+            subInfo.downloadUrl
+          )//.withSourceInfo( subInfo.subtitlePage.toString )
+          
+          if (!subInfo.moviePage.isEmpty) {
+            val moviePage = subInfo.moviePage.get
+            movieInfos append MovieInfos.IMDB(
+              moviePage.imdbID
+            ).withSourceInfo( moviePage.moviePage.toString )
+          }
+          
+          movieInfos.toList
         }
-        
-        (score, movieInfos.toList)
-      }
       
       infos.toList
     }

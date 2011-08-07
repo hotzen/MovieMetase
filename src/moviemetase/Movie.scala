@@ -44,22 +44,23 @@ sealed trait MovieInfo {
 
 object MovieInfos {
   trait Downloadable extends MovieInfo {
-    def url: URL
+    def file: URL
     
     import java.io.File
     import java.util.concurrent.Callable
     
-    def createDownloader(target: File) = new Callable[(URL,File)] {
-      import java.net.URL
+    def downloadTask(target: File) = new Callable[(URL,File)] {
       import java.io._
       import java.nio._
       import java.nio.channels._
           
       def call(): (URL, File) = {
-        val rbc: ReadableByteChannel = Channels.newChannel( url.openStream() )
-        val fos: FileOutputStream    = new FileOutputStream( target )
-        fos.getChannel().transferFrom(rbc, 0, 1 << 24)
-        (url, target)
+        val rbc: ReadableByteChannel = Channels.newChannel( file.openStream() )
+        val fos: FileOutputStream = new FileOutputStream( target )
+        val fch = fos.getChannel()
+        fch.lock()
+        fch.transferFrom(rbc, 0, 1 << 24)
+        (file, target)
       }
     }
   }
@@ -67,11 +68,16 @@ object MovieInfos {
   trait Image extends MovieInfo with Downloadable {
     def url: URL
     def preview: Option[URL]
+    
+    def file = url // Downloadable
   }
   
-  trait Website extends MovieInfo {
-    def url: URL
+  trait WebPage extends MovieInfo {
+    def page: URL
   }
+  
+  // search scoring
+  case class Score(score: Double) extends MovieInfo
   
   
   case class Title(name: String) extends MovieInfo
@@ -91,14 +97,16 @@ object MovieInfos {
   case class Producer(name: String) extends MovieInfo
   case class Writer(name: String)   extends MovieInfo
     
-  case class IMDB(id: String) extends MovieInfo
-  case class TMDB(id: String) extends MovieInfo
+  case class IMDB(id: String) extends MovieInfo with WebPage {
+    lazy val page: URL = new URL( "http://www.imdb.com/title/" + id + "/" )
+  }
   
-  case class ImdbSite(url: URL) extends MovieInfo with Website
-  case class TmdbSite(url: URL) extends MovieInfo with Website
+  case class TMDB(id: String) extends MovieInfo with WebPage {
+    lazy val page: URL = new URL( "http://www.themoviedb.org/movie/" + id )
+  }
     
-  case class Trailer(label: String, url: URL) extends MovieInfo with Website
-  case class Subtitle(label: String, lang: String, url: URL) extends MovieInfo with Downloadable
+  case class Trailer(label: String, page: URL) extends MovieInfo with WebPage
+  case class Subtitle(label: String, lang: String, page: URL, file: URL) extends MovieInfo with WebPage with Downloadable 
   
   case class Poster(url: URL, preview: Option[URL] = None) extends MovieInfo with Image
   case class Backdrop(url: URL, preview: Option[URL] = None) extends MovieInfo with Image

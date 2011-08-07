@@ -11,7 +11,7 @@ import scala.util.parsing.json.JSON
 
 import Util._
 
-sealed trait GoogleQuery extends Query[GoogleResult]
+sealed trait GoogleQuery extends Query[List[GoogleResult]] with UrlProcessor[List[GoogleResult]]
 
 object Google {
   

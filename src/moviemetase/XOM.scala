@@ -52,27 +52,45 @@ object XOM {
       }
       res.toList
     }
-
+    
     // http://www.xom.nu/faq.xhtml#d0e452
     def namespaces: List[Namespace] =
       node.query("namespace::node()").collect({ case n:Namespace => n }).toList
       
-    def childElems: List[Element] = {
-      Nil
+    
+    def children: Iterable[Node] = new Iterable[Node] {
+      val cnt = node.getChildCount
+      var i = 0
+      def iterator = new Iterator[Node] {
+        def hasNext = (i < cnt)
+        def next = {
+          val n = node.getChild(i)
+          i = i + 1
+          n
+        }
+        override def hasDefiniteSize = true
+        override def isTraversableAgain = true
+      }
     }
+    
+//    @see getChildElements in nu.xom.Element
+//    def childElements: Iterable[Element] = children.flatMap( _.toElement )
+//    def childElementsByName(name: String): Iterable[Element]  = childElements.filter( _.getLocalName == name )
+//    def childElementsByQName(qname: QName): Iterable[Element] = childElements.filter( elem => elem.getLocalName == qname.name && elem.getNamespaceURI == qname.ns )
   }
 
   
   implicit def ImplicitElement(elem: Element): RichElement = RichElement(elem)
   case class RichElement(elem: Element) extends RichNode(elem) {
         
-    def name: String = elem.getLocalName
-    def text = elem.getValue
+    //def name: String = elem.getLocalName
+    //def value = elem.getValue
     
     def attributes = new Iterable[Attribute] {
+      val cnt = elem.getAttributeCount()
       var i = 0
       def iterator = new Iterator[Attribute] {
-        def hasNext = (i < elem.getAttributeCount)
+        def hasNext = (i < cnt)
         def next = {
           val e = elem.getAttribute(i)
           i = i + 1

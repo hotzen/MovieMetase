@@ -9,7 +9,7 @@ import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.HashMap
 import java.util.concurrent.Future
 
-sealed trait TmdbQuery extends Query[Movie]
+sealed trait TmdbQuery extends Query[List[Movie]] with XmlProcessor[List[Movie]]
 
 object TMDB {
   case class ImdbLookup(imdbID: String) extends TmdbQuery {
@@ -25,12 +25,8 @@ object TMDB {
       new URL( urlBuilder.toString )
     }
     
-    def process(in: InputStream): List[Movie] = {
+    def process(doc: Document): List[Movie] = {
       import XOM._
-      
-      val builder = new Builder()
-      val doc = builder build in
-            
       val infos = new ListBuffer[MovieInfo]()
       
       val movies = for (elemMovies <- doc.getRootElement.getChildElements("movies");
@@ -125,12 +121,12 @@ trait TmdbIntegrator extends Search[Movie] with Logging { // self: Search[Movie]
   
   //val logID = "TmdbIntegrator(" + self.id + ")"
   
-  abstract override def search(term: String): List[(Double,Movie)] = {
+  abstract override def search(term: String): List[Movie] = {
     // execute actual search
     val res = super.search(term)
         
     // do TMDB-lookups for each result
-    val resFut = for ( (score, movie) <- res) yield {
+    val resFut = for ( movie <- res) yield {
       val infos = movie.infos
       
       // search for IMDB-IDs
@@ -139,24 +135,25 @@ trait TmdbIntegrator extends Search[Movie] with Logging { // self: Search[Movie]
       
       if (ids.isEmpty) {
         trace("TmdbIntegrator found no IMDB-ID, aborting")
-        (score, movie, None)
+        (movie, None)
       } else {
         val imdbID = ids.head._1
         trace("TmdbIntegrator looking up TMDB-Info by IMDB-ID " + imdbID)
         
         val fut = TMDB.ImdbLookup(imdbID).execute()
-        (score, movie, Some(fut) )
+        (movie, Some(fut) )
       }
     }
     
     // join futures and integrate their result-infos
-    for ( (score, movie, futOpt) <- resFut) yield futOpt match {
+    for ( (movie, futOpt) <- resFut) yield futOpt match {
+      case None => movie  
       case Some(fut) => {
         val tmdbMovies = fut.get() // blocking wait
         
         if (tmdbMovies.isEmpty) {
           trace("TMDB IMDB-Lookup returned NO movies, aborting TMDB-integration")
-          (score, movie)
+          movie
         
         } else {
           if (!tmdbMovies.tail.isEmpty)
@@ -174,10 +171,9 @@ trait TmdbIntegrator extends Search[Movie] with Logging { // self: Search[Movie]
           
           val newMovie = Movie.create(filtInfos ::: tmdbInfos).head
           trace("successfully integrated TMDB-Information")
-          (score, newMovie)
+          newMovie
         }
       }
-      case None => (score, movie)
     }
   }
 }

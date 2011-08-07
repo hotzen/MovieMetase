@@ -17,7 +17,7 @@ class TermWithImdbLinkSearch(val id: String) extends Search[Movie] with Logging 
   
   val logID = id
 
-  def search(term: String): List[(Double,Movie)] = {
+  def search(term: String): List[Movie] = {
     
     val q = term + " link:imdb.com/title/"
     trace("querying GoogleAjax with '" + q + "' ...")
@@ -55,7 +55,7 @@ class TermWithImdbLinkSearch(val id: String) extends Search[Movie] with Logging 
     }.flatten
   }
   
-  def imdbLookup(imdbUrl: String, score: Double): Option[(Double,Movie)] = {
+  def imdbLookup(imdbUrl: String, score: Double): Option[Movie] = {
     val lookup = GoogleCSE.Query(IMDB.CSE, imdbUrl)
     val fut = lookup.execute()
     val res = fut.get() // block
@@ -63,7 +63,9 @@ class TermWithImdbLinkSearch(val id: String) extends Search[Movie] with Logging 
     val infos = new ListBuffer[MovieInfo]
     
     for (r <- res if r.url.toString.contains( imdbUrl )) {
+      infos append MovieInfos.Score( score )
       infos append MovieInfos.IMDB( r.url.toString )
+      
       
       for (dataType <- r.pageMap.keys) {
         trace("Parsing Google PageMap of IMDB-Lookup Result: " + r.url + " ("+score+")")
@@ -74,7 +76,7 @@ class TermWithImdbLinkSearch(val id: String) extends Search[Movie] with Logging 
     Movie.create(infos) match {
       case Some(movie) => {
         trace("sucessfully created: " + movie)
-        Some(score,movie)
+        Some(movie)
       }
       case None => {
         trace("NO MOVIE CREATED, not enough information: " + infos.mkString(", "))

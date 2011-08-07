@@ -142,7 +142,13 @@ class GUI extends Reactor {
       case Events.MovieResults(res) => {
         mdl.clear
         
-        for ( (score, movie) <- res) {
+        for ( movie <- res) {
+          val score = {
+            val scores = movie.infos.collect({ case MovieInfos.Score(score) => score })
+              if (scores.isEmpty) 0.0
+              else scores.head
+          }
+          
           val imdb = {
             val imdbs = movie.infos.collect({ case MovieInfos.IMDB(url) => url })
             if (imdbs.isEmpty) ""
@@ -217,18 +223,20 @@ class GUI extends Reactor {
   lazy val SubtitlesPanel = new ScrollPane {
     border = createBorder("Subtitles")
     
-    case class Row(var checked: Boolean, url: String, lang: String, obj: MovieInfos.Subtitle) extends TableModelRow {
+    case class Row(var checked: Boolean, lang: String, page: String, file: String, obj: MovieInfos.Subtitle) extends TableModelRow {
       def value(i: Int): AnyRef = { i match {
         case 0 => checked
-        case 1 => url
-        case 2 => lang
+        case 1 => lang
+        case 2 => page
+        case 3 => file
       }}.asInstanceOf[AnyRef]
     }
     
     val cols =
       TableModel.CheckboxCol("")      ::
-      TableModel.Col("URL", 630)      ::
       TableModel.Col("Language", 100) ::
+      TableModel.Col("Page", 430)     ::
+      TableModel.Col("File", 230)     ::
       Nil
     
     val mdl = TableModel[Row](cols)
@@ -247,7 +255,7 @@ class GUI extends Reactor {
       case Events.SelectedMovieResult(movie) => {
         mdl.clear
         for (sub <- movie.infos.collect({ case sub:MovieInfos.Subtitle => sub})) {
-          mdl add Row(false, sub.url.toString, sub.lang, sub)
+          mdl add Row(false, sub.lang, sub.page.toString, sub.file.toString, sub)
         }
       }
       case TableRowsSelected(src, rng, false) => {
@@ -411,7 +419,7 @@ class GUI extends Reactor {
 }
 
 object Events {
-  case class MovieResults(res: List[(Double,Movie)]) extends Event
+  case class MovieResults(res: List[Movie]) extends Event
   case class SelectedMovieResult(movie: Movie) extends Event
   case class SelectedImage(img: MovieInfos.Image) extends Event
 }
