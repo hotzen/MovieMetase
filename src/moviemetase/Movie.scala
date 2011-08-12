@@ -5,7 +5,7 @@ import java.util.Date
 
 
 object Movie {
-  def create(infos: Traversable[MovieInfo]): Option[Movie] = {
+  def apply(infos: Traversable[MovieInfo]): Option[Movie] = {
     val t = infos.collect({ case MovieInfos.Title(t) => t   })   
     val y = infos.collect({ case MovieInfos.Release(d) => d })
     
@@ -97,11 +97,11 @@ object MovieInfos {
   case class Producer(name: String) extends MovieInfo
   case class Writer(name: String)   extends MovieInfo
     
-  case class IMDB(id: String) extends MovieInfo with WebPage {
+  case class Imdb(id: String) extends MovieInfo with WebPage {
     lazy val page: URL = new URL( "http://www.imdb.com/title/" + id + "/" )
   }
   
-  case class TMDB(id: String) extends MovieInfo with WebPage {
+  case class Tmdb(id: String) extends MovieInfo with WebPage {
     lazy val page: URL = new URL( "http://www.themoviedb.org/movie/" + id )
   }
     

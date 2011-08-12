@@ -31,7 +31,7 @@ object SubtitleSource {
     
     def search(term: String): List[List[MovieInfo]] = {
       val fuzzy = Google.fuzzyTerm(term)
-      trace("querying GoogleCSE with term '" + fuzzy + "'")
+      trace("querying GoogleCSE with fuzzy term '" + fuzzy + "'")
       
       val relQuery = GoogleCSE.Query(ReleaseCSE, term)
       val fut = relQuery.execute()
@@ -43,7 +43,7 @@ object SubtitleSource {
                _       <- Regex.ReleaseLink.findFirstIn(r.url.toString) ) yield {
 
           val score = BaseScore * (1.0 - idx * 0.05)
-          trace("ResultIndex=" + idx + "; ReleasePage=" + r.url + "; Score=" + score)
+          trace("found ReleasePage", ("ResultIndex" -> idx) :: ("ReleasePage" -> r.url) :: ("Score" -> score) :: Nil)
           
           val extract = ReleasePageExtractor( r.url )
           extract.logOut = logOut
@@ -54,7 +54,7 @@ object SubtitleSource {
       val allReleaseInfos = for ( fut  <- releaseFuts; link <- fut.get() ) yield link      
 
       // filter out duplicate Subtitle-Pages
-      val releaseInfos = allReleaseInfos.countedDistinct((a,b) => a.subtitlePage == b.subtitlePage).sortByCount().noCount()
+      val releaseInfos = allReleaseInfos.countDistinct((a,b) => a.subtitlePage == b.subtitlePage).sortByCount().noCount()
             
       // extract Subtitle-page
       val combinedFuts =
@@ -86,7 +86,7 @@ object SubtitleSource {
           
           if (!subInfo.moviePage.isEmpty) {
             val moviePage = subInfo.moviePage.get
-            movieInfos append MovieInfos.IMDB(
+            movieInfos append MovieInfos.Imdb(
               moviePage.imdbID
             ).withSourceInfo( moviePage.moviePage.toString )
           }
@@ -156,7 +156,7 @@ object SubtitleSource {
           yield (aElem, href)
       
       def eq(a: (Element,String), b: (Element,String)): Boolean = a._2 == b._2 // equality on href
-      val links = allLinks.countedDistinct(eq).noCount()
+      val links = allLinks.countDistinct(eq).noCount()
       
       val allMoviePages = 
         for ( (aElem, href) <- links;
@@ -172,6 +172,7 @@ object SubtitleSource {
         warn("found no MoviePage on SubtitlePage " + url)
       else if (!moviePages.tail.isEmpty)
         warn("found " + moviePages.length + " MoviePages, using only first: " + moviePages.first)
+      
       val moviePage = moviePages.headOption
       
       

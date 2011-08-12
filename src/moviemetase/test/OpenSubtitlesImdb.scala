@@ -9,8 +9,8 @@ object OpenSubtitlesImdb {
     val t = OpenSubtitles.Login().task().call()
     println(t)
     
-    val imdb = MovieInfos.IMDB("tt0088247")
-    val r = OpenSubtitles.SearchByImdb(t.get, imdb).task().call()
+    val imdb = MovieInfos.Imdb("tt0088247")
+    val r = OpenSubtitles.Imdb(t.get, imdb).task().call()
     println( r.mkString("\n") )
     
     ()

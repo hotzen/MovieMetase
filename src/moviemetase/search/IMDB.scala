@@ -13,6 +13,7 @@ object IMDB {
   val IdRegex   = """tt[0-9]+""".r
 }
 
+
 class TermWithImdbLinkSearch(val id: String) extends Search[Movie] with Logging {
   
   val logID = id
@@ -31,7 +32,7 @@ class TermWithImdbLinkSearch(val id: String) extends Search[Movie] with Logging 
     val imdbUrls = googleRes.flatMap(r => IMDB.UrlRegex.findFirstIn( r.snippet ) ).map( m => "http://www." + m + "/")
     
     // group by URL, count occurrence, sort by occurrence
-    val imdbPackedUrls = imdbUrls.countedDistinct().sortByCount()
+    val imdbPackedUrls = imdbUrls.countDistinct().sortByCount()
     trace("found " + imdbPackedUrls.length + " distinct IMDB-URLs")
     
     // nothing found, abort
@@ -42,7 +43,7 @@ class TermWithImdbLinkSearch(val id: String) extends Search[Movie] with Logging 
     val firstImdbUrl = imdbUrls.head
     val mostImdbUrl  = imdbPackedUrls.head._1
     val mostImdbCnt  = imdbPackedUrls.head._2
-        
+
     {
       if (firstImdbUrl == mostImdbUrl || mostImdbCnt == 1) {
         trace("IMDB-Lookup for first/most IMDB-URL: " + firstImdbUrl)
@@ -51,7 +52,6 @@ class TermWithImdbLinkSearch(val id: String) extends Search[Movie] with Logging 
         trace("IMDB-Lookups for first " + firstImdbUrl + " and most IMDB-URL " + mostImdbUrl)
         imdbLookup(firstImdbUrl, 0.7) :: imdbLookup(mostImdbUrl, 0.7)  :: Nil
       }
-        
     }.flatten
   }
   
@@ -64,7 +64,7 @@ class TermWithImdbLinkSearch(val id: String) extends Search[Movie] with Logging 
     
     for (r <- res if r.url.toString.contains( imdbUrl )) {
       infos append MovieInfos.Score( score )
-      infos append MovieInfos.IMDB( r.url.toString )
+      infos append MovieInfos.Imdb( r.url.toString )
       
       
       for (dataType <- r.pageMap.keys) {
@@ -73,7 +73,7 @@ class TermWithImdbLinkSearch(val id: String) extends Search[Movie] with Logging 
       }
     }
     
-    Movie.create(infos) match {
+    Movie(infos) match {
       case Some(movie) => {
         trace("sucessfully created: " + movie)
         Some(movie)
@@ -102,7 +102,6 @@ class TermWithImdbLinkSearch(val id: String) extends Search[Movie] with Logging 
         pageMapData.get("title") match {
           case Some(t) => {
             val TitleRegex = """(.+?)\(([0-9]+)\)""".r
-            
             TitleRegex.findFirstMatchIn( t ) match {
               case Some(m) => {
                 infos append MovieInfos.Title( m.group(1).trim )

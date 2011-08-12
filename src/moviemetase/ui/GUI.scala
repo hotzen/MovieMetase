@@ -93,7 +93,7 @@ class GUI extends Reactor {
       
       else {
         val s: SearchManager[Movie] = new MovieSearch
-        val res = s.searchByFile( FileInfo.create( files.head ) )
+        val res = s.searchByFile( FileInfo( files.head ) )
         publish( Events.MovieResults(res) )
       }
     }}
@@ -150,13 +150,13 @@ class GUI extends Reactor {
           }
           
           val imdb = {
-            val imdbs = movie.infos.collect({ case MovieInfos.IMDB(url) => url })
+            val imdbs = movie.infos.collect({ case MovieInfos.Imdb(url) => url })
             if (imdbs.isEmpty) ""
             else imdbs.head
           }
 
           val tmdb = {
-            val tmdbs = movie.infos.collect({ case MovieInfos.TMDB(url) => url })
+            val tmdbs = movie.infos.collect({ case MovieInfos.Tmdb(url) => url })
             if (tmdbs.isEmpty) ""
             else tmdbs.head
           }

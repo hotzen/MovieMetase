@@ -38,7 +38,7 @@ object ImdbLink {
     infos appendAll queryIMDB( imdbUrl )
 //    infos appendAll queryTMDB( )
     
-    val m = Movie.create( infos.toList )
+    val m = Movie( infos.toList )
     println( m )
     
     ()
@@ -60,7 +60,7 @@ object ImdbLink {
     
     for (r <- rs) {
       println("CSE-Result: " + r.url)
-      infos append MovieInfos.IMDB( r.url.toString )
+      infos append MovieInfos.Imdb( r.url.toString )
       
       for (dataType <- r.pageMap.keys) {
         println("PageMap " + dataType)

@@ -14,7 +14,7 @@ sealed trait TmdbQuery extends Query[List[Movie]] with XmlProcessor[List[Movie]]
 object TMDB {
   case class ImdbLookup(imdbID: String) extends TmdbQuery {
     val BASE_URL = "http://api.themoviedb.org/2.1/Movie.imdbLookup/en/xml/"
-    val API_KEY  =  "be11971c1e1d73be3465ce33a0aaed78"
+    val API_KEY  = "be11971c1e1d73be3465ce33a0aaed78"
     
     def query: String = imdbID
       
@@ -34,7 +34,7 @@ object TMDB {
         
         infos.clear
         
-        infos append MovieInfos.TMDB(
+        infos append MovieInfos.Tmdb(
           elemMovie.getChildElements("url").
             map( _.getValue ).
             head
@@ -107,7 +107,7 @@ object TMDB {
             assert(false, "unknown TMDB image-type: " + img.imgType)
         }
         
-        Movie.create( infos ).head
+        Movie( infos ).head
       }
       
       movies.toList
@@ -130,8 +130,8 @@ trait TmdbIntegrator extends Search[Movie] with Logging { // self: Search[Movie]
       val infos = movie.infos
       
       // search for IMDB-IDs
-      val ids = infos.collect({ case MovieInfos.IMDB(url) => IMDB.IdRegex.findFirstIn(url) }).flatten.
-                  countedDistinct().sortByCount()
+      val ids = infos.collect({ case MovieInfos.Imdb(url) => IMDB.IdRegex.findFirstIn(url) }).flatten.
+                  countDistinct().sortByCount()
       
       if (ids.isEmpty) {
         trace("TmdbIntegrator found no IMDB-ID, aborting")
@@ -169,7 +169,7 @@ trait TmdbIntegrator extends Search[Movie] with Logging { // self: Search[Movie]
             case _                     => true
           })
           
-          val newMovie = Movie.create(filtInfos ::: tmdbInfos).head
+          val newMovie = Movie(filtInfos ::: tmdbInfos).head
           trace("successfully integrated TMDB-Information")
           newMovie
         }

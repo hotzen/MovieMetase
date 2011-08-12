@@ -7,7 +7,6 @@ object XOM {
   
   object XPath {
     val XHTML = new XPathContext("xhtml", "http://www.w3.org/1999/xhtml")
-    
   }
         
   implicit def NodesToIterable(nodes: Nodes): Iterable[Node] = new Iterable[Node] {

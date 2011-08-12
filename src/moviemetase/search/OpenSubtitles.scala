@@ -14,14 +14,14 @@ import java.io.PrintWriter
 //  def toSubtitle: MovieInfos.Subtitle = null
 //}
 //
-//sealed trait OpenSubtitlesQuery extends Query[OpenSubtitlesResult] with XmlProcessor[List[OpenSubtitlesResult]] {
-//  final override val UserAgent = OpenSubtitles.API_UA
-//  final override val RequestContentType = Some("text/xml")
-//  
-//  final def url: URL = new URL( OpenSubtitles.API_URL )
-//}
-//
-// http://trac.opensubtitles.org/projects/opensubtitles/wiki/XMLRPC
+sealed trait OpenSubtitlesQuery extends Query[List[MovieInfos.Subtitle]] with XmlProcessor[List[MovieInfos.Subtitle]] with Logging {
+  final override val UserAgent = OpenSubtitles.API_UA
+  final override val RequestContentType = Some("text/xml")
+    
+  final val url: URL = new URL( OpenSubtitles.API_URL )
+}
+
+
 object OpenSubtitles {
 
   val API_UA  = "MovieMetase v1"
@@ -30,14 +30,18 @@ object OpenSubtitles {
   var defaultLanguage: String = "eng"
   
   // http://trac.opensubtitles.org/projects/opensubtitles/wiki/XmlRpcLogIn
-  case class Login(user: String = "", password: String = "", language: String = defaultLanguage) extends XmlProcessor[Option[String]] {
+  case class Login(user: String = "", password: String = "", language: String = defaultLanguage) extends XmlProcessor[Option[String]] with Logging {
+    val logID = "OpenSubtitles.Login"
+    
     override val UserAgent = API_UA
     override val RequestContentType = Some("text/xml")
     
     override val RequestFn = Some( (os:OutputStream) => {
+      trace("XML-RPC LogIn ...", ("user" -> user) :: ("password" -> password) :: ("language" -> language) :: Nil)
+      
       val pw  = new PrintWriter( os )
       val rpc = XmlRpc.methodCall("LogIn", user:: password :: language :: API_UA :: Nil)
-      
+            
       pw.write( rpc )
       pw.flush()
       os.close()
@@ -52,17 +56,23 @@ object OpenSubtitles {
         for (node  <- doc.xpath("""//member[name="token"]/value/string""");
              token <- node.toElement) yield token.getValue
 
-      tokens.headOption
+      val token = tokens.headOption
+      
+      if (token.isEmpty)
+        error("authentication failed, no token issued")
+      else
+        trace("authenticated", ("token" -> token) :: Nil)
+        
+      token
     }
   }
   
   // http://trac.opensubtitles.org/projects/opensubtitles/wiki/XmlRpcSearchSubtitles
-  case class SearchByImdb(token: String, imdb: MovieInfos.IMDB, language: String = defaultLanguage) extends XmlProcessor[List[MovieInfos.Subtitle]] {
-    override val UserAgent = OpenSubtitles.API_UA
-    override val RequestContentType = Some("text/xml")
-  
-    def url: URL = new URL( OpenSubtitles.API_URL )
+  case class Imdb(token: String, imdb: MovieInfos.Imdb, language: String = defaultLanguage) extends OpenSubtitlesQuery {
+    val logID = "OpenSubtitles.Imdb"
     
+    def query = imdb.toString
+      
     override val RequestFn = Some( (os:OutputStream) => {
       val pw  = new PrintWriter( os )
 
@@ -70,6 +80,8 @@ object OpenSubtitles {
       val searchStruct = ("sublanguageid" -> language) :: ("imdbid" -> imdbID) :: Nil
       val searches = Array( searchStruct )
       val rpc = XmlRpc.methodCall("SearchSubtitles", token :: searches :: Nil)
+      
+      trace("XML-RPC SearchSubtitles ...", ("token" -> token) :: ("sublanguageid" -> language) :: ("imdbid" -> imdbID) :: Nil)
       
       pw.write( rpc )
       pw.flush()
@@ -88,7 +100,7 @@ object OpenSubtitles {
                  elem <- node.toElement) yield elem.getValue
           values.headOption
         }
-          
+                
         val labelParts = memberValue("MovieName") :: memberValue("MovieReleaseName") :: memberValue("SubFileName") :: memberValue("SubAuthorComment") :: Nil
         val label = labelParts.flatten.map(_.trim.noTags.noEntities).filter(_.length > 0).mkString(" / ")
         
@@ -99,7 +111,9 @@ object OpenSubtitles {
         
         val file  = memberValue("ZipDownloadLink").get.toURL
         
-        MovieInfos.Subtitle(label, lang, page, file)
+        val sub = MovieInfos.Subtitle(label, lang, page, file)
+        trace("found " + sub)
+        sub
       }
     }
   }

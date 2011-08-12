@@ -21,16 +21,16 @@ class ListUtils[A](val ls: List[A]) {
 
   def defaultEq(a: A, b: A): Boolean = a == b
   
-  def countedDistinct(eq: (A,A) => Boolean = defaultEq): List[(A,Int)] = {
-    def doIt(xs: List[A], res: List[(A,Int)]): List[(A,Int)] = xs match {
+  def countDistinct(eq: (A,A) => Boolean = defaultEq): List[(A,Int)] = {
+    def f(xs: List[A], res: List[(A,Int)]): List[(A,Int)] = xs match {
       case Nil => res
       case x::tail => {
         val count = 1 + tail.count(  eq(_,x) )
         val newXs = tail.remove( eq(_,x) )
-        doIt(newXs, (x,count) :: res)
+        f(newXs, (x,count) :: res)
       }
     }
-    doIt(ls, Nil).reverse
+    f(ls, Nil).reverse
   }
 }
 
@@ -86,16 +86,21 @@ trait Logging {
   
   def logTime: String = System.currentTimeMillis().toString
   
-  val LINE_MAX_LEN = 150
-  val LINE_SEP = "\n  "
+  val LOG_LINE_MAX_LEN = 300
+  val LOG_LINE_SEP = "\n  "
   
-  final def trace(s: String): Unit = log(LogLevel.Trace, s)
-  final def warn(s: String): Unit  = log(LogLevel.Warn,  s)
-  final def error(s: String): Unit = log(LogLevel.Error, s) 
+  final def trace(msg: String, ps: List[(String,Any)] = Nil): Unit = log(LogLevel.Trace, msg, ps)
+  final def warn(msg: String,  ps: List[(String,Any)] = Nil): Unit = log(LogLevel.Warn,  msg, ps)
+  final def error(msg: String, ps: List[(String,Any)] = Nil): Unit = log(LogLevel.Error, msg, ps) 
       
-  final def log(lvl: LogLevel, s: String): Unit = {
+  final def log(lvl: LogLevel, msg: String, ps: List[(String,Any)]): Unit = {
     if (lvl.id >= minLogLevel.id) {
-      logOut.println("[" + lvl.label + "] " + logTime + " " + logID + LINE_SEP + s.grouped(LINE_MAX_LEN).mkString(LINE_SEP))
+      
+      val s =
+        if (ps.isEmpty) msg
+        else            msg + " {" + ps.map( p => p._1+"="+p._2 ).mkString("; ") + "}"
+      
+      logOut.println("[" + lvl.label + "] " + logTime + " " + logID + "\t" + s.grouped(LOG_LINE_MAX_LEN).mkString(LOG_LINE_SEP))
     }
   }
 }

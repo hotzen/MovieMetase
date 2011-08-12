@@ -15,16 +15,18 @@ sealed trait GoogleQuery extends Query[List[GoogleResult]] with UrlProcessor[Lis
 
 object Google {
   
-  val NonAlphaNumRegex = """[^a-zA-Z\d]+""".r
-  //val MultiMinusRegex  = """-{2,}""".r
-  val FirstMinusRegex  = """^-+""".r
-  val LastMinusRegex   = """-+$""".r
-  
+  object Regex {
+    val NonAlphaNum  = """[^a-zA-Z\d]+""".r
+    //val MultiMinus = """-{2,}""".r
+    val FirstMinus   = """^-+""".r
+    val LastMinus    = """-+$""".r
+  }
+    
   def fuzzyTerm(t: String): String = {
     val _1 = t.trim
-    val _2 = NonAlphaNumRegex.replaceAllIn(_1, "-")
-    val _3 = FirstMinusRegex.replaceFirstIn(_2, "")
-    val _4 = LastMinusRegex.replaceFirstIn(_3, "")
+    val _2 = Regex.NonAlphaNum.replaceAllIn(_1,  "-")
+    val _3 = Regex.FirstMinus.replaceFirstIn(_2, "")
+    val _4 = Regex.LastMinus.replaceFirstIn(_3,  "")
     _4
   }
   
