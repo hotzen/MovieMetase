@@ -9,7 +9,7 @@ import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.HashMap
 import java.util.concurrent.Future
 
-sealed trait SubsceneQuery extends Query[List[MovieInfos.Subtitle]] with HtmlProcessor[List[MovieInfos.Subtitle]]
+sealed trait SubsceneQuery extends Query[List[MovieInfos.Subtitle]] with HtmlTask[List[MovieInfos.Subtitle]]
 
 object Subscene {
   
@@ -90,7 +90,7 @@ object Subscene {
   
   case class SubtitlePageInfo()
   
-  case class SubtitlePageExtractor(url: URL) extends HtmlProcessor[List[SubtitlePageInfo]] with Logging {
+  case class SubtitlePageExtractor(url: URL) extends HtmlTask[List[SubtitlePageInfo]] with Logging {
     val logID = "Subscene.SubtitlePageExtractor(" + url + ")"
     
     def process(doc: nu.xom.Document): List[SubtitlePageInfo] = {
@@ -179,7 +179,7 @@ object Subscene {
 ////  
 //  case class ReleasePageInfo(releasePage: URL, subtitlePage: URL, label: String, lang: String)
 //  
-//  case class ReleasePageExtractor(url: URL) extends HtmlProcessor[List[ReleasePageInfo]] with Logging {
+//  case class ReleasePageExtractor(url: URL) extends HtmlTask[List[ReleasePageInfo]] with Logging {
 //    import XOM._
 //    val logID = "SubtitleSource_ReleasePageExtractor(" +  url.toString + ")"
 //
@@ -219,7 +219,7 @@ object Subscene {
 //  case class SubtitlePageInfo(subtitlePage: URL, downloadUrl: URL, moviePage: Option[MoviePageInfo])
 //  case class MoviePageInfo(moviePage: URL, imdbID: String)
 //  
-//  case class SubtitlePageExtractor(url: URL) extends HtmlProcessor[Option[SubtitlePageInfo]] with Logging {
+//  case class SubtitlePageExtractor(url: URL) extends HtmlTask[Option[SubtitlePageInfo]] with Logging {
 //    import XOM._
 //    val logID = "SubtitleSource_SubtitlePageExtractor(" +  url.toString + ")"
 //    

@@ -1,6 +1,7 @@
 package moviemetase
-package search
+package query
 
+import sites._
 import java.net.URL
 import nu.xom._
 import java.io.InputStream
@@ -14,7 +15,7 @@ import java.io.PrintWriter
 //  def toSubtitle: MovieInfos.Subtitle = null
 //}
 //
-sealed trait OpenSubtitlesQuery extends Query[List[MovieInfos.Subtitle]] with XmlProcessor[List[MovieInfos.Subtitle]] with Logging {
+sealed trait OpenSubtitlesQuery extends Query[List[MovieInfos.Subtitle]] with XmlTask[List[MovieInfos.Subtitle]] with Logging {
   final override val UserAgent = OpenSubtitles.API_UA
   final override val RequestContentType = Some("text/xml")
     
@@ -30,7 +31,7 @@ object OpenSubtitles {
   var defaultLanguage: String = "eng"
   
   // http://trac.opensubtitles.org/projects/opensubtitles/wiki/XmlRpcLogIn
-  case class Login(user: String = "", password: String = "", language: String = defaultLanguage) extends XmlProcessor[Option[String]] with Logging {
+  case class Login(user: String = "", password: String = "", language: String = defaultLanguage) extends XmlTask[Option[String]] with Logging {
     val logID = "OpenSubtitles.Login"
     
     override val UserAgent = API_UA
@@ -81,7 +82,7 @@ object OpenSubtitles {
       val searches = Array( searchStruct )
       val rpc = XmlRpc.methodCall("SearchSubtitles", token :: searches :: Nil)
       
-      trace("XML-RPC SearchSubtitles ...", ("token" -> token) :: ("sublanguageid" -> language) :: ("imdbid" -> imdbID) :: Nil)
+      trace("XML-RPC SearchSubtitles ...", ("token" -> token) :: ("sublanguageID" -> language) :: ("imdbID" -> imdbID) :: Nil)
       
       pw.write( rpc )
       pw.flush()

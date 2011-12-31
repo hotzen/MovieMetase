@@ -1,5 +1,5 @@
 package moviemetase
-package search
+package query
 
 import java.net.URL
 import nu.xom._
@@ -11,7 +11,7 @@ import scala.util.parsing.json.JSON
 
 import Util._
 
-sealed trait GoogleQuery extends Query[List[GoogleResult]] with UrlProcessor[List[GoogleResult]]
+sealed trait GoogleQuery extends Query[List[GoogleResult]] with UrlTask[List[GoogleResult]]
 
 object Google {
   
@@ -69,7 +69,7 @@ object GoogleAjax {
         val title   = get("titleNoFormatting").head
         val snippet = get("content").map( _.noTags.noEntities ).head
         
-        GoogleResult(new URL(url), title, snippet, Map(), this)
+        GoogleResult(new URL(url), title, snippet, Nil, this)
       }
     }
   }
@@ -107,8 +107,15 @@ object GoogleCSE {
       val builder = new Builder()
       val doc = builder build in
       
+      //println( doc.toXML )
+      
       val results = for (entry <- doc.getRootElement.getChildElements("entry", NS_ATOM)) yield {
   
+//        val id = entry.
+//          getChildElements("id", NS_ATOM).
+//          map( _.getValue ).
+//          head
+        
         val url = entry.
           getChildElements("link", NS_ATOM).
           map( _.getAttributeValue("href") ).
@@ -125,8 +132,8 @@ object GoogleCSE {
           head
         
         // collect data-objects
-        val data = for (pageMap    <- entry.getChildElements("PageMap", NS_CSE);
-                        dataObject <- pageMap.getChildElements("DataObject", NS_CSE)) yield {
+        val pageMap = for (pageMap    <- entry.getChildElements("PageMap", NS_CSE);
+                           dataObject <- pageMap.getChildElements("DataObject", NS_CSE)) yield {
   
           // type
           val dataType = dataObject.getAttributeValue("type")
@@ -139,10 +146,10 @@ object GoogleCSE {
             attribs.put(attrName, attrVal)
           }
           
-          (dataType -> GooglePageMapData(dataType, attribs.toMap))
+          GooglePageMapDataObject(dataType, attribs.toMap)
         }
         
-        GoogleResult(new URL(url), title, snippet, data.toMap, this)
+        GoogleResult(new URL(url), title, snippet, pageMap.toList, this)
       }
       
       results.toList
@@ -154,12 +161,24 @@ object GoogleCSE {
 
 
 // http://code.google.com/intl/de-DE/apis/customsearch/docs/structured_data.html#pagemaps
-case class GooglePageMapData(dataType: String, data: Map[String,String]) {
-  def names: Iterable[String] = data.keys
-  def get(name: String): Option[String] = data.get(name)
+case class GooglePageMapDataObject(dataType: String, data: Map[String,String]) {
+  def attributes: Iterable[String] = data.keys
+  
+  def get(attribute: String): Option[String] = data.get(attribute)
+  
+  override def toString = {
+    val sb = new StringBuffer("GooglePageMap")
+    sb append "(" append dataType append ") {\n"
+    for ( (k,v) <- data) {
+      sb append "\t" append k append " = '" append v append "'\n"
+    }
+    sb append "}"
+    
+    sb.toString
+  }
 }
 
-case class GoogleResult(url: URL, title: String, snippet: String, pageMap: Map[String, GooglePageMapData], query: GoogleQuery)
+case class GoogleResult(url: URL, title: String, snippet: String, pageMap: List[GooglePageMapDataObject], query: GoogleQuery)
 
 
 

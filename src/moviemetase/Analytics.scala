@@ -12,7 +12,7 @@ object Analyzer {
   val SplitRegex = """[^A-Z0-9ÄÖÜ]""".r
     
   def split(s: String): List[String] =
-    SplitRegex.split( s.toUpperCase ).map(_.trim).filter(!_.isEmpty).toList
+    SplitRegex.split( s.toLowerCase ).map(_.trim).filter(!_.isEmpty).toList
     
   
 

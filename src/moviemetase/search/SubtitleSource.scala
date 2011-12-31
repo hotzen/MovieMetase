@@ -1,6 +1,7 @@
 package moviemetase
 package search
 
+import query._
 import Util._
 import java.net.URL
 import java.io.InputStream
@@ -9,7 +10,7 @@ import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.HashMap
 import java.util.concurrent.Future
 
-sealed trait SubtitleSourceQuery extends Query[List[Movie]] with UrlProcessor[List[Movie]]
+sealed trait SubtitleSourceQuery extends Query[List[Movie]] with UrlTask[List[Movie]]
 
 object SubtitleSource {
   
@@ -24,7 +25,7 @@ object SubtitleSource {
     val DownloadZipLink = """/download/zip/(\d+)""".r
   }
     
-  case class ReleaseSearch(val id: String) extends Search[List[MovieInfo]] with Logging {
+  case class ReleaseSearch(val id: String) extends SearchStrategy[List[MovieInfo]] with Logging {
     val logID = "SubtitleSource_ReleaseSearch(" + id  + ")"
     
     val BaseScore = 0.95
@@ -54,7 +55,7 @@ object SubtitleSource {
       val allReleaseInfos = for ( fut  <- releaseFuts; link <- fut.get() ) yield link      
 
       // filter out duplicate Subtitle-Pages
-      val releaseInfos = allReleaseInfos.countDistinct((a,b) => a.subtitlePage == b.subtitlePage).sortByCount().noCount()
+      val releaseInfos = allReleaseInfos.distinctNoCount((a,b) => a.subtitlePage == b.subtitlePage) // map out counts //.sortByCount().noCount()
             
       // extract Subtitle-page
       val combinedFuts =
@@ -100,7 +101,7 @@ object SubtitleSource {
   
   case class ReleasePageInfo(releasePage: URL, subtitlePage: URL, label: String, lang: String)
   
-  case class ReleasePageExtractor(url: URL) extends HtmlProcessor[List[ReleasePageInfo]] with Logging {
+  case class ReleasePageExtractor(url: URL) extends HtmlTask[List[ReleasePageInfo]] with Logging {
     import XOM._
     val logID = "SubtitleSource_ReleasePageExtractor(" +  url.toString + ")"
 
@@ -140,7 +141,7 @@ object SubtitleSource {
   case class SubtitlePageInfo(subtitlePage: URL, downloadUrl: URL, moviePage: Option[MoviePageInfo])
   case class MoviePageInfo(moviePage: URL, imdbID: String)
   
-  case class SubtitlePageExtractor(url: URL) extends HtmlProcessor[Option[SubtitlePageInfo]] with Logging {
+  case class SubtitlePageExtractor(url: URL) extends HtmlTask[Option[SubtitlePageInfo]] with Logging {
     import XOM._
     val logID = "SubtitleSource_SubtitlePageExtractor(" +  url.toString + ")"
     
@@ -156,7 +157,7 @@ object SubtitleSource {
           yield (aElem, href)
       
       def eq(a: (Element,String), b: (Element,String)): Boolean = a._2 == b._2 // equality on href
-      val links = allLinks.countDistinct(eq).noCount()
+      val links = allLinks.distinctNoCount(eq)
       
       val allMoviePages = 
         for ( (aElem, href) <- links;
@@ -171,7 +172,7 @@ object SubtitleSource {
       if (moviePages.isEmpty)
         warn("found no MoviePage on SubtitlePage " + url)
       else if (!moviePages.tail.isEmpty)
-        warn("found " + moviePages.length + " MoviePages, using only first: " + moviePages.first)
+        warn("found " + moviePages.length + " MoviePages, using only first: " + moviePages.head )
       
       val moviePage = moviePages.headOption
       
@@ -190,7 +191,7 @@ object SubtitleSource {
         None
       } else {
         if (!downloadUrls.tail.isEmpty)
-          warn("found " + downloadUrls.length + " DownloadURLs, using only first: " + downloadUrls.first)
+          warn("found " + downloadUrls.length + " DownloadURLs, using only first: " + downloadUrls.head )
         
         Some( SubtitlePageInfo(url, downloadUrls.head, moviePage) )
       }

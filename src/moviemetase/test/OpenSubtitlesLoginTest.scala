@@ -1,6 +1,7 @@
 package moviemetase
 package test
 
+import query._
 import search._
 
 object OpenSubtitlesLoginTest {

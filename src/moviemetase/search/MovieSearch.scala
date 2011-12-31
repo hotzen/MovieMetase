@@ -1,20 +1,27 @@
 package moviemetase
 package search
 
+import search._
+import java.util.concurrent._
+import java.net.URL
+import java.io.InputStream
+import java.io.OutputStream
+import java.io.PrintStream
 import java.util.concurrent.Callable
 import java.util.concurrent.Future
 import java.util.concurrent.Executors
+import java.net.URLConnection
 import scala.collection.mutable.ListBuffer
 import Util._
 import java.io.PrintStream
 
+
 case class MovieSearch(val out: PrintStream = System.out) extends SearchManager[Movie] {
   
-  def searchTerm(term: String): List[Movie] = {
-    val s = new TermWithImdbLinkSearch("FileNameWithImdbLink") with TmdbIntegrator
-    s.out = out
+  def searchByTerm(term: String): List[Movie] = {
+    val search = new GoogleTermAndImdbLink with TmdbIntegrator
     
-    val fut = s.execute( term )
+    val fut = search.execute( term )
     val res = fut.get()
     
     sortMovies(res)
@@ -23,19 +30,19 @@ case class MovieSearch(val out: PrintStream = System.out) extends SearchManager[
   def searchByFile(fileInfo: FileInfo): List[Movie] = {
     
     val fut1 = {
-      val t = fileInfo.fileName
-      val s = new TermWithImdbLinkSearch("FileNameWithImdbLink") with TmdbIntegrator
-      s.out = out
+      val term = fileInfo.fileName
+      val search = new GoogleTermAndImdbLink with TmdbIntegrator
+      //s.out = out
       
-      s.execute( t )
+      search.execute( term )
     }
     
     val fut2 = {
-      val t = fileInfo.dirName
-      val s = new TermWithImdbLinkSearch("DirNameWithImdbLink") with TmdbIntegrator
-      s.out = out
+      val term = fileInfo.dirName
+      val search = new GoogleTermAndImdbLink with TmdbIntegrator
+      //s.out = out
       
-      s.execute( t )
+      search.execute( term )
     }
     
     val fut3 = {

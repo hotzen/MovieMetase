@@ -5,6 +5,8 @@ import java.util.Date
 
 
 object Movie {
+  
+  // create a Movie from MovieInfos
   def apply(infos: Traversable[MovieInfo]): Option[Movie] = {
     val t = infos.collect({ case MovieInfos.Title(t) => t   })   
     val y = infos.collect({ case MovieInfos.Release(d) => d })
@@ -22,7 +24,7 @@ object Movie {
 case class Movie(title: String, year: Int, infos: List[MovieInfo] = Nil) {
   override def toString: String = {
     val s = new StringBuffer
-    s append "Movie(_" append title append "_/" append year append "){\n"
+    s append "Movie(" append title append " [" append year append "]){\n"
     for (info <- infos) {
       val infoStr = info.toString.grouped(150).mkString("\n    ")
       s append "  " append infoStr append "\n"
@@ -50,9 +52,9 @@ object MovieInfos {
     import java.util.concurrent.Callable
     
     def downloadTask(target: File) = new Callable[(URL,File)] {
-      import java.io._
-      import java.nio._
-      import java.nio.channels._
+      import java.io.FileOutputStream
+      import java.nio.channels.{Channels, ReadableByteChannel}
+      //import java.nio.channels._
           
       def call(): (URL, File) = {
         val rbc: ReadableByteChannel = Channels.newChannel( file.openStream() )

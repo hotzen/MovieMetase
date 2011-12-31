@@ -1,4 +1,4 @@
-package moviemetase.search
+package moviemetase
 
 object XmlRpc {
   def methodCall(method: String, params: List[Any]): String = {

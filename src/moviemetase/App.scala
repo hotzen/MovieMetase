@@ -26,8 +26,7 @@ object App {
 //    new java.io.File(userDir, path)
   
   def configDir: java.io.File = {
-    val userDir = util.Properties.userDir
-    val f = new java.io.File(userDir, "MovieMetase")
+    val f = new java.io.File(util.Properties.userDir, "MovieMetase")
     if (!f.exists)
       f.mkdir()
     f

@@ -1,6 +1,7 @@
 package moviemetase
 package search
 
+import query._
 import Util._
 import java.net.URL
 import java.io.InputStream
@@ -9,7 +10,7 @@ import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.HashMap
 import java.util.concurrent.Future
 
-sealed trait TmdbQuery extends Query[List[Movie]] with XmlProcessor[List[Movie]]
+sealed trait TmdbQuery extends Query[List[Movie]] with XmlTask[List[Movie]]
 
 object TMDB {
   case class ImdbLookup(imdbID: String) extends TmdbQuery {
@@ -117,7 +118,7 @@ object TMDB {
 
 
 
-trait TmdbIntegrator extends Search[Movie] with Logging { // self: Search[Movie] with Logging =>
+trait TmdbIntegrator extends SearchStrategy[Movie] with Logging { // self: Search[Movie] with Logging =>
   
   //val logID = "TmdbIntegrator(" + self.id + ")"
   
@@ -130,8 +131,7 @@ trait TmdbIntegrator extends Search[Movie] with Logging { // self: Search[Movie]
       val infos = movie.infos
       
       // search for IMDB-IDs
-      val ids = infos.collect({ case MovieInfos.Imdb(url) => IMDB.IdRegex.findFirstIn(url) }).flatten.
-                  countDistinct().sortByCount()
+      val ids = infos.collect({ case MovieInfos.Imdb(url) => IMDB.IdRegex.findFirstIn(url) }).flatten.distinctCount() //.sortByCount()
       
       if (ids.isEmpty) {
         trace("TmdbIntegrator found no IMDB-ID, aborting")

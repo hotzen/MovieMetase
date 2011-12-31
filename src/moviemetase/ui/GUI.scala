@@ -1,7 +1,8 @@
 package moviemetase
 package ui
 
-import search.{SearchManager, MovieSearch}
+//import search.{SearchManager, MovieSearch}
+import search._
 
 import scala.swing._
 import scala.swing.event._

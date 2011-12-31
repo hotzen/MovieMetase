@@ -1,91 +1,82 @@
 package moviemetase
-package test
+package search
 
-import query._
-import search._
 import Util._
-
-import java.net.URL
+import query._
+//import java.util.concurrent.Future
 import scala.collection.mutable.ListBuffer
 
-object ImdbLink {
-  def main(args: Array[String]) {
+class GoogleTermAndImdbLink extends SearchStrategy[Movie] with Logging {
+  
+  val logID = "GoogleTermAndImdbLink"
+
+  def search(term: String): List[Movie] = {
     
-    val title = "Inception.1080p.BluRay.x264-REFiNED"
-    val q = GoogleAjax.Query(title + " link:imdb.com/title/")
-    val s = q.task()
-    val rs = s.call()
+    // search at google for the term linking to IMDB
+    val q = '"' + term + '"' + " link:imdb.com/title/"
+    trace("querying GoogleAjax with '" + q + "' ...")
     
-    // search all snippets for an IMDB-link
-    val ImdbRegex = """imdb.com/title/tt[0-9]+""".r
-    val imdbUrls = rs.flatMap(r => ImdbRegex.findFirstIn( r.snippet ) ).map( m => "http://www." + m + "/")
-    println("found " + imdbUrls.length + " IMDB-links")
+    val googleQry = GoogleAjax.Query(q)
+    val googleFut = googleQry.execute()
+    val googleRes = googleFut.get() // block
     
-    // remove duplicates, count occurrence in tuple _1, sort by occurrence descending
-    def pack(ls: List[String], ps: List[(Int,String)] = Nil): List[(Int,String)] = ls match {
-      case Nil   => ps
-      case x::xs => pack( xs.remove(_ == x), (1 + xs.count(_ == x), x) :: ps )
-    }
-    val imdbPackedUrls = pack( imdbUrls ).sort( (t1,t2) => t1._1 > t2._1 )
-    println("IMDB-Links found: " + imdbPackedUrls)
+    val urls = googleRes.flatMap(r => IMDB.extractTitleUrls( r.snippet ) )
+    val distinctUrls = urls.distinctCount()
     
-    // use first only
-    println("using imdb-link: " + imdbPackedUrls.head)
-    val imdbUrl = imdbPackedUrls.head._2
+    if (urls.isEmpty)
+      return Nil
     
-    // collect infos
-    val infos = new ListBuffer[MovieInfo]( )
+    if (isLogging(LogLevel.Trace))
+      for (url <- distinctUrls)
+        trace("found " + url._1 + " (" + url._2 + ")")
         
-    infos appendAll queryIMDB( imdbUrl )
-//    infos appendAll queryTMDB( )
-    
-    val m = Movie( infos.toList )
-    println( m )
-    
-    ()
+    val firstUrl = urls.head
+    val mostUrl  = distinctUrls.head._1
+    val mostCnt  = distinctUrls.head._2
+
+    {
+      if (firstUrl == mostUrl || mostCnt == 1) {
+        trace("IMDB-Lookup for IMDB-URL: " + firstUrl)
+        imdbLookup(firstUrl, 0.95) :: Nil
+      } else {
+        trace("IMDB-Lookups for first " + firstUrl + " and most-occurred IMDB-URL " + mostUrl)
+        imdbLookup(firstUrl, 0.7) :: imdbLookup(mostUrl, 0.7)  :: Nil
+      }
+    }.flatten
   }
   
-  val IMDB_CSE = "011282045967305256347:dyc6spozqnc"
-  
-  def queryIMDB(imdbUrl: String): List[MovieInfo] = {
-    println("----------")
-    println("CSE-Search at IMDB for: " + imdbUrl)
+  def imdbLookup(url: String, baseScore: Double): Option[Movie] = {
+    val lookup = GoogleCSE.Query(IMDB.CSE, url)
+    val fut = lookup.execute()
+    val res = fut.get() // block
+    //println( res.mkString("\n") )
     
-    val q = GoogleCSE.Query(IMDB_CSE, imdbUrl)
-    val s = q.task()
-    val rs = s.call()
-    
-    //println( rs.mkString("\n") )
-    val PathRegex = """/title/tt[0-9]+""".r
     val infos = new ListBuffer[MovieInfo]
     
-    for (r <- rs) {
-      println("CSE-Result: " + r.url)
-      infos append MovieInfos.Imdb( r.url.toString )
-      
-//      for (dataType <- r.pageMap.keys) {
-//        println("PageMap " + dataType)
-//        infos appendAll parseImdbPageMap(dataType, r.pageMap.get(dataType).head)
-//      }
+    //for (r <- res if r.url.toString.contains( url )) {
+    for (r <- res if r.url.toString == url) {
+      infos append MovieInfos.Score( baseScore )
+            
+      infos append MovieInfos.Imdb( IMDB.extractId(r.url.toString).head )
+
       for (dataObject <- r.pageMap) {
-       // trace("Google PageMap-DateObject: " + dataObject)
-        infos appendAll parseImdbPageMap( dataObject )
+        //println( dataObject.toString )
+        infos appendAll extractInfosFromGooglePageMap( dataObject )
       }
     }
     
-    infos.toList
-  }
-  
-  def queryTMDB(imdbID: String) {
+    println( infos )
     
+    val movieOpt = Movie(infos)
+    
+    if (movieOpt.isEmpty) {
+      warn("could not extract enough information!")
+    }
+    
+    movieOpt
   }
-//  
-//  def transformIMDB(pageMap: GooglePageMap): Movie = {
-//    
-//    null
-//  }
   
-  def parseImdbPageMap(dataObject: GooglePageMapDataObject): List[MovieInfo] = {
+  def extractInfosFromGooglePageMap(dataObject: GooglePageMapDataObject): List[MovieInfo] = {
     val infos = new ListBuffer[MovieInfo]
     
     dataObject.dataType.toLowerCase match {
@@ -102,7 +93,6 @@ object ImdbLink {
         dataObject.get("title") match {
           case Some(t) => {
             val TitleRegex = """(.+?)\(([0-9]+)\)""".r
-            
             TitleRegex.findFirstMatchIn( t ) match {
               case Some(m) => {
                 infos append MovieInfos.Title( m.group(1).trim )
@@ -142,7 +132,7 @@ object ImdbLink {
           case Some(r) => infos append MovieInfos.ImdbRating( r.trim.toDouble )
           case _ =>
         }
-//        dataObject.get("summary") match {
+//        pageMapData.get("summary") match {
 //          case Some(s) => infos append MovieInfos.Summary( s.trim )
 //          case _ =>
 //        }
