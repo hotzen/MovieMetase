@@ -5,6 +5,7 @@ import java.net.URLEncoder
 
 object Util {
     implicit def stringUtils[A](s: String) = new StringUtils(s)
+    implicit def regexUtils[A](r: scala.util.matching.Regex) = new RegexUtils(r)
     implicit def listUtils[A](ls: List[A]) = new ListUtils[A](ls)
     //implicit def listTupleCountUtils[A](ls: List[(A,Int)]) = new ListTupleCountUtils[A](ls)
 }
@@ -16,6 +17,13 @@ class StringUtils(val s: String) {
   def urlEncode  = URLEncoder.encode(s, "UTF-8")
   def noTags     = """<.*?>""".r.replaceAllIn(s, "")
   def noEntities = """&.+?;""".r.replaceAllIn(s, "")
+}
+
+class RegexUtils(val r: scala.util.matching.Regex) {
+  
+  def matches(s: String): Boolean =
+    r.findFirstIn(s).isDefined
+    
 }
 
 class ListUtils[A](val xs: List[A]) {

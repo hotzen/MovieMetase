@@ -22,11 +22,9 @@ case class GoogleQuery(initial: String = "") {
     this
   }
   
-  def and(t: String) =
-    append(t)
+  def and(t: String) = append(t)
   
-  def clean(t: String): String =
-    t.trim
+  def clean(t: String): String = t.trim
   
   def strict(t: String) =
     append("\"" + clean(t) + "\"")
@@ -90,7 +88,7 @@ object GoogleAjax {
       
       for ( (k1:String,resp:List[_]) <- json if k1 == "responseData";
             (k2:String,ress:List[_]) <- resp if k2 == "results";
-            resAny                     <- ress) yield {
+            resAny                   <- ress) yield {
         
         def get(Key: String): List[String] = resAny match {
           case tpls:List[(String,String)] => tpls.collect({ case (Key,v) => v })

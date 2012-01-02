@@ -109,15 +109,15 @@ trait UrlTask[A] extends Task[A] {
   // processor of the response
   def process(is: InputStream): A
     
-  
   // dont keep-alive
   val ConnectionClose = true
   
   // fooling around with user-agent and referer checks
   val UserAgent = "Mozilla/5.0"
   val Referer   = "http://stackoverflow.com/questions/tagged/referer"
-  
+      
   // if sending data, define its content-type and the function to fill the OutputStream with the data
+  val RequestProperties: List[(String, String)] = Nil
   val RequestContentType: Option[String]      = None
   val RequestFn: Option[OutputStream => Unit] = None
 
@@ -136,6 +136,9 @@ trait UrlTask[A] extends Task[A] {
     
     conn setRequestProperty ("User-Agent", UserAgent)
     conn setRequestProperty ("Referer",    Referer)
+    
+    for ((propName, propValue) <- RequestProperties)
+      conn setRequestProperty (propName, propValue)
     
     conn.connect()
     

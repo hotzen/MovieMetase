@@ -1,5 +1,5 @@
 package moviemetase
-package search
+package query
 
 import Util._
 import java.net.URL
@@ -9,77 +9,72 @@ import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.HashMap
 import java.util.concurrent.Future
 
-sealed trait SubsceneQuery extends HtmlTask[List[MovieInfos.Subtitle]]
-
 object Subscene {
   
   val BASE_URL = "http://subscene.com"
   
-  object Regex {
 //    val SubtitlePageLinkData = """/([^/]+)/([^/]+)/subtitle-(\d+).*""".r
-    val SubtitlePageLink     = """/subtitle-\d+""".r
-  }
+  val FilmPathRegex = """/(.+?)/subtitles-(\d+).aspx""".r 
+  val SubtitlePathRegex = """/(.+?)/(.+?)/subtitle-(\d+).aspx""".r
+  
+
+  case class SearchByRelease(release: String) extends HtmlTask[List[MovieInfos.Subtitle]] with Logging {
+    val logID = "Subscene.SearchByRelease(" + release + ")"
     
-  case class Release(val query: String) extends SubsceneQuery with Logging {
-    val logID = "Subscene.Release(" + query + ")"
-    
+    override val Referer = "http://subscene.com"
+
     def url: URL = {
       val sb = new StringBuilder(BASE_URL)
-      sb append "/s.aspx?q=" + query.urlEncode
+      sb append "/s.aspx?q=" + release.urlEncode
       sb.toString.toURL
     }
     
     def process(doc: nu.xom.Document): List[MovieInfos.Subtitle] = {
+      import Util._
       import XOM._
       
-      val ctx = XPathContext.XHTML
-      
-      val subPageFuts =
-        for (aNode       <- doc.xpath("""//xhtml:a""", ctx);
-             aElem       <- aNode.toElement;
-             aHref       <- aElem.attribute("href");
-             subPageLink <- Regex.SubtitlePageLink.findFirstIn(aHref) ) yield {
+      val futs =
+        for (aNode <- doc.xpath("""//xhtml:a""", XPathContext.XHTML);
+             aElem <- aNode.toElement;
+             href  <- aElem.attribute("href") if SubtitlePathRegex.matches(href) ) yield {
         
-        val subPageURL = (BASE_URL + subPageLink).toURL
-        val extract = SubtitlePageExtractor( subPageURL )
-        
-        trace("submitting task SubtitlePageExtractor", ("URL" -> subPageURL) :: Nil)
-        extract.execute()
-      }
-      
+          val pageUrl = BASE_URL + href
+          trace("Subtitle-Page: " + pageUrl)
+  
+          SubtitlePageExtractor( pageUrl.toURL ).submit()
+        }
       
       // TODO
-      
+
       Nil
     }
   }
   
-  case class Movie(val query: String) extends SubsceneQuery with Logging {
-    val logID = "Subscene.Release(" + query + ")"
+  
+  case class SearchByTitle(title: String) extends HtmlTask[List[MovieInfos.Subtitle]] with Logging {
+    val logID = "Subscene.SearchByTitle(" + title + ")"
+    
+    override val Referer = "http://subscene.com"
     
     def url: URL = {
       val sb = new StringBuilder(BASE_URL)
-      sb append "/filmsearch.aspx?q=" + query.urlEncode
+      sb append "/filmsearch.aspx?q=" + title.urlEncode
       sb.toString.toURL
     }
     
     def process(doc: nu.xom.Document): List[MovieInfos.Subtitle] = {
       import XOM._
-      
-      val ctx = XPathContext.XHTML
-      
-      val subPageFuts =
-        for (aNode      <- doc.xpath("""//xhtml:a""", ctx);
-            aElem       <- aNode.toElement;
-            aHref       <- aElem.attribute("href");
-            subPageLink <- Regex.SubtitlePageLink.findFirstIn(aHref) ) yield {
+
+      val futs =
+        for (aNode <- doc.xpath("""//xhtml:a""", XPathContext.XHTML);
+             aElem <- aNode.toElement;
+             href  <- aElem.attribute("href") if FilmPathRegex.matches(href) ) yield {
         
-        val subPageURL = (BASE_URL + subPageLink).toURL
-        val extract = SubtitlePageExtractor( subPageURL )
-        
-        trace("submitting task SubtitlePageExtractor", ("subtitlePage" -> subPageURL) :: Nil)
-        extract.execute()
-      }
+          val pageUrl = BASE_URL + href
+          trace("Film-Page: " + href)
+          
+          FilmPageExtractor( pageUrl.toURL ).submit()
+        }
       
       // TODO
       
@@ -101,6 +96,19 @@ object Subscene {
       Nil
     }
   }
+  
+  case class FilmPageExtractor(url: URL) extends HtmlTask[List[SubtitlePageInfo]] with Logging {
+    val logID = "Subscene.FilmPageExtractor(" + url + ")"
+    
+    def process(doc: nu.xom.Document): List[SubtitlePageInfo] = {
+      import XOM._
+      
+      // TODO
+      
+      Nil
+    }
+  }
+  
   
 }
 //    

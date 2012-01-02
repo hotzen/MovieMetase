@@ -3,7 +3,7 @@ package query
 
 object IMDB {
   val CSE = "011282045967305256347:dyc6spozqnc"
-  
+    
   val TitleUrlRegex  = """imdb.com/title/tt[0-9]+""".r
   val TitlePathRegex = """/title/tt[0-9]+""".r
   val IdRegex        = """tt[0-9]+""".r

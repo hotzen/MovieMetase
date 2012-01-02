@@ -58,9 +58,6 @@ object Movie {
 
 case class Movie(title: String, year: Int, infos: List[MovieInfo] = Nil) {
   
-//  def get[A](pf: PartialFunction[MovieInfo,A]): Option[A] =
-//    infos.collect(pf).headOption
-  
   val label = title + "/" + year
   
   def withNewInfos(infos2: List[MovieInfo]): Movie =
