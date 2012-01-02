@@ -3,7 +3,6 @@ package search
 
 import Util._
 import query._
-//import java.util.concurrent.Future
 import scala.collection.mutable.ListBuffer
 
 case class GoogleExactTermWithImdbLink(term: String) extends Task[List[Movie]] with Logging {
@@ -12,8 +11,6 @@ case class GoogleExactTermWithImdbLink(term: String) extends Task[List[Movie]] w
 
   def execute(): List[Movie] = {
     val q = GoogleQuery().strict(term).linkTo("imdb.com/title/").toString
-    
-    trace("Querying GoogleAjax: '" + q + "' ...")
     val googleRes = GoogleAjax.Query(q).execute()
 
     for (res <- googleRes) {

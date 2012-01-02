@@ -65,19 +65,20 @@ object GoogleAjax {
   val BASE_URL = "http://ajax.googleapis.com/ajax/services/search/web"
   
   case class Query(query: String, page: Int = 1) extends UrlTask[List[GoogleResult]] with Logging {
-    val logID = "GoogleAjax.Query(" + query + ", " + page + ")"
+    val logID = "GoogleAjax.Query"
     
     def params: String = "v=1.0&rsz=large&hl=en"
     def limit: Int = 8
       
     def url: URL = {
-      val urlBuilder = new StringBuilder( BASE_URL )
-      urlBuilder append "?"       append params
-      urlBuilder append "&start=" append ((page-1)*limit)
-      urlBuilder append "&q="     append query.urlEncode
+      val sb = new StringBuilder( BASE_URL )
+      sb append "?"       append params
+      sb append "&start=" append ((page-1)*limit)
+      sb append "&q="     append query.urlEncode
 
-      trace( urlBuilder.toString )
-      new URL( urlBuilder.toString )
+      val url = sb.toString 
+      trace("querying '" + query + "' ...", ("url" -> url) :: Nil)
+      new URL(url)
     }
     
     def process(in: InputStream): List[GoogleResult] = {
@@ -115,20 +116,24 @@ object GoogleCSE {
   val NS_OS   = "http://a9.com/-/spec/opensearch/1.1/"
   val NS_GD   = "http://schemas.google.com/g/2005"
 
-  case class Query(cseID: String, query: String, page: Int = 1) extends UrlTask[List[GoogleResult]] {
+  case class Query(cseID: String, query: String, page: Int = 1) extends UrlTask[List[GoogleResult]] with Logging {
+    val logID = "GoogleCSE.Query"
+    
     def params: String = "alt=atom&prettyprint=true&safe=off"
     def limit: Int = 10
     
     def url: URL = {
-      val urlBuilder = new StringBuilder( BASE_URL )
-      urlBuilder append "?key="   append API_KEY
-      urlBuilder append "&cx="    append cseID
-      urlBuilder append "&"       append params
-      urlBuilder append "&num="   append limit
-      urlBuilder append "&start=" append (page + (page-1)*limit)
-      urlBuilder append "&q="     append query.urlEncode
+      val sb = new StringBuilder( BASE_URL )
+      sb append "?key="   append API_KEY
+      sb append "&cx="    append cseID
+      sb append "&"       append params
+      sb append "&num="   append limit
+      sb append "&start=" append (page + (page-1)*limit)
+      sb append "&q="     append query.urlEncode
       
-      new URL( urlBuilder.toString )
+      val url = sb.toString 
+      trace("querying '" + query + "' ...", ("url" -> url) :: Nil)
+      new URL(url)
     }
 
     def process(in: InputStream): List[GoogleResult] = {
