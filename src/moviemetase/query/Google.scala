@@ -66,7 +66,9 @@ object Google {
 object GoogleAjax {
   val BASE_URL = "http://ajax.googleapis.com/ajax/services/search/web"
   
-  case class Query(query: String, page: Int = 1) extends UrlTask[List[GoogleResult]] {
+  case class Query(query: String, page: Int = 1) extends UrlTask[List[GoogleResult]] with Logging {
+    val logID = "GoogleAjax.Query(" + query + ", " + page + ")"
+    
     def params: String = "v=1.0&rsz=large&hl=en"
     def limit: Int = 8
       
@@ -76,7 +78,7 @@ object GoogleAjax {
       urlBuilder append "&start=" append ((page-1)*limit)
       urlBuilder append "&q="     append query.urlEncode
 
-      println("GoogleAjax.Query: " + urlBuilder.toString)
+      trace( urlBuilder.toString )
       new URL( urlBuilder.toString )
     }
     

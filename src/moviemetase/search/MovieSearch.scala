@@ -1,7 +1,6 @@
 package moviemetase
 package search
 
-import search._
 import java.util.concurrent._
 import java.net.URL
 import java.io.InputStream
@@ -19,7 +18,7 @@ import java.io.PrintStream
 case class MovieSearch(val out: PrintStream = System.out) extends SearchManager[Movie] {
   
   def searchByTerm(term: String): List[Movie] = {
-    val search = new GoogleTermAndImdbLink(term) with TmdbIntegrator
+    val search = new GoogleExactTermWithImdbLink(term)
     
     val res = search.execute()
         
@@ -30,7 +29,7 @@ case class MovieSearch(val out: PrintStream = System.out) extends SearchManager[
     
     val fut1 = {
       val term = fileInfo.fileName
-      val search = new GoogleTermAndImdbLink(term) with TmdbIntegrator
+      val search = new GoogleExactTermWithImdbLink(term)
       //s.out = out
       
       search.submit()
@@ -38,7 +37,7 @@ case class MovieSearch(val out: PrintStream = System.out) extends SearchManager[
     
     val fut2 = {
       val term = fileInfo.dirName
-      val search = new GoogleTermAndImdbLink(term) with TmdbIntegrator
+      val search = new GoogleExactTermWithImdbLink(term)
       //s.out = out
       
       search.submit()

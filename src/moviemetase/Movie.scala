@@ -9,23 +9,23 @@ object Movie {
     var newInfos = new scala.collection.mutable.ListBuffer[MovieInfo]
     newInfos appendAll infos.toList.distinct
     
+    // try to parse TitleWithRelease Infos
     val (optTitleInfo, optReleaseInfo) = parseAllTitleWithReleases(
       infos.collect({ case MovieInfos.TitleWithRelease(tr) => tr }).toList
     )
-    
     for (titleInfo <- optTitleInfo)
       newInfos append titleInfo
-      
     for (releaseInfo <- optReleaseInfo)
       newInfos append releaseInfo
 
+    // create Movie from Title and Release
     val t  = newInfos.collect({ case MovieInfos.Title(t)   => t  }).headOption
     val r  = newInfos.collect({ case MovieInfos.Release(d) => d  }).headOption
-    
+
     if (t.isDefined) {
       val title = t.head
       val year  = if (r.isEmpty) 0 else r.head
-      Some( Movie(title, year, newInfos.toList) )
+      Some( Movie(title, year, newInfos.distinct.toList) )
     } else None
   }
   
@@ -57,6 +57,15 @@ object Movie {
 }
 
 case class Movie(title: String, year: Int, infos: List[MovieInfo] = Nil) {
+  
+//  def get[A](pf: PartialFunction[MovieInfo,A]): Option[A] =
+//    infos.collect(pf).headOption
+  
+  val label = title + "/" + year
+  
+  def withNewInfos(infos2: List[MovieInfo]): Movie =
+    Movie(title, year, (infos ::: infos2).distinct)
+    
   override def toString: String = {
     val s = new StringBuffer
     s append "Movie(" append title append "/" append year append "){\n"

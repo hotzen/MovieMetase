@@ -16,22 +16,22 @@ object IMDB {
     
   def extractId(s: String): Option[String] = extractIds(s).headOption
     
-  case class ExtractInfos(val id: String) extends HtmlTask[List[MovieInfo]] with Logging {
-    val logID = "IMDB.ExtractInfos(" + id + ")"
+  case class FetchByID(val id: String) extends HtmlTask[Option[Movie]] with Logging {
+    val logID = "IMDB.FetchByID(" + id + ")"
     
-    val info = MovieInfos.IMDB(id)
-    def url = info.page
+    val imdbInfo = MovieInfos.IMDB(id)
+    def url = imdbInfo.page
     
-    def process(doc: nu.xom.Document): List[MovieInfo] = {
+    def process(doc: nu.xom.Document): Option[Movie] = {
       import Util._
       import XOM._
       import scala.collection.mutable.ListBuffer
       //println(doc.toXML)
       
       val infos = new ListBuffer[MovieInfo]()
-      val ctx = XPathContext.XHTML
+      infos append imdbInfo
       
-      trace("extracting ...")
+      val ctx = XPathContext.XHTML
       
       // meta-tags
       val metas =
@@ -43,53 +43,45 @@ object IMDB {
         }
             
       // title & release
-      var extractTitle = true
-      if (extractTitle)
+      var extractedTitle = false
+      if (!extractedTitle)
         for ( (name,value) <- metas if name == "og:title") {
-          trace("Title/Release from <meta og:title>: " + value)
           infos append MovieInfos.TitleWithRelease(value)
-          extractTitle = false
+          extractedTitle = true
         }
-      if (extractTitle)
+      if (!extractedTitle)
         for ( (name,value) <- metas if name == "title") {
-          trace("Title/Release from <meta title>: " + value)
           infos append MovieInfos.TitleWithRelease(value)
-          extractTitle = false
+          extractedTitle = true
         }
-
-
+      if (!extractedTitle)
+        warn("Could not extract Title!")
+      
+      
       // description    
-      for ( (name,value) <- metas if name == "description") {
-        trace("Description from <meta description>: " + value)
+      for ( (name,value) <- metas if name == "description")
         infos append MovieInfos.Description(value)
-        extractTitle = false
-      }
-    
+
       
       // thumbnails
-      var extractThumbs = true
-      if (extractThumbs)
+      var extractedThumbs = false
+      if (!extractedThumbs)
         for ( (name,value) <- metas if name == "og:image") {
-          trace("Thumbnail from <meta og:image>: " + value)
           infos append MovieInfos.Thumbnail(value.toURL)
-          extractThumbs = false
+          extractedThumbs = true
         }
-      if (extractThumbs)
+      if (!extractedThumbs)
         for ( (name,value) <- metas if name == "image_src") {
-          trace("Thumbnail from <meta image_src>: " + value)
           infos append MovieInfos.Thumbnail(value.toURL)
-          extractThumbs = false
+          extractedThumbs = true
         }
       
       
       // summary
       for (h2Node <- doc.xpath("""//xhtml:h2[text()='Storyline']""", ctx);
            pNode   <- h2Node.xpath("""following-sibling::xhtml:p""", ctx).headOption;
-           pElem   <- pNode.toElement) {
-        val text = pElem.text.hardTrim
-        trace("Summary from <h2>Storyline</h2>: " + text)
-        infos append MovieInfos.Summary(text)
-      }
+           pElem   <- pNode.toElement)
+        infos append MovieInfos.Summary( pElem.text.hardTrim )
       
       // cast table
       for (trNode <- doc.xpath("""//xhtml:table[@class="cast_list"]//xhtml:tr""", ctx);
@@ -119,7 +111,9 @@ object IMDB {
         infos append MovieInfos.Genre( genre )
       }
       
-      infos.toList
+      val movie = Movie(infos)
+      trace( movie.toString )
+      movie
     }
   }
   

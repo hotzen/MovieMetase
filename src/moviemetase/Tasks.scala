@@ -49,16 +49,55 @@ object TaskExecutor {
     Pool submit new Callable[T] { def call(): T = code }
 }
 
-
 trait Task[A] {
-  
   // executes the task synchronously
   def execute(): A
   
   // submits the task for later execution
   final def submit(): Future[A] = TaskExecutor submit new Callable[A] { def call(): A = execute() }
+  
+  // create a new task that executes <this> and then <next>
+  final def then[B](next: Task[B]): Task[B] = new SerialTask[B](this, next)
+  
+  // create a new task that executes <this> and then the tasks produced by <f>
+  final def thenFork[B](f: A => List[Task[B]]): Task[List[B]] = new ForkingTask[A,B](this, f)
 }
 
+class SerialTask[B](val t1: Task[_], val t2: Task[B]) extends Task[B] {
+  final def execute(): B = {
+    t1.execute()
+    t2.execute()
+  }
+}
+
+class ForkingTask[A,B](val t: Task[A], val f: A => List[Task[B]]) extends Task[List[B]] {
+  final def execute(): List[B] = {
+    
+    // execute first task 
+    val res = t.execute()
+    
+    // calculate tasks to be forked
+    val ts = f( res )
+    
+    if (ts.isEmpty)
+      return Nil
+    
+    // first task and rest of tasks
+    val t1 = ts.head
+    val tt = ts.tail
+    
+    // submit rest of tasks
+    val ft = tt.map( _.submit() )
+    
+    // execute first task
+    val r1 = t1.execute()
+    
+    // join rest tasks
+    val rt = ft.map( _.get() )
+    
+    r1 :: rt
+  }
+}
 
 
 // Task processing an URL
