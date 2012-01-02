@@ -9,7 +9,7 @@ import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.HashMap
 import java.util.concurrent.Future
 
-sealed trait SubsceneQuery extends Query[List[MovieInfos.Subtitle]] with HtmlTask[List[MovieInfos.Subtitle]]
+sealed trait SubsceneQuery extends HtmlTask[List[MovieInfos.Subtitle]]
 
 object Subscene {
   
@@ -32,7 +32,7 @@ object Subscene {
     def process(doc: nu.xom.Document): List[MovieInfos.Subtitle] = {
       import XOM._
       
-      val ctx = Some( XOM.XPath.XHTML )
+      val ctx = XPathContext.XHTML
       
       val subPageFuts =
         for (aNode       <- doc.xpath("""//xhtml:a""", ctx);
@@ -66,7 +66,7 @@ object Subscene {
     def process(doc: nu.xom.Document): List[MovieInfos.Subtitle] = {
       import XOM._
       
-      val ctx = Some( XOM.XPath.XHTML )
+      val ctx = XPathContext.XHTML
       
       val subPageFuts =
         for (aNode      <- doc.xpath("""//xhtml:a""", ctx);

@@ -13,11 +13,10 @@ import scala.collection.mutable.ListBuffer
 import Util._
 import java.io.PrintStream
 
-// A Query-Task that queries something and returns A  
-abstract class Query[A] extends TaskFactory[A] {
-  def query: String
-}
-
+// A Query is a task that returns some A, when queried with a String  
+//trait Query[A] extends Task[A] {
+//  def query: String
+//}
 
 // A Search-Manager that chooses the right Strategy
 abstract class SearchManager[A] {
@@ -26,13 +25,6 @@ abstract class SearchManager[A] {
 }
 
 
-// A generic Search-Strategy
-abstract class SearchStrategy[A] {
-   
-  
-  // searching a particular term, BLOCKING
-  def search(term: String): List[A]
-
-  // executing the search in parallel
-  final def execute(term: String): Future[List[A]] = WorkerPool submit { search(term) }
-}
+//trait SearchStrategy[A] extends Task[A] {
+//  def search(term: String): List[A]
+//}

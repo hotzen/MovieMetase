@@ -6,75 +6,91 @@ import query._
 //import java.util.concurrent.Future
 import scala.collection.mutable.ListBuffer
 
-class GoogleTermAndImdbLink extends SearchStrategy[Movie] with Logging {
+case class GoogleTermAndImdbLink(term: String) extends Task[List[Movie]] with Logging {
   
   val logID = "GoogleTermAndImdbLink"
 
-  def search(term: String): List[Movie] = {
+  def execute(): List[Movie] = {
+    val q = GoogleQuery().strict(term).linkTo("imdb.com/title/").toString
     
-    // search at google for the term linking to IMDB
-    val q = '"' + term + '"' + " link:imdb.com/title/"
-    trace("querying GoogleAjax with '" + q + "' ...")
+    trace("Querying GoogleAjax: '" + q + "' ...")
+    val googleRes = GoogleAjax.Query(q).execute()
     
-    val googleQry = GoogleAjax.Query(q)
-    val googleFut = googleQry.execute()
-    val googleRes = googleFut.get() // block
-    
-    val urls = googleRes.flatMap(r => IMDB.extractTitleUrls( r.snippet ) )
-    val distinctUrls = urls.distinctCount()
-    
-    if (urls.isEmpty)
+    val imdbTitleUrls = googleRes.flatMap(r => IMDB.extractTitleUrls( r.snippet ) )
+    val distinctTitleUrls = imdbTitleUrls.distinctWithCount()
+            
+    if (imdbTitleUrls.isEmpty)
       return Nil
-    
+      
     if (isLogging(LogLevel.Trace))
-      for (url <- distinctUrls)
-        trace("found " + url._1 + " (" + url._2 + ")")
-        
-    val firstUrl = urls.head
-    val mostUrl  = distinctUrls.head._1
-    val mostCnt  = distinctUrls.head._2
+      for (url <- distinctTitleUrls)
+        trace("IMDB URL: '" + url._1 + "' (" + url._2 + ")")
+    
+    val firstUrl = imdbTitleUrls.head
+    val mostUrl  = distinctTitleUrls.head._1
+    val mostCnt  = distinctTitleUrls.head._2
+    
+    // Use only the first URL if it is also the most-occurring one,
+    // otherwise use the first and the most-occurring URL
+    val tryUrls =
+      if (firstUrl == mostUrl || mostCnt == 1)
+        firstUrl :: Nil
+      else
+        firstUrl :: mostUrl :: Nil
 
-    {
-      if (firstUrl == mostUrl || mostCnt == 1) {
-        trace("IMDB-Lookup for IMDB-URL: " + firstUrl)
-        imdbLookup(firstUrl, 0.95) :: Nil
-      } else {
-        trace("IMDB-Lookups for first " + firstUrl + " and most-occurred IMDB-URL " + mostUrl)
-        imdbLookup(firstUrl, 0.7) :: imdbLookup(mostUrl, 0.7)  :: Nil
+    // IMDB-Title-URL => IMDB-ID
+    val tryIds = for (url <- tryUrls) yield IMDB.extractId(url).head
+    
+    // Futures of extraction
+    val futs =
+      for (id <- tryIds)
+        yield IMDB.ExtractInfos(id).submit() 
+
+    // Extracted Infos
+    val extracts =
+      for (fut <- futs)
+        yield fut.get()
+            
+    // Create Movies from Infos
+    val movies =
+      for (infos <- extracts) yield {
+        val movie = Movie(infos)
+        info( movie.toString )
+        movie
       }
-    }.flatten
+    
+    movies.flatten.toList
   }
   
-  def imdbLookup(url: String, baseScore: Double): Option[Movie] = {
-    val lookup = GoogleCSE.Query(IMDB.CSE, url)
-    val fut = lookup.execute()
-    val res = fut.get() // block
-    //println( res.mkString("\n") )
-    
-    val infos = new ListBuffer[MovieInfo]
-    
-    //for (r <- res if r.url.toString.contains( url )) {
-    for (r <- res if r.url.toString == url) {
-      infos append MovieInfos.Score( baseScore )
-            
-      infos append MovieInfos.Imdb( IMDB.extractId(r.url.toString).head )
-
-      for (dataObject <- r.pageMap) {
-        //println( dataObject.toString )
-        infos appendAll extractInfosFromGooglePageMap( dataObject )
-      }
-    }
-    
-    println( infos )
-    
-    val movieOpt = Movie(infos)
-    
-    if (movieOpt.isEmpty) {
-      warn("could not extract enough information!")
-    }
-    
-    movieOpt
-  }
+//  def imdbLookup(url: String, baseScore: Double): Option[Movie] = {
+//    val res = GoogleCSE.Query(IMDB.CSE, url).execute()
+//    //println( res.mkString("\n") )
+//    
+//    val infos = new ListBuffer[MovieInfo]
+//    
+//    //for (r <- res if r.url.toString.contains( url )) {
+//    for (r <- res if r.url.toString == url) {
+//      infos append MovieInfos.Score( baseScore )
+//      
+//      IMDB.extractId(r.url.toString).foreach( infos append MovieInfos.IMDB(_) )
+//      //infos append MovieInfos.IMDB( IMDB.extractId(r.url.toString).head )
+//
+//      for (dataObject <- r.pageMap) {
+//        //println( dataObject.toString )
+//        infos appendAll extractInfosFromGooglePageMap( dataObject )
+//      }
+//    }
+//    
+//    println( infos )
+//    
+//    val movieOpt = Movie(infos)
+//    
+//    if (movieOpt.isEmpty) {
+//      warn("could not extract enough information!")
+//    }
+//    
+//    movieOpt
+//  }
   
   def extractInfosFromGooglePageMap(dataObject: GooglePageMapDataObject): List[MovieInfo] = {
     val infos = new ListBuffer[MovieInfo]

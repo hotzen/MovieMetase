@@ -5,7 +5,8 @@ import org.xml.sax.helpers.XMLReaderFactory
 
 object XOM {
   
-  object XPath {
+  object XPathContext {
+    val None  = null
     val XHTML = new XPathContext("xhtml", "http://www.w3.org/1999/xhtml")
   }
         
@@ -44,11 +45,13 @@ object XOM {
       case _ => None
     }
     
-    def xpath[A](xp: String, ctx: Option[XPathContext] = None): List[Node] = {
-      val res = ctx match {
-        case Some(ctx) => node.query(xp, ctx)
-        case None      => node.query(xp)
-      }
+    def xpath[A](xp: String, ctx: XPathContext = XPathContext.None): List[Node] = {
+      val res =
+        if (ctx != null)
+          node.query(xp, ctx)
+        else
+          node.query(xp)
+      
       res.toList
     }
     
@@ -82,8 +85,14 @@ object XOM {
   implicit def ImplicitElement(elem: Element): RichElement = RichElement(elem)
   case class RichElement(elem: Element) extends RichNode(elem) {
         
-    //def name: String = elem.getLocalName
-    //def value = elem.getValue
+    def name: String =
+      elem.getLocalName
+    
+    def value: String =
+      elem.getValue
+    
+    def text: String =
+      elem.query("""child::text()""").map(_.getValue).mkString("")
     
     def attributes = new Iterable[Attribute] {
       val cnt = elem.getAttributeCount()

@@ -10,7 +10,7 @@ import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.HashMap
 import java.util.concurrent.Future
 
-sealed trait SubtitleSourceQuery extends Query[List[Movie]] with UrlTask[List[Movie]]
+sealed trait SubtitleSourceQuery extends UrlTask[List[Movie]]
 
 object SubtitleSource {
   
@@ -25,17 +25,17 @@ object SubtitleSource {
     val DownloadZipLink = """/download/zip/(\d+)""".r
   }
     
-  case class ReleaseSearch(val id: String) extends SearchStrategy[List[MovieInfo]] with Logging {
-    val logID = "SubtitleSource_ReleaseSearch(" + id  + ")"
+  case class ReleaseSearch(val term: String) extends Task[List[List[MovieInfo]]] with Logging {
+    val logID = "SubtitleSource_ReleaseSearch(" + term  + ")"
     
     val BaseScore = 0.95
     
-    def search(term: String): List[List[MovieInfo]] = {
+    def execute(): List[List[MovieInfo]] = {
       val fuzzy = Google.fuzzyTerm(term)
       trace("querying GoogleCSE with fuzzy term '" + fuzzy + "'")
       
       val relQuery = GoogleCSE.Query(ReleaseCSE, term)
-      val fut = relQuery.execute()
+      val fut = relQuery.submit()
       val res = fut.get() // block
 
       // extract Release-Page
@@ -48,21 +48,21 @@ object SubtitleSource {
           
           val extract = ReleasePageExtractor( r.url )
           extract.logOut = logOut
-          extract.execute()
+          extract.submit()
         }
       
       // join Futures
       val allReleaseInfos = for ( fut  <- releaseFuts; link <- fut.get() ) yield link      
 
       // filter out duplicate Subtitle-Pages
-      val releaseInfos = allReleaseInfos.distinctNoCount((a,b) => a.subtitlePage == b.subtitlePage) // map out counts //.sortByCount().noCount()
+      val releaseInfos = allReleaseInfos.distinctWithoutCount((a,b) => a.subtitlePage == b.subtitlePage) // map out counts //.sortByCount().noCount()
             
       // extract Subtitle-page
       val combinedFuts =
         for ( releaseInfo <- releaseInfos ) yield {
           val extract = SubtitlePageExtractor( releaseInfo.subtitlePage )
           extract.logOut = logOut
-          (releaseInfo, extract.execute())
+          (releaseInfo, extract.submit())
         }
       
       // join Futures
@@ -87,7 +87,7 @@ object SubtitleSource {
           
           if (!subInfo.moviePage.isEmpty) {
             val moviePage = subInfo.moviePage.get
-            movieInfos append MovieInfos.Imdb(
+            movieInfos append MovieInfos.IMDB(
               moviePage.imdbID
             ).withSourceInfo( moviePage.moviePage.toString )
           }
@@ -107,7 +107,7 @@ object SubtitleSource {
 
     def process(doc: nu.xom.Document): List[ReleasePageInfo] = {
       val infos = new ListBuffer[ReleasePageInfo]
-      val ctx = Some( XOM.XPath.XHTML )
+      val ctx = XPathContext.XHTML
       
       // all links
       for (aNode <- doc.xpath("""//xhtml:li/xhtml:a[@href]""", ctx);
@@ -147,7 +147,7 @@ object SubtitleSource {
     
     def process(doc: nu.xom.Document): Option[SubtitlePageInfo] = {
       
-      val ctx = Some( XOM.XPath.XHTML )
+      val ctx = XPathContext.XHTML
       
       // all links of content-container
       val allLinks = 
@@ -157,7 +157,7 @@ object SubtitleSource {
           yield (aElem, href)
       
       def eq(a: (Element,String), b: (Element,String)): Boolean = a._2 == b._2 // equality on href
-      val links = allLinks.distinctNoCount(eq)
+      val links = allLinks.distinctWithoutCount(eq)
       
       val allMoviePages = 
         for ( (aElem, href) <- links;

@@ -11,7 +11,34 @@ import scala.util.parsing.json.JSON
 
 import Util._
 
-sealed trait GoogleQuery extends Query[List[GoogleResult]] with UrlTask[List[GoogleResult]]
+case class GoogleQuery(initial: String = "") {
+  val sb = new StringBuilder(initial)
+  
+  def append(t: String): GoogleQuery = {
+    if (sb.isEmpty)
+      sb.append(t)
+    else
+      sb.append(" ").append(t)
+    this
+  }
+  
+  def and(t: String) =
+    append(t)
+  
+  def clean(t: String): String =
+    t.trim
+  
+  def strict(t: String) =
+    append("\"" + clean(t) + "\"")
+  
+  def both(t1: String, t2: String) =
+    append(clean(t1) + " | " + clean(t2))
+    
+  def linkTo(url: String) =
+    append("link:" + url)
+  
+  override def toString() = sb.toString()
+}
 
 object Google {
   
@@ -31,13 +58,15 @@ object Google {
   }
   
   def strictTerm(t: String): String = "\"" + t.trim + "\""
+  def strictTerm(ts: Seq[String]): String = strictTerm( ts.mkString(" ") )
+  
   def bothTerms(t1: String, t2: String): String = t1.trim + " | " + t2.trim
 }
 
 object GoogleAjax {
   val BASE_URL = "http://ajax.googleapis.com/ajax/services/search/web"
   
-  case class Query(query: String, page: Int = 1) extends GoogleQuery {
+  case class Query(query: String, page: Int = 1) extends UrlTask[List[GoogleResult]] {
     def params: String = "v=1.0&rsz=large&hl=en"
     def limit: Int = 8
       
@@ -46,7 +75,8 @@ object GoogleAjax {
       urlBuilder append "?"       append params
       urlBuilder append "&start=" append ((page-1)*limit)
       urlBuilder append "&q="     append query.urlEncode
-            
+
+      println("GoogleAjax.Query: " + urlBuilder.toString)
       new URL( urlBuilder.toString )
     }
     
@@ -56,8 +86,8 @@ object GoogleAjax {
       val str = Source.fromInputStream(in).mkString
       val json = JSON.parse( str ).head
       
-      for ( (k1:String,resp:List[Any]) <- json if k1 == "responseData";
-            (k2:String,ress:List[Any]) <- resp if k2 == "results";
+      for ( (k1:String,resp:List[_]) <- json if k1 == "responseData";
+            (k2:String,ress:List[_]) <- resp if k2 == "results";
             resAny                     <- ress) yield {
         
         def get(Key: String): List[String] = resAny match {
@@ -69,7 +99,7 @@ object GoogleAjax {
         val title   = get("titleNoFormatting").head
         val snippet = get("content").map( _.noTags.noEntities ).head
         
-        GoogleResult(new URL(url), title, snippet, Nil, this)
+        GoogleResult(new URL(url), title, snippet, Nil, query)
       }
     }
   }
@@ -85,7 +115,7 @@ object GoogleCSE {
   val NS_OS   = "http://a9.com/-/spec/opensearch/1.1/"
   val NS_GD   = "http://schemas.google.com/g/2005"
 
-  case class Query(cseID: String, query: String, page: Int = 1) extends GoogleQuery {
+  case class Query(cseID: String, query: String, page: Int = 1) extends UrlTask[List[GoogleResult]] {
     def params: String = "alt=atom&prettyprint=true&safe=off"
     def limit: Int = 10
     
@@ -149,7 +179,7 @@ object GoogleCSE {
           GooglePageMapDataObject(dataType, attribs.toMap)
         }
         
-        GoogleResult(new URL(url), title, snippet, pageMap.toList, this)
+        GoogleResult(new URL(url), title, snippet, pageMap.toList, query)
       }
       
       results.toList
@@ -167,7 +197,7 @@ case class GooglePageMapDataObject(dataType: String, data: Map[String,String]) {
   def get(attribute: String): Option[String] = data.get(attribute)
   
   override def toString = {
-    val sb = new StringBuffer("GooglePageMap")
+    val sb = new StringBuffer("GooglePageMapDataObject")
     sb append "(" append dataType append ") {\n"
     for ( (k,v) <- data) {
       sb append "\t" append k append " = '" append v append "'\n"
@@ -178,7 +208,7 @@ case class GooglePageMapDataObject(dataType: String, data: Map[String,String]) {
   }
 }
 
-case class GoogleResult(url: URL, title: String, snippet: String, pageMap: List[GooglePageMapDataObject], query: GoogleQuery)
+case class GoogleResult(url: URL, title: String, snippet: String, pageMap: List[GooglePageMapDataObject], query: String)
 
 
 

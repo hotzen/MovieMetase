@@ -12,10 +12,8 @@ object ImdbLink {
   def main(args: Array[String]) {
     
     val title = "Inception.1080p.BluRay.x264-REFiNED"
-    val q = GoogleAjax.Query(title + " link:imdb.com/title/")
-    val s = q.task()
-    val rs = s.call()
-    
+    val rs = GoogleAjax.Query(title + " link:imdb.com/title/").execute( )
+        
     // search all snippets for an IMDB-link
     val ImdbRegex = """imdb.com/title/tt[0-9]+""".r
     val imdbUrls = rs.flatMap(r => ImdbRegex.findFirstIn( r.snippet ) ).map( m => "http://www." + m + "/")
@@ -51,9 +49,7 @@ object ImdbLink {
     println("----------")
     println("CSE-Search at IMDB for: " + imdbUrl)
     
-    val q = GoogleCSE.Query(IMDB_CSE, imdbUrl)
-    val s = q.task()
-    val rs = s.call()
+    val rs = GoogleCSE.Query(IMDB_CSE, imdbUrl).execute()
     
     //println( rs.mkString("\n") )
     val PathRegex = """/title/tt[0-9]+""".r
@@ -61,7 +57,7 @@ object ImdbLink {
     
     for (r <- rs) {
       println("CSE-Result: " + r.url)
-      infos append MovieInfos.Imdb( r.url.toString )
+      infos append MovieInfos.IMDB( r.url.toString )
       
 //      for (dataType <- r.pageMap.keys) {
 //        println("PageMap " + dataType)

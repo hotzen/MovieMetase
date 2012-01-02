@@ -1,7 +1,6 @@
 package moviemetase
 package query
 
-import sites._
 import java.net.URL
 import nu.xom._
 import java.io.InputStream
@@ -15,19 +14,19 @@ import java.io.PrintWriter
 //  def toSubtitle: MovieInfos.Subtitle = null
 //}
 //
-sealed trait OpenSubtitlesQuery extends Query[List[MovieInfos.Subtitle]] with XmlTask[List[MovieInfos.Subtitle]] with Logging {
-  final override val UserAgent = OpenSubtitles.API_UA
-  final override val RequestContentType = Some("text/xml")
-    
-  final val url: URL = new URL( OpenSubtitles.API_URL )
-}
+//sealed trait OpenSubtitlesQuery extends Query[List[MovieInfos.Subtitle]] with XmlTask[List[MovieInfos.Subtitle]] with Logging {
+//  final override val UserAgent = OpenSubtitles.API_UA
+//  final override val RequestContentType = Some("text/xml")
+//    
+//  final val url: URL = new URL( OpenSubtitles.API_URL )
+//}
 
 
 object OpenSubtitles {
 
   val API_UA  = "MovieMetase v1"
   val API_URL = "http://api.opensubtitles.org/xml-rpc"
-  
+    
   var defaultLanguage: String = "eng"
   
   // http://trac.opensubtitles.org/projects/opensubtitles/wiki/XmlRpcLogIn
@@ -36,6 +35,7 @@ object OpenSubtitles {
     
     override val UserAgent = API_UA
     override val RequestContentType = Some("text/xml")
+    def url: URL = new URL( API_URL )
     
     override val RequestFn = Some( (os:OutputStream) => {
       trace("XML-RPC LogIn ...", ("user" -> user) :: ("password" -> password) :: ("language" -> language) :: Nil)
@@ -47,9 +47,7 @@ object OpenSubtitles {
       pw.flush()
       os.close()
     })
-    
-    def url: URL = new URL( API_URL )
-    
+        
     def process(doc: nu.xom.Document): Option[String] = {
       import XOM._
       
@@ -69,13 +67,17 @@ object OpenSubtitles {
   }
   
   // http://trac.opensubtitles.org/projects/opensubtitles/wiki/XmlRpcSearchSubtitles
-  case class Imdb(token: String, imdb: MovieInfos.Imdb, language: String = defaultLanguage) extends OpenSubtitlesQuery {
+  case class IMDB(token: String, imdb: MovieInfos.IMDB, language: String = defaultLanguage) extends XmlTask[List[MovieInfos.Subtitle]] with Logging {
     val logID = "OpenSubtitles.Imdb"
     
-    def query = imdb.toString
+//    def query = imdb.toString
+    
+    override val UserAgent = API_UA
+    override val RequestContentType = Some("text/xml")
+    def url: URL = new URL( API_URL )
       
     override val RequestFn = Some( (os:OutputStream) => {
-      val pw  = new PrintWriter( os )
+      val pw = new PrintWriter( os )
 
       val imdbID = imdb.id.drop(2) // skip leading "tt" of ID
       val searchStruct = ("sublanguageid" -> language) :: ("imdbid" -> imdbID) :: Nil

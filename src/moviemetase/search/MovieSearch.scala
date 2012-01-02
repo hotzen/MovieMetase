@@ -19,11 +19,10 @@ import java.io.PrintStream
 case class MovieSearch(val out: PrintStream = System.out) extends SearchManager[Movie] {
   
   def searchByTerm(term: String): List[Movie] = {
-    val search = new GoogleTermAndImdbLink with TmdbIntegrator
+    val search = new GoogleTermAndImdbLink(term) with TmdbIntegrator
     
-    val fut = search.execute( term )
-    val res = fut.get()
-    
+    val res = search.execute()
+        
     sortMovies(res)
   }
   
@@ -31,18 +30,18 @@ case class MovieSearch(val out: PrintStream = System.out) extends SearchManager[
     
     val fut1 = {
       val term = fileInfo.fileName
-      val search = new GoogleTermAndImdbLink with TmdbIntegrator
+      val search = new GoogleTermAndImdbLink(term) with TmdbIntegrator
       //s.out = out
       
-      search.execute( term )
+      search.submit()
     }
     
     val fut2 = {
       val term = fileInfo.dirName
-      val search = new GoogleTermAndImdbLink with TmdbIntegrator
+      val search = new GoogleTermAndImdbLink(term) with TmdbIntegrator
       //s.out = out
       
-      search.execute( term )
+      search.submit()
     }
     
     val fut3 = {

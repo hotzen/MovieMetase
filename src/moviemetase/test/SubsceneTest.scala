@@ -7,8 +7,7 @@ object SubsceneTest {
   def main(args: Array[String]) = {
     
     val q = Subscene.Release("Inception")
-    val t = q.task()
-    println( t.call() )
+    val t = println( q.execute() )
     
     ()
   }

@@ -5,25 +5,71 @@ import java.net.URL
 import java.io.InputStream
 import java.io.OutputStream
 import java.io.PrintStream
-import java.util.concurrent.Callable
-import java.util.concurrent.Future
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.ThreadPoolExecutor.AbortPolicy
 import java.net.URLConnection
 
+object TaskExecutor {
+  val CorePoolSize  = 4
+  val MaxPoolSize   = Integer.MAX_VALUE
+  val KeepAliveTime = 60L
+  val KeepAliveUnit = TimeUnit.SECONDS
+  val Queue         = new SynchronousQueue[Runnable]()
+  
+  val RejectedExecHandler = new AbortPolicy()
+  
+  val ThreadFactory = new ThreadFactory {
+    val counter = new AtomicInteger(1)
 
-// Something that can create a task for concurrent execution
-trait TaskFactory[A] {
-  def task(): Callable[A]
+    def newThread(r: Runnable): Thread = {
+      val t = new Thread(r)
+      t.setName( "T" + counter.getAndIncrement() )
+      t.setDaemon( false )
+      t.setPriority( Thread.NORM_PRIORITY )
+      t
+    }
+  }
+  
+  val Pool: ExecutorService = new ThreadPoolExecutor(
+    CorePoolSize, MaxPoolSize,
+    KeepAliveTime, KeepAliveUnit,
+    Queue, ThreadFactory, 
+    RejectedExecHandler
+  )
+     
+  def shutdown(): Unit = {
+    Pool.shutdownNow()
+    Pool.awaitTermination(3, TimeUnit.SECONDS)
+  }
+  
+  def submit[T](task: Callable[T]): Future[T] = 
+    Pool submit task
+  
+  def submit[T](code: => T): Future[T] = 
+    Pool submit new Callable[T] { def call(): T = code }
 }
 
 
+trait Task[A] {
+  
+  // executes the task synchronously
+  def execute(): A
+  
+  // submits the task for later execution
+  final def submit(): Future[A] = TaskExecutor submit new Callable[A] { def call(): A = execute() }
+}
+
+
+
 // Task processing an URL
-trait UrlTask[A] extends TaskFactory[A] {
+trait UrlTask[A] extends Task[A] {
   
   // url to process
   def url: URL
   
-  // processor of the InputStream representing the URL's reponse-data
+  // processor of the response
   def process(is: InputStream): A
+    
   
   // dont keep-alive
   val ConnectionClose = true
@@ -33,54 +79,46 @@ trait UrlTask[A] extends TaskFactory[A] {
   val Referer   = "http://stackoverflow.com/questions/tagged/referer"
   
   // if sending data, define its content-type and the function to fill the OutputStream with the data
-  val RequestContentType: Option[String] = None
+  val RequestContentType: Option[String]      = None
   val RequestFn: Option[OutputStream => Unit] = None
-  
-  // create a Task to be executed concurrently
-  final def task(): Callable[A] = new Callable[A] {
-    def call(): A = {
-      val conn: URLConnection = url.openConnection()
-      conn setUseCaches true
-      conn setAllowUserInteraction false
-      conn setDoInput  true
-      conn setDoOutput RequestFn.isDefined
-      
-      if (ConnectionClose)
-         conn setRequestProperty ("Connection", "Close")
-      
-      if (RequestContentType.isDefined)
-        conn setRequestProperty ("Content-Type", RequestContentType.get);
-      
-      conn setRequestProperty ("User-Agent", UserAgent)
-      conn setRequestProperty ("Referer",    Referer)
-      
-      conn.connect()
-      
-      RequestFn match {
-        case Some(fn) => fn( conn.getOutputStream )
-        case None     => // request-parameters solely encoded in URL
+
+  final def execute(): A = {
+    val conn: URLConnection = url.openConnection()
+    conn setUseCaches true
+    conn setAllowUserInteraction false
+    conn setDoInput  true
+    conn setDoOutput RequestFn.isDefined
+    
+    if (ConnectionClose)
+       conn setRequestProperty ("Connection", "Close")
+    
+    if (RequestContentType.isDefined)
+      conn setRequestProperty ("Content-Type", RequestContentType.get);
+    
+    conn setRequestProperty ("User-Agent", UserAgent)
+    conn setRequestProperty ("Referer",    Referer)
+    
+    conn.connect()
+    
+    RequestFn match {
+      case Some(fn) => fn( conn.getOutputStream )
+      case None     => // request-parameters solely encoded in URL
+    }
+    
+    val is = conn.getInputStream
+    
+    try {
+      process( is )
+    } catch {
+      case e:Exception => {
+        System.err.println("UrlProcessor failed! URL: " + url)
+        e.printStackTrace( System.err )
+        throw e
       }
-      
-      val is = conn.getInputStream
-      
-      try {
-        process( is )
-      } catch {
-        case e:Exception => {
-          System.err.println("UrlProcessor failed! URL: " + url)
-          e.printStackTrace( System.err )
-          throw e
-        }
-      } finally {
-        is.close()
-      }
+    } finally {
+      is.close()
     }
   }
-  
-  
-  // automatically execute the task in the global Worker-Pool and
-  // return the task's result wrapped in a Future
-  final def execute(): Future[A] = WorkerPool submit task()
 }
 
 

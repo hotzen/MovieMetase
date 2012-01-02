@@ -9,8 +9,6 @@ object TmdbTest {
     val imdbID = "tt1375666"
     
     val q = TMDB.ImdbLookup(imdbID)
-    val s = q.task()
-    println ( s.call().mkString("\n") )
-    
+    println ( q.execute().mkString("\n") )
   }
 }

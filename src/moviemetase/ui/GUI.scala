@@ -151,13 +151,13 @@ class GUI extends Reactor {
           }
           
           val imdb = {
-            val imdbs = movie.infos.collect({ case MovieInfos.Imdb(url) => url })
+            val imdbs = movie.infos.collect({ case MovieInfos.IMDB(url) => url })
             if (imdbs.isEmpty) ""
             else imdbs.head
           }
 
           val tmdb = {
-            val tmdbs = movie.infos.collect({ case MovieInfos.Tmdb(url) => url })
+            val tmdbs = movie.infos.collect({ case MovieInfos.TMDB(url) => url })
             if (tmdbs.isEmpty) ""
             else tmdbs.head
           }
@@ -339,7 +339,7 @@ class GUI extends Reactor {
     contents = imgLbl
     
     def display(url: URL) {
-      WorkerPool submit { try {
+      TaskExecutor submit { try {
         image = Some( ImageIO.read( url ) )
         contents.head.revalidate()
         contents.head.repaint()

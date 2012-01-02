@@ -12,28 +12,37 @@ object Util {
 class StringUtils(val s: String) {
   def toURL: URL = new URL(s)
 
+  def hardTrim   = """[^\w\.\:\?\!]+$""".r.replaceAllIn(s.trim, "") // kill remaining non-word characters
   def urlEncode  = URLEncoder.encode(s, "UTF-8")
   def noTags     = """<.*?>""".r.replaceAllIn(s, "")
   def noEntities = """&.+?;""".r.replaceAllIn(s, "")
 }
 
-class ListUtils[A](val ls: List[A]) {
+class ListUtils[A](val xs: List[A]) {
 
   def defaultEq(a: A, b: A): Boolean = ( a == b )
   
-  def distinctNoCount(eq: (A,A) => Boolean = defaultEq): List[A] =
-    distinctCount(eq).map( tpl => tpl._1 )
-  
-  def distinctCount(eq: (A,A) => Boolean = defaultEq): List[(A,Int)] = {
-    def f(xs: List[A], res: List[(A,Int)]): List[(A,Int)] = xs match {
-      case Nil => res
-      case x::tail => {
-        val count = 1 + tail.count(  eq(_,x) )
-        val nextXs = tail.filterNot( eq(_,x) )
-        f(nextXs, (x,count) :: res)
+  def distinctWithoutCount(eq: (A,A) => Boolean = defaultEq): List[A] =
+    distinctWithCount(eq).map( tpl => tpl._1 )
+      
+  def distinctWithCount(eq: (A,A) => Boolean = defaultEq): List[(A,Int)] = {
+    val map = new scala.collection.mutable.HashMap[A,Int]
+    for (x <- xs) {
+      map.get(x) match {
+        case Some(count) => map += (x -> (count+1)) 
+        case None        => map += (x -> 1)
       }
     }
-    f(ls, Nil).sortWith( (a,b) => a._2 <= b._2 ) // sort descending by count
+    map.toList.sortWith( (a,b) => a._2 <= b._2 )
+//    def f(xs: List[A], res: List[(A,Int)]): List[(A,Int)] = xs match {
+//      case Nil => res
+//      case x::tail => {
+//        val count = 1 + tail.count(  eq(_,x) )
+//        val nextXs = tail.filterNot( eq(_,x) )
+//        f(nextXs, (x,count) :: res)
+//      }
+//    }
+//    f(ls, Nil).sortWith( (a,b) => a._2 <= b._2 ) // sort descending by count
   }
 }
 
