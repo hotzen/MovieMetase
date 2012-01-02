@@ -91,8 +91,9 @@ object XOM {
     def value: String =
       elem.getValue
     
-    def text: String =
-      elem.query("""child::text()""").map(_.getValue).mkString("")
+    // only direct text-nodes, no further descendants
+    def text: String = 
+      elem.query("child::text()").map(_.getValue).mkString("")
     
     def attributes = new Iterable[Attribute] {
       val cnt = elem.getAttributeCount()

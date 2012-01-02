@@ -111,6 +111,14 @@ object IMDB {
           infos append MovieInfos.Actor(name, charOpt)
       }
       
+      // genres
+      for (aNode <- doc.xpath("""//xhtml:a""", ctx);
+           aElem <- aNode.toElement if aElem.attribute("href").getOrElse("").startsWith("/genre/")) {
+        
+        val genre = aElem.getValue.noEntities.trim
+        infos append MovieInfos.Genre( genre )
+      }
+      
       infos.toList
     }
   }
