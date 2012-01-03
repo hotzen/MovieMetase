@@ -1,7 +1,6 @@
 package moviemetase
-package search
+package query
 
-import query._
 import Util._
 import java.net.URL
 import java.io.InputStream
@@ -14,7 +13,7 @@ sealed trait SubtitleSourceQuery extends UrlTask[List[Movie]]
 
 object SubtitleSource {
   
-  val BaseUrl = "http://www.subtitlesource.org"
+  val BASE_URL = "http://www.subtitlesource.org"
   
   val ReleaseCSE = "011282045967305256347:2mp-i5b1ixi"
   
@@ -31,7 +30,7 @@ object SubtitleSource {
     val BaseScore = 0.95
     
     def execute(): List[List[MovieInfo]] = {
-      val fuzzy = Google.fuzzyTerm(term)
+      val fuzzy = term //Google.fuzzyTerm(term)
       trace("querying GoogleCSE with fuzzy term '" + fuzzy + "'")
       
       val relQuery = GoogleCSE.Query(ReleaseCSE, term)
@@ -46,9 +45,7 @@ object SubtitleSource {
           val score = BaseScore * (1.0 - idx * 0.05)
           trace("found ReleasePage", ("ResultIndex" -> idx) :: ("ReleasePage" -> r.url) :: ("Score" -> score) :: Nil)
           
-          val extract = ReleasePageExtractor( r.url )
-          extract.logOut = logOut
-          extract.submit()
+          ReleasePageExtractor( r.url ).submit()
         }
       
       // join Futures
@@ -59,11 +56,8 @@ object SubtitleSource {
             
       // extract Subtitle-page
       val combinedFuts =
-        for ( releaseInfo <- releaseInfos ) yield {
-          val extract = SubtitlePageExtractor( releaseInfo.subtitlePage )
-          extract.logOut = logOut
-          (releaseInfo, extract.submit())
-        }
+        for ( releaseInfo <- releaseInfos ) yield
+          (releaseInfo, SubtitlePageExtractor( releaseInfo.subtitlePage ).submit())
       
       // join Futures
       val combinedInfos =
@@ -117,7 +111,7 @@ object SubtitleSource {
         for (href <- aElem.attribute("href");
              m    <- Regex.SubtitleLink.findFirstIn(href)) {
           
-           val subtitlePage = BaseUrl + m
+           val subtitlePage = BASE_URL + m
            val label = aElem.getValue.trim
            
            val langList = 
@@ -180,7 +174,7 @@ object SubtitleSource {
       val allDownloadUrls = 
         for ( (aElem, href) <- links;
               m <- Regex.DownloadZipLink.findFirstIn(href) ) yield {
-          val url = BaseUrl + m
+          val url = BASE_URL + m
           trace("DownloadURL=" + url)
           url.toURL
         }

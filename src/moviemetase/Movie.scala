@@ -64,14 +64,30 @@ case class Movie(title: String, year: Int, infos: List[MovieInfo] = Nil) {
     Movie(title, year, (infos ::: infos2).distinct)
     
   override def toString: String = {
-    val s = new StringBuffer
-    s append "Movie(" append title append "/" append year append "){\n"
+    val sb = new StringBuffer
+    sb append "Movie("
+    sb append title
+    sb append "/"
+    sb append year
+    sb append " ["
+    sb append infos.length
+    sb append "])"
+    sb.toString
+  }
+    
+  def toStringWithInfos: String = {
+    val sb = new StringBuffer
+    sb append "Movie("
+    sb append title
+    sb append "/"
+    sb append year
+    sb append "){\n"
     for (info <- infos) {
       val infoStr = info.toString.grouped(150).map(_.trim).mkString("\n    ")
-      s append "  " append infoStr append "\n"
+      sb append "  " append infoStr append "\n"
     }
-    s append "}"
-    s.toString
+    sb append "}"
+    sb.toString
   }
 }
 

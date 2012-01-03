@@ -11,54 +11,27 @@ import scala.util.parsing.json.JSON
 
 import Util._
 
-case class GoogleQuery(initial: String = "") {
-  val sb = new StringBuilder(initial)
-  
-  def append(t: String): GoogleQuery = {
-    if (sb.isEmpty)
-      sb.append(t)
-    else
-      sb.append(" ").append(t)
-    this
-  }
-  
-  def and(t: String) = append(t)
-  
-  def clean(t: String): String = t.trim
-  
-  def strict(t: String) =
-    append("\"" + clean(t) + "\"")
-  
-  def both(t1: String, t2: String) =
-    append(clean(t1) + " | " + clean(t2))
-    
-  def linkTo(url: String) =
-    append("link:" + url)
-  
-  override def toString() = sb.toString()
-}
-
 object Google {
   
-  object Regex {
-    val NonAlphaNum  = """[^a-zA-Z\d]+""".r
-    //val MultiMinus = """-{2,}""".r
-    val FirstMinus   = """^-+""".r
-    val LastMinus    = """-+$""".r
-  }
+//  object Regex {
+//    val NonAlphaNum  = """[^a-zA-Z\d]+""".r
+//    //val MultiMinus = """-{2,}""".r
+//    val FirstMinus   = """^-+""".r
+//    val LastMinus    = """-+$""".r
+//  }
     
-  def fuzzyTerm(t: String): String = {
-    val _1 = t.trim
-    val _2 = Regex.NonAlphaNum.replaceAllIn(_1,  "-")
-    val _3 = Regex.FirstMinus.replaceFirstIn(_2, "")
-    val _4 = Regex.LastMinus.replaceFirstIn(_3,  "")
-    _4
-  }
-  
-  def strictTerm(t: String): String = "\"" + t.trim + "\""
-  def strictTerm(ts: Seq[String]): String = strictTerm( ts.mkString(" ") )
-  
-  def bothTerms(t1: String, t2: String): String = t1.trim + " | " + t2.trim
+//  def fuzzyTerm(t: String): String = {
+//    val _1 = t.trim
+//    val _2 = Regex.NonAlphaNum.replaceAllIn(_1,  "-")
+//    val _3 = Regex.FirstMinus.replaceFirstIn(_2, "")
+//    val _4 = Regex.LastMinus.replaceFirstIn(_3,  "")
+//    _4
+//  }
+//  
+//  def strictTerm(t: String): String = "\"" + t.trim + "\""
+//  def strictTerm(ts: Seq[String]): String = strictTerm( ts.mkString(" ") )
+//  
+//  def bothTerms(t1: String, t2: String): String = t1.trim + " | " + t2.trim
 }
 
 object GoogleAjax {
@@ -100,7 +73,7 @@ object GoogleAjax {
         val title   = get("titleNoFormatting").head
         val snippet = get("content").map( _.noTags.noEntities ).head
         
-        GoogleResult(new URL(url), title, snippet, Nil, query)
+        GoogleResult(query, new URL(url), title, snippet)
       }
     }
   }
@@ -166,25 +139,25 @@ object GoogleCSE {
           map( _.getValue.noTags.noEntities ).
           head
         
-        // collect data-objects
-        val pageMap = for (pageMap    <- entry.getChildElements("PageMap", NS_CSE);
-                           dataObject <- pageMap.getChildElements("DataObject", NS_CSE)) yield {
-  
-          // type
-          val dataType = dataObject.getAttributeValue("type")
-          
-          // collect attributes
-          val attribs = new scala.collection.mutable.HashMap[String,String]
-          for (dataAttr <- dataObject.getChildElements("Attribute", NS_CSE)) {
-            val attrName = dataAttr.getAttributeValue("name")
-            val attrVal  = dataAttr.getAttributeValue("value")
-            attribs.put(attrName, attrVal)
-          }
-          
-          GooglePageMapDataObject(dataType, attribs.toMap)
-        }
+//        // collect data-objects
+//        val pageMap = for (pageMap    <- entry.getChildElements("PageMap", NS_CSE);
+//                           dataObject <- pageMap.getChildElements("DataObject", NS_CSE)) yield {
+//  
+//          // type
+//          val dataType = dataObject.getAttributeValue("type")
+//          
+//          // collect attributes
+//          val attribs = new scala.collection.mutable.HashMap[String,String]
+//          for (dataAttr <- dataObject.getChildElements("Attribute", NS_CSE)) {
+//            val attrName = dataAttr.getAttributeValue("name")
+//            val attrVal  = dataAttr.getAttributeValue("value")
+//            attribs.put(attrName, attrVal)
+//          }
+//          
+//          GooglePageMapDataObject(dataType, attribs.toMap)
+//        }
         
-        GoogleResult(new URL(url), title, snippet, pageMap.toList, query)
+        GoogleResult(query, new URL(url), title, snippet)
       }
       
       results.toList
@@ -192,30 +165,26 @@ object GoogleCSE {
   }
 }
 
-
+case class GoogleResult(query: String, url: URL, title: String, snippet: String) //, pageMap: List[GooglePageMapDataObject]) {
 
 
 // http://code.google.com/intl/de-DE/apis/customsearch/docs/structured_data.html#pagemaps
-case class GooglePageMapDataObject(dataType: String, data: Map[String,String]) {
-  def attributes: Iterable[String] = data.keys
-  
-  def get(attribute: String): Option[String] = data.get(attribute)
-  
-  override def toString = {
-    val sb = new StringBuffer("GooglePageMapDataObject")
-    sb append "(" append dataType append ") {\n"
-    for ( (k,v) <- data) {
-      sb append "\t" append k append " = '" append v append "'\n"
-    }
-    sb append "}"
-    
-    sb.toString
-  }
-}
-
-case class GoogleResult(url: URL, title: String, snippet: String, pageMap: List[GooglePageMapDataObject], query: String)
-
-
+//case class GooglePageMapDataObject(dataType: String, data: Map[String,String]) {
+//  def attributes: Iterable[String] = data.keys
+//  
+//  def get(attribute: String): Option[String] = data.get(attribute)
+//  
+//  override def toString = {
+//    val sb = new StringBuffer("GooglePageMapDataObject")
+//    sb append "(" append dataType append ") {\n"
+//    for ( (k,v) <- data) {
+//      sb append "\t" append k append " = '" append v append "'\n"
+//    }
+//    sb append "}"
+//    
+//    sb.toString
+//  }
+//}
 
 // FOCKIN HELL, no results
 /*object Google {

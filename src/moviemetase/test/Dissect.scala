@@ -13,7 +13,7 @@ object Dissect {
       val i = FileInfo(p)
       val d = DissectedFileInfo(i)
       
-      println(p + "\n" + i + "\n" + d + "\n")
+      println("===\n" + p + "\n" + i + "\n" + d + "\n")
     }
   }
 }

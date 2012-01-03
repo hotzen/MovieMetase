@@ -19,6 +19,10 @@ class StringUtils(val s: String) {
   def noEntities = """&.+?;""".r.replaceAllIn(s, "")
 }
 
+object RegexUtils {
+  val Whitespace = """\s""".r
+}
+
 class RegexUtils(val r: scala.util.matching.Regex) {
   
   def matches(s: String): Boolean =

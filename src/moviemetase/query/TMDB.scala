@@ -20,7 +20,7 @@ object TMDB {
     case Some(m) => Some( m.group(1) )
     case None    => None
   }
-      
+
   case class AutoExpandMovie(movie: Movie) extends Task[Movie] with Logging {
     val logID = "TMDB.AutoExpandMovie(" + movie.label + ")"
     
@@ -32,6 +32,8 @@ object TMDB {
         for (tmdbMovie <- FetchByImdbID(imdbID).execute())
           return movie.withNewInfos( tmdbMovie.infos ) 
       }
+      
+      // XXX other checks?
       
       // default return unchanged
       movie

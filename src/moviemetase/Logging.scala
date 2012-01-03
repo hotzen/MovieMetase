@@ -9,6 +9,8 @@ object LogLevel {
 case class LogLevel(id: Int, label: String)
 
 object Logging {
+  var out: java.io.PrintStream = System.out
+  
   var MaxLogLineLength = 300
   var LogLineBreak = "\n  "
   
@@ -17,9 +19,8 @@ object Logging {
 
 trait Logging {
   def logID:  String
-  var logOut: java.io.PrintStream = System.out
   var minLogLevel = LogLevel.Trace // LogLevel.Info
-  
+    
   private val logBuf = new StringBuffer()
     
   final def trace(msg: String, infos: List[(String,Any)] = Nil): Unit = log(LogLevel.Trace, msg, infos)
@@ -42,7 +43,7 @@ trait Logging {
       
       val thread = Thread.currentThread().getName()
       val time = Logging.TimestampFormat.format( new java.util.Date() )
-      logOut.println("[" + thread + "][" + lvl.label + "] " + time + " " + logID + "\t" + logBuf.toString) //.grouped(Logging.MaxLogLineLength).mkString(Logging.LogLineBreak))
+      Logging.out.println("[" + thread + "][" + lvl.label + "] " + time + " " + logID + "\t" + logBuf.toString) //.grouped(Logging.MaxLogLineLength).mkString(Logging.LogLineBreak))
     }
   }
 }

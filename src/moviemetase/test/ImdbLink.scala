@@ -63,10 +63,10 @@ object ImdbLink {
 //        println("PageMap " + dataType)
 //        infos appendAll parseImdbPageMap(dataType, r.pageMap.get(dataType).head)
 //      }
-      for (dataObject <- r.pageMap) {
-       // trace("Google PageMap-DateObject: " + dataObject)
-        infos appendAll parseImdbPageMap( dataObject )
-      }
+//      for (dataObject <- r.pageMap) {
+//       // trace("Google PageMap-DateObject: " + dataObject)
+//        infos appendAll parseImdbPageMap( dataObject )
+//      }
     }
     
     infos.toList
@@ -80,81 +80,81 @@ object ImdbLink {
 //    
 //    null
 //  }
-  
-  def parseImdbPageMap(dataObject: GooglePageMapDataObject): List[MovieInfo] = {
-    val infos = new ListBuffer[MovieInfo]
-    
-    dataObject.dataType.toLowerCase match {
-      // MOVIE
-      case "movie" => {
-        dataObject.get("image") match {
-          case Some(url) => infos append MovieInfos.Poster( url.toURL )
-          case _ =>
-        }
-        dataObject.get("director") match {
-          case Some(name) => infos append MovieInfos.Director( name.trim )
-          case _ =>
-        }
-        dataObject.get("title") match {
-          case Some(t) => {
-            val TitleRegex = """(.+?)\(([0-9]+)\)""".r
-            
-            TitleRegex.findFirstMatchIn( t ) match {
-              case Some(m) => {
-                infos append MovieInfos.Title( m.group(1).trim )
-                infos append MovieInfos.Release( m.group(2).trim.toInt )
-              }
-              case None => {
-                infos append MovieInfos.Title( t.trim )
-              }
-            }
-          }
-          case _ =>
-        }
-      }
-      // REVIEW
-      case "moviereview" => {
-        dataObject.get("genre") match {
-          case Some(gs) => {
-            for (g <- gs.split("/")) {
-              infos append MovieInfos.Genre( g.trim )
-            }
-          }
-          case _ =>
-        }
-        dataObject.get("starring") match {
-          case Some(actors) => {
-            for (actor <- actors.split(",")) {
-              infos append MovieInfos.Actor( actor.trim )
-            }
-          }
-          case _ =>
-        }
-        dataObject.get("image_href") match {
-          case Some(url) => infos append MovieInfos.Poster( url.toURL )
-          case _ =>
-        }
-        dataObject.get("originalrating") match {
-          case Some(r) => infos append MovieInfos.ImdbRating( r.trim.toDouble )
-          case _ =>
-        }
-//        dataObject.get("summary") match {
-//          case Some(s) => infos append MovieInfos.Summary( s.trim )
+//  
+//  def parseImdbPageMap(dataObject: GooglePageMapDataObject): List[MovieInfo] = {
+//    val infos = new ListBuffer[MovieInfo]
+//    
+//    dataObject.dataType.toLowerCase match {
+//      // MOVIE
+//      case "movie" => {
+//        dataObject.get("image") match {
+//          case Some(url) => infos append MovieInfos.Poster( url.toURL )
 //          case _ =>
 //        }
-      }
-      // IMAGE
-      case "image" => {
-        dataObject.get("src") match {
-          case Some(url) => infos append MovieInfos.Poster( url.toURL )
-          case _ =>
-        }
-      }
-      case x => {
-        //prtln("Unknown PageMap DataType '" + x + "'")
-      }
-    }
-   
-    infos.toList
-  }
+//        dataObject.get("director") match {
+//          case Some(name) => infos append MovieInfos.Director( name.trim )
+//          case _ =>
+//        }
+//        dataObject.get("title") match {
+//          case Some(t) => {
+//            val TitleRegex = """(.+?)\(([0-9]+)\)""".r
+//            
+//            TitleRegex.findFirstMatchIn( t ) match {
+//              case Some(m) => {
+//                infos append MovieInfos.Title( m.group(1).trim )
+//                infos append MovieInfos.Release( m.group(2).trim.toInt )
+//              }
+//              case None => {
+//                infos append MovieInfos.Title( t.trim )
+//              }
+//            }
+//          }
+//          case _ =>
+//        }
+//      }
+//      // REVIEW
+//      case "moviereview" => {
+//        dataObject.get("genre") match {
+//          case Some(gs) => {
+//            for (g <- gs.split("/")) {
+//              infos append MovieInfos.Genre( g.trim )
+//            }
+//          }
+//          case _ =>
+//        }
+//        dataObject.get("starring") match {
+//          case Some(actors) => {
+//            for (actor <- actors.split(",")) {
+//              infos append MovieInfos.Actor( actor.trim )
+//            }
+//          }
+//          case _ =>
+//        }
+//        dataObject.get("image_href") match {
+//          case Some(url) => infos append MovieInfos.Poster( url.toURL )
+//          case _ =>
+//        }
+//        dataObject.get("originalrating") match {
+//          case Some(r) => infos append MovieInfos.ImdbRating( r.trim.toDouble )
+//          case _ =>
+//        }
+////        dataObject.get("summary") match {
+////          case Some(s) => infos append MovieInfos.Summary( s.trim )
+////          case _ =>
+////        }
+//      }
+//      // IMAGE
+//      case "image" => {
+//        dataObject.get("src") match {
+//          case Some(url) => infos append MovieInfos.Poster( url.toURL )
+//          case _ =>
+//        }
+//      }
+//      case x => {
+//        //prtln("Unknown PageMap DataType '" + x + "'")
+//      }
+//    }
+//   
+//    infos.toList
+//  }
 }

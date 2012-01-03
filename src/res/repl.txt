@@ -1,0 +1,7 @@
+# Replacement-Map that is applied before splitting Strings into parts and analyzing them
+ä -> ae
+ö -> oe
+ü -> ue
+' ->
+` ->
+´ ->

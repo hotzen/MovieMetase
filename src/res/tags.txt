@@ -9,6 +9,8 @@ dvdscr
 dubbed
 r5
 screener
+sample
+proper
 tc
 mic
 line
@@ -21,6 +23,7 @@ bdrip
 xvid
 divx
 1080p
+hd1080
 720p
 x264
 h264
@@ -33,6 +36,8 @@ dd
 flac
 pal
 ntsc
+mp4
+mkv
 cd1
 cd2
 cd3

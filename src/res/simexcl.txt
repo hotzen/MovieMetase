@@ -1,0 +1,8 @@
+# Exclusion-List for calculation of similarity between names
+the
+a
+an
+of
+as
+at
+to

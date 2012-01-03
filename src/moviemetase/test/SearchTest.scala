@@ -8,11 +8,11 @@ object SearchTest {
     
     val ms  = new MovieSearch
     
-    val res = ms.searchByTerm( "Inception.1080p.BluRay.x264-REFiNED" )
+    val res = ms.searchByTerm( "Inception 2010 1080p refined" )
     
     println("====================================")
     println("DONE.")
-    println( res.mkString("\n") )
+    println( res.map(_.toStringWithInfos).mkString("\n") )
     ()
   }
 }
