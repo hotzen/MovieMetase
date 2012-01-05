@@ -1,5 +1,5 @@
 package moviemetase
-package query
+package sites
 
 import Util._
 import java.net.URL
@@ -101,7 +101,7 @@ object SubtitleSource {
 
     def process(doc: nu.xom.Document): List[ReleasePageInfo] = {
       val infos = new ListBuffer[ReleasePageInfo]
-      val ctx = XPathContext.XHTML
+      val ctx = Context.XHTML
       
       // all links
       for (aNode <- doc.xpath("""//xhtml:li/xhtml:a[@href]""", ctx);
@@ -141,7 +141,7 @@ object SubtitleSource {
     
     def process(doc: nu.xom.Document): Option[SubtitlePageInfo] = {
       
-      val ctx = XPathContext.XHTML
+      val ctx = Context.XHTML
       
       // all links of content-container
       val allLinks = 

@@ -2,7 +2,7 @@ package moviemetase
 package search
 
 import Util._
-import query._
+import sites._
 import scala.collection.mutable.ListBuffer
 
 case class GoogleTermAtImdbSite(term: String) extends Task[List[Movie]] with Logging {

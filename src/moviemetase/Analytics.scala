@@ -2,6 +2,7 @@ package moviemetase
 
 import scala.collection.mutable.ListBuffer
 import java.io.File
+import scala.util.matching.Regex
 
 object Analyzer {
   
@@ -31,16 +32,23 @@ object Analyzer {
     
 
 // ----------------------------------------------
-  val SplitRegex = """[^a-z0-9]""".r
+  val TokenSplitRegex = """[^a-z0-9]""".r
   
-  type SplitString = List[String]
-  def split(in: String): SplitString = {
+  type Tokens = List[String]
+  
+  def tokenize(in: String): Tokens = {
     var out = in.toLowerCase
     
     for ( (s,r) <- ReplMap )
       out = out.replace(s, r)
     
-    SplitRegex.split( out ).map(_.trim).filter( !_.isEmpty ).toList
+    TokenSplitRegex.split( out ).map(_.trim).filter( !_.isEmpty ).toList
+  }
+  
+  def fuzzy(in: String): (Regex,Tokens) = {
+    val ts = tokenize(in)
+    val regex = ts.map(t => "(?:" + java.util.regex.Pattern.quote(t) + ")?").mkString(".*?").toString.r
+    (regex, ts)
   }
   
      
@@ -79,54 +87,10 @@ object Analyzer {
     (i.size.toFloat / u.size.toFloat)
   }
   
-  def sim(s1: String, s2: String): Float = sim(split(s1), split(s2)) 
+  def sim(s1: String, s2: String): Float = sim(tokenize(s1), tokenize(s2)) 
 
-  
-// ----------------------------------------------
-  def dissect(s: String): Dissected = Dissected(s)
-  def dissectFileInfo(info: FileInfo): DissectedFileInfo = DissectedFileInfo(info)
-  
-//    
-////DissectedFileInfo( V:\01_Filme\Dark.Knight.1080p.BluRay.x264-HD1080\hd1080-tdk.mkv
-////  Dir:  Dissected( [DARK, KNIGHT] None {1080P, BLURAY, X264, HD1080} )
-////  File: Dissected( [HD1080, TDK, MKV] None {} )
-////  Same: Dissected( [] None {} )
-////  All:  Dissected( [DARK, KNIGHT, HD1080, TDK, MKV] None {1080P, BLURAY, X264, HD1080} )
-////)
-//  
-////  val MovieRules = List[DissectedFileInfo => Option[Movie]](
-////      
-////      
-////      (dfi => None)
-////  )
-////  
-//  
-//  def guessMovieFromFile(dfi: DissectedFileInfo): Option[Movie] = {
-//    
-//    val infos = new scala.collection.mutable.ListBuffer[MovieInfo]
-//    
-//    if (!dfi.same.names.isEmpty) {
-//      val sameToDirRatio  = dfi.same.names.size / dfi.dir.names.size
-//      val sameToFileRatio = dfi.same.names.size / dfi.file.names.size
-//      val RatioThreshold  = 0.7
-//      
-//      // use same names if they are about 70% of both dir-names and file-names
-//      if (sameToDirRatio >= RatioThreshold && sameToFileRatio >= RatioThreshold) {
-//        infos append MovieInfos.Title( dfi.same.names.mkString(" ") )
-//      } else {
-//        
-//      }
-//    } else {
-//      
-//    }
-//    
-//    if (dfi.same.year.isDefined)
-//      infos append MovieInfos.Release( dfi.same.year.get )
-//    else if (dfi.all.year.isDefined)
-//      infos append MovieInfos.Release( dfi.all.year.get )
-//    
-//    Movie( infos.toList )
-//  }
+  //def dissect(s: String): Dissected = Dissected(s)
+  //def dissectFileInfo(info: FileInfo): DissectedFileInfo = DissectedFileInfo(info)
 }
 
 
@@ -137,6 +101,15 @@ object FileInfo {
 }
 
 case class FileInfo(path: String, dirName: String, fileName: String) {
+  
+  def fileNameWithoutExt: String = {
+    val pos = fileName.lastIndexOf(".")
+    if (pos < 0)
+      fileName
+    else
+      fileName.substring(0, pos);
+  }
+  
   override def toString: String = {
     val sb = new StringBuffer("FileInfo(")
     sb append path
@@ -151,26 +124,26 @@ case class FileInfo(path: String, dirName: String, fileName: String) {
 
 object Dissected {
   def apply(s: String): Dissected = {
-    var ps = Analyzer.split(s)
+    var ts = Analyzer.tokenize(s)
     val names = new ListBuffer[String]
     
     // check last part, if it is an extension ignore it
-    if (!ps.isEmpty && Analyzer.isExt(ps.last))
-      ps = ps.init
+    if (!ts.isEmpty && Analyzer.isExt(ts.last))
+      ts = ts.init
     
     // parts are names until a year or a tag is reached
-    while (!ps.isEmpty && !Analyzer.toYear(ps.head).isDefined && !Analyzer.isTag(ps.head)) {
-      names append ps.head
-      ps = ps.tail
+    while (!ts.isEmpty && !Analyzer.toYear(ts.head).isDefined && !Analyzer.isTag(ts.head)) {
+      names append ts.head
+      ts = ts.tail
     }
     
     // try to transform the next part to a year
-    val year = if (!ps.isEmpty) Analyzer.toYear(ps.head)
+    val year = if (!ts.isEmpty) Analyzer.toYear(ts.head)
                else             None
 
     // the rest are tags
-    val tags = if (year.isDefined) ps.tail
-               else                ps
+    val tags = if (year.isDefined) ts.tail
+               else                ts
 
     Dissected(s, names.toList, tags, year)
   }
@@ -217,7 +190,7 @@ object Dissected {
 
 case class Dissected(orig: String, names: List[String], tags: List[String], year: Option[Int]) {
   def name: String = names.mkString(" ")
-  def parts: List[String] = Analyzer.split( orig )
+  def parts: List[String] = Analyzer.tokenize( orig )
   
   def same(d2: Dissected) = Dissected.same(this, d2)
   def all(d2: Dissected)  = Dissected.all(this, d2)

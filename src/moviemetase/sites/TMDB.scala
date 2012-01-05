@@ -1,7 +1,6 @@
 package moviemetase
-package query
+package sites
 
-import query._
 import Util._
 import java.net.URL
 import java.io.InputStream
@@ -14,7 +13,7 @@ object TMDB {
   val API_KEY = "be11971c1e1d73be3465ce33a0aaed78"
   val API_URL = "http://api.themoviedb.org/2.1/" 
   
-  val IdRegex        = """/movie/([0-9]+)""".r
+  val IdRegex = """/movie/([0-9]+)""".r
     
   def extractId(s: String): Option[String] = IdRegex.findFirstMatchIn(s) match {
     case Some(m) => Some( m.group(1) )
@@ -35,7 +34,7 @@ object TMDB {
       
       // XXX other checks?
       
-      // default return unchanged
+      // default, return unchanged
       movie
     }
   }
@@ -77,7 +76,7 @@ object TMDB {
                     
           elemMovie.getChildElements("released").
             map( _.getValue ).
-            map( _.split("-")(0).toInt ).
+            map( _.split("-").head ).filter(!_.isEmpty).filter( _.forall(_.isDigit) ).map(_.toInt).
             foreach( infos append MovieInfos.Release(_) )
 
           elemMovie.getChildElements("overview").

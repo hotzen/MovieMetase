@@ -7,7 +7,9 @@ import java.io.OutputStream
 import java.io.PrintStream
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.ThreadPoolExecutor.AbortPolicy
-import java.net.URLConnection
+import java.net.HttpURLConnection
+import java.util.WeakHashMap
+import java.lang.ref.WeakReference
 
 object TaskExecutor {
   val CorePoolSize  = 4
@@ -42,11 +44,19 @@ object TaskExecutor {
     Pool.awaitTermination(3, TimeUnit.SECONDS)
   }
   
-  def submit[T](task: Callable[T]): Future[T] = 
-    Pool submit task
+//  val TaskInfos = new WeakHashMap[Callable[_], TaskInfo]()
+  
+  def submit[T](task: Callable[T]): Future[T] =
+      Pool submit task
+//  {
+//    val fut = Pool submit task
+//    TaskInfos.put(task, TaskInfo(new WeakReference(fut)))
+//    fut
+//  }
+    
   
   def submit[T](code: => T): Future[T] = 
-    Pool submit new Callable[T] { def call(): T = code }
+    submit( new Callable[T] { def call(): T = code } )
 }
 
 trait Task[A] {
@@ -62,6 +72,16 @@ trait Task[A] {
   // create a new task that executes <this> and then the tasks produced by <f>
   final def thenFork[B](f: A => List[Task[B]]): Task[List[B]] = new ForkingTask[A,B](this, f)
 }
+
+//case class TaskInfo(weakFuture: WeakReference[Future[_]]) {
+//  def future: Option[Future[_]] = {
+//    val ref = weakFuture.get()
+//    if (ref == null)
+//      None
+//    else
+//      Some(ref)
+//  }
+//}
 
 class SerialTask[B](val t1: Task[_], val t2: Task[B]) extends Task[B] {
   final def execute(): B = {
@@ -110,47 +130,63 @@ trait UrlTask[A] extends Task[A] {
   def process(is: InputStream): A
     
   // dont keep-alive
-  val ConnectionClose = true
+  val connectionClose = true
   
-  // fooling around with user-agent and referer checks
-  val UserAgent = "Mozilla/5.0"
-  val Referer   = "http://stackoverflow.com/questions/tagged/referer"
-      
+  val userAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:9.0.1) Gecko/20100101 Firefox/9.0.1"
+  val referer   = "http://stackoverflow.com/questions/tagged/referer" 
+  
   // if sending data, define its content-type and the function to fill the OutputStream with the data
-  val RequestProperties: List[(String, String)] = Nil
-  val RequestContentType: Option[String]      = None
-  val RequestFn: Option[OutputStream => Unit] = None
+  val requestMethod: String = "GET"
+  val requestProperties: List[(String, String)] = Nil
+  val requestContentType: Option[String]      = None
+  val requestSendData: Option[OutputStream => Unit] = None
 
   final def execute(): A = {
-    val conn: URLConnection = url.openConnection()
+    val conn: HttpURLConnection = url.openConnection() match {
+      case http:HttpURLConnection => http
+      case _                      => throw new Exception("UrlTask only supports HTTP connections")
+    }
+    
     conn setUseCaches true
     conn setAllowUserInteraction false
     conn setDoInput  true
-    conn setDoOutput RequestFn.isDefined
+    conn setDoOutput requestSendData.isDefined
     
-    if (ConnectionClose)
+    conn setRequestMethod requestMethod
+    conn setInstanceFollowRedirects false
+        
+    if (connectionClose)
        conn setRequestProperty ("Connection", "Close")
     
-    if (RequestContentType.isDefined)
-      conn setRequestProperty ("Content-Type", RequestContentType.get);
+    if (requestContentType.isDefined)
+      conn setRequestProperty ("Content-Type", requestContentType.get);
     
-    conn setRequestProperty ("User-Agent", UserAgent)
-    conn setRequestProperty ("Referer",    Referer)
+    conn setRequestProperty ("User-Agent", userAgent)
+    conn setRequestProperty ("Referer",    referer)
     
-    for ((propName, propValue) <- RequestProperties)
+    for ((propName, propValue) <- requestProperties)
       conn setRequestProperty (propName, propValue)
     
     conn.connect()
     
-    RequestFn match {
-      case Some(fn) => fn( conn.getOutputStream )
-      case None     => // request-parameters solely encoded in URL
+    requestSendData match {
+      case Some(f) => f( conn.getOutputStream )
+      case None    => // request-parameters only encoded in URL
     }
     
+    val respCode = conn.getResponseCode
+    if (respCode != HttpURLConnection.HTTP_OK)
+      throw new Exception("UrlTask failed with HTTP " + respCode + ": " + conn.getResponseMessage)
+        
     val is = conn.getInputStream
     
     try {
-      process( is )
+      val res = process( is )
+      
+      if (!connectionClose)
+        conn.disconnect()
+        
+      res
     } catch {
       case e:Exception => {
         System.err.println("UrlProcessor failed! URL: " + url)

@@ -2,10 +2,10 @@ package moviemetase
 package search
 
 import Util._
-import query._
+import sites._
 import scala.collection.mutable.ListBuffer
 
-case class GoogleTermWithImdbLink(term: String, requireMatch: Option[String] = None) extends Task[List[Movie]] with Logging {
+case class GoogleTermWithImdbLink(term: String, requiresMatch: Option[GoogleResult => Boolean] = None) extends Task[List[Movie]] with Logging {
   val logID = "GoogleTermWithImdbLink"
   
   val query = term + " linkto:imdb.com/title/"
@@ -18,7 +18,7 @@ case class GoogleTermWithImdbLink(term: String, requireMatch: Option[String] = N
     }
     
     val imdbTitleUrls = googleRes.flatMap(extractImdbUrl(_))
-            
+
     if (imdbTitleUrls.isEmpty) {
       trace("Nothing found")
       return Nil 
@@ -64,16 +64,18 @@ case class GoogleTermWithImdbLink(term: String, requireMatch: Option[String] = N
     futs.flatMap( _.get() )
   }
   
+  val WhitespaceRegex = """\s""".r
+  
   def extractImdbUrl(res: GoogleResult): Option[String] = {
-    val title   = RegexUtils.Whitespace.replaceAllIn(res.title.toLowerCase,   "")
-    val snippet = RegexUtils.Whitespace.replaceAllIn(res.snippet.toLowerCase, "")
-
-    requireMatch match {
-      case None    => 
-      case Some(m) => if (!title.contains( m.toLowerCase ) && !snippet.contains( m.toLowerCase ))
-                        return None
-    }
+    val matched =
+      requiresMatch match {
+        case Some(matchFn) => matchFn(res)
+        case None          => true
+      }
     
-    IMDB.extractTitleUrls( snippet ).headOption
+    if (!matched)
+      None
+    else
+      IMDB.extractTitleUrls( WhitespaceRegex.replaceAllIn(res.snippet.toLowerCase, "") ).headOption
   }
 }

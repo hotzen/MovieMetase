@@ -144,11 +144,11 @@ class GUI extends Reactor {
         mdl.clear
         
         for ( movie <- res) {
-          val score = {
+          val score = 0 /* {
             val scores = movie.infos.collect({ case MovieInfos.Score(score) => score })
               if (scores.isEmpty) 0.0
               else scores.head
-          }
+          } */
           
           val imdb = {
             val imdbs = movie.infos.collect({ case MovieInfos.IMDB(url) => url })

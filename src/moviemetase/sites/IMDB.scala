@@ -1,5 +1,5 @@
 package moviemetase
-package query
+package sites
 
 object IMDB {
   val CSE = "011282045967305256347:dyc6spozqnc"
@@ -31,7 +31,7 @@ object IMDB {
       val infos = new ListBuffer[MovieInfo]()
       infos append imdbInfo
       
-      val ctx = XPathContext.XHTML
+      val ctx = Context.XHTML
       
       // meta-tags
       val metas =

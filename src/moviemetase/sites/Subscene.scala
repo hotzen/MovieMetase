@@ -1,5 +1,5 @@
 package moviemetase
-package query
+package sites
 
 import Util._
 import java.net.URL
@@ -21,7 +21,7 @@ object Subscene {
   case class SearchByRelease(release: String) extends HtmlTask[List[MovieInfos.Subtitle]] with Logging {
     val logID = "Subscene.SearchByRelease(" + release + ")"
     
-    override val Referer = "http://subscene.com"
+    override val referer = "http://subscene.com"
 
     def url: URL = {
       val sb = new StringBuilder(BASE_URL)
@@ -34,7 +34,7 @@ object Subscene {
       import XOM._
       
       val futs =
-        for (aNode <- doc.xpath("""//xhtml:a""", XPathContext.XHTML);
+        for (aNode <- doc.xpath("""//xhtml:a""", Context.XHTML);
              aElem <- aNode.toElement;
              href  <- aElem.attribute("href") if SubtitlePathRegex.matches(href) ) yield {
         
@@ -54,7 +54,7 @@ object Subscene {
   case class SearchByTitle(title: String) extends HtmlTask[List[MovieInfos.Subtitle]] with Logging {
     val logID = "Subscene.SearchByTitle(" + title + ")"
     
-    override val Referer = "http://subscene.com"
+    override val referer = "http://subscene.com"
     
     def url: URL = {
       val sb = new StringBuilder(BASE_URL)
@@ -66,7 +66,7 @@ object Subscene {
       import XOM._
 
       val futs =
-        for (aNode <- doc.xpath("""//xhtml:a""", XPathContext.XHTML);
+        for (aNode <- doc.xpath("""//xhtml:a""", Context.XHTML);
              aElem <- aNode.toElement;
              href  <- aElem.attribute("href") if FilmPathRegex.matches(href) ) yield {
         

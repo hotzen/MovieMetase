@@ -1,7 +1,7 @@
 package moviemetase
 package test
 
-import query._
+import sites._
 import search._
 import Util._
 

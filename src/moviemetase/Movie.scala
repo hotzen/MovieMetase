@@ -19,8 +19,8 @@ object Movie {
       newInfos append releaseInfo
 
     // create Movie from Title and Release
-    val t  = newInfos.collect({ case MovieInfos.Title(t)   => t  }).headOption
-    val r  = newInfos.collect({ case MovieInfos.Release(d) => d  }).headOption
+    val t = newInfos.collect({ case MovieInfos.Title(t)   => t }).headOption
+    val r = newInfos.collect({ case MovieInfos.Release(d) => d }).headOption
 
     if (t.isDefined) {
       val title = t.head
@@ -59,6 +59,12 @@ object Movie {
 case class Movie(title: String, year: Int, infos: List[MovieInfo] = Nil) {
   
   val label = title + "/" + year
+  
+  var attributedTo: Option[String] = None
+  def attributeTo(s: String): Movie = {
+    attributedTo = Some(s)
+    this
+  }
   
   def withNewInfos(infos2: List[MovieInfo]): Movie =
     Movie(title, year, (infos ::: infos2).distinct)
@@ -136,10 +142,7 @@ object MovieInfos {
   trait WebPage extends MovieInfo {
     def page: URL
   }
-  
-  // search scoring
-  case class Score(score: Double) extends MovieInfo
-  
+    
   case class TitleWithRelease(titleRelease: String) extends MovieInfo
   
   case class Title(name: String) extends MovieInfo
@@ -149,8 +152,7 @@ object MovieInfos {
   
   case class Description(text: String) extends MovieInfo
   case class Summary(text: String) extends MovieInfo
-  //case class Plot(text: String) extends MovieInfo
-  
+    
   case class AlternativeTitle(title: String) extends MovieInfo
   //case class Rating(rating: Double, max: Double) extends MovieInfo
   case class ImdbRating(rating: Double) extends MovieInfo
@@ -179,4 +181,12 @@ object MovieInfos {
   case class Backdrop(url: URL, preview: Option[URL] = None) extends MovieInfo with Image
   
   case class Extra(name: String, value: String) extends MovieInfo
+  
+// TODO
+//  case class ResultScore(baseScore: Double) extends MovieInfo {
+//    var scores: List[Double] = baseScore :: Nil
+//    def score: Double = scores.reduceLeft(_ * _)
+//    
+//    override def toString = "ResultScore(" + score + ")"
+//  }
 }

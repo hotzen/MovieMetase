@@ -19,9 +19,9 @@ class StringUtils(val s: String) {
   def noEntities = """&.+?;""".r.replaceAllIn(s, "")
 }
 
-object RegexUtils {
-  val Whitespace = """\s""".r
-}
+//object RegexUtils {
+//  val Whitespace = """\s""".r
+//}
 
 class RegexUtils(val r: scala.util.matching.Regex) {
   
@@ -45,7 +45,7 @@ class ListUtils[A](val xs: List[A]) {
         case None        => map += (x -> 1)
       }
     }
-    map.toList.sortWith( (a,b) => a._2 <= b._2 )
+    map.toList.sortWith( (a,b) => a._2 > b._2 )
 //    def f(xs: List[A], res: List[(A,Int)]): List[(A,Int)] = xs match {
 //      case Nil => res
 //      case x::tail => {
@@ -63,3 +63,17 @@ class ListUtils[A](val xs: List[A]) {
 //  //def noCount(): List[A] = ls.map(tpl => tpl._1)
 //}
 //      
+
+
+// http://stackoverflow.com/a/4186090
+object JsonType {
+  class CC[T] {
+    def unapply(a: Any): Option[T] = Some( a.asInstanceOf[T] )
+  }
+
+  object M extends CC[Map[String, Any]]
+  object L extends CC[List[Any]]
+  object S extends CC[String]
+  object D extends CC[Double]
+  object B extends CC[Boolean]
+}

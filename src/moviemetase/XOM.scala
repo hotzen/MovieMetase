@@ -5,7 +5,7 @@ import org.xml.sax.helpers.XMLReaderFactory
 
 object XOM {
   
-  object XPathContext {
+  object Context {
     val None  = null
     val XHTML = new XPathContext("xhtml", "http://www.w3.org/1999/xhtml")
   }
@@ -38,14 +38,19 @@ object XOM {
     }
   }
 
-  implicit def ImplicitNode(node: Node): RichNode = RichNode(node)
-  case class RichNode(node: Node) {
+  implicit def ImplicitNode(node: Node): RichNode = new RichNode(node)
+  class RichNode(node: Node) {
     def toElement(): Option[Element] = node match {
       case elem:Element => Some(elem)
       case _ => None
     }
     
-    def xpath[A](xp: String, ctx: XPathContext = XPathContext.None): List[Node] = {
+    // TODO CSS-selector
+    def select[A](sel: String): List[Node] = {
+      Nil
+    }
+    
+    def xpath[A](xp: String, ctx: XPathContext = Context.None): List[Node] = {
       val res =
         if (ctx != null)
           node.query(xp, ctx)
@@ -58,7 +63,6 @@ object XOM {
     // http://www.xom.nu/faq.xhtml#d0e452
     def namespaces: List[Namespace] =
       node.query("namespace::node()").collect({ case n:Namespace => n }).toList
-      
     
     def children: Iterable[Node] = new Iterable[Node] {
       val cnt = node.getChildCount
@@ -82,8 +86,8 @@ object XOM {
   }
 
   
-  implicit def ImplicitElement(elem: Element): RichElement = RichElement(elem)
-  case class RichElement(elem: Element) extends RichNode(elem) {
+  implicit def ImplicitElement(elem: Element): RichElement = new RichElement(elem)
+  class RichElement(elem: Element) extends RichNode(elem) {
         
     def name: String =
       elem.getLocalName
@@ -118,8 +122,8 @@ object XOM {
     
   } // EndOf RichElement
   
-  implicit def ImplicitAttribut(attrib: Attribute): RichAttribute = RichAttribute(attrib)
-  case class RichAttribute(attrib: Attribute) extends RichNode(attrib) {
+  implicit def ImplicitAttribut(attrib: Attribute): RichAttribute = new RichAttribute(attrib)
+  class RichAttribute(attrib: Attribute) extends RichNode(attrib) {
     def name = attrib.getLocalName
     def value = attrib.getValue
   }

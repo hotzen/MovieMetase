@@ -1,7 +1,7 @@
 package moviemetase
 package test
 
-import query._
+import sites._
 
 object SubtitleSourceTest {
   def main(args: Array[String]) = {
