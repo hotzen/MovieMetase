@@ -69,7 +69,7 @@ trait Task[A] {
   // create a new task that executes <this> and then <next>
   final def then[B](next: Task[B]): Task[B] = new SerialTask[B](this, next)
   
-  // create a new task that executes <this> and then the tasks produced by <f>
+  // create a new task that executes <this> and then forks the tasks produced by <f>
   final def thenFork[B](f: A => List[Task[B]]): Task[List[B]] = new ForkingTask[A,B](this, f)
 }
 

@@ -23,20 +23,20 @@ object SubtitleSource {
     val SubtitleLink    = """/subs/(\d+)[^"]*""".r  
     val DownloadZipLink = """/download/zip/(\d+)""".r
   }
-    
-  case class ReleaseSearch(val term: String) extends Task[List[List[MovieInfo]]] with Logging {
+      
+  case class ReleaseSearch(term: String) extends Task[List[List[MovieInfo]]] with Logging {
     val logID = "SubtitleSource_ReleaseSearch(" + term  + ")"
     
+    def query = term + " site:subtitlesource.org/release/"
+
     val BaseScore = 0.95
     
     def execute(): List[List[MovieInfo]] = {
-      val fuzzy = term //Google.fuzzyTerm(term)
-      trace("querying GoogleCSE with fuzzy term '" + fuzzy + "'")
+      val res = Google.Query(query).execute()
+          
+      for (r <- res)
+        println(r)
       
-      val relQuery = GoogleCSE.Query(ReleaseCSE, term)
-      val fut = relQuery.submit()
-      val res = fut.get() // block
-
       // extract Release-Page
       val releaseFuts =
         for ( (r, idx) <- res.zipWithIndex;

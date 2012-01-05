@@ -8,12 +8,12 @@ import scala.collection.mutable.ListBuffer
 case class GoogleTermAtImdbSite(term: String) extends Task[List[Movie]] with Logging {
   val logID = "GoogleTermAtImdbSite"
   
-  val query = term // + " site:imdb.com/title/"
+  def query = term + " site:imdb.com/title/"
   
   val Max = 3
   
   final def execute(): List[Movie] = {
-    val googleRes = GoogleCSE.Query(IMDB.CSE, query).execute()
+    val googleRes = Google.Query(query).execute()
 
     for (res <- googleRes) {
       trace(res.toString)
