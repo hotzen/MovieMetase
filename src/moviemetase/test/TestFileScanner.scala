@@ -15,6 +15,6 @@ object TestFileScanner {
         println("TOOK " + q.take)
       }
     }
-    t.execute()
+    //t.execute()
   }
 }

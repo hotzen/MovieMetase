@@ -8,11 +8,13 @@ import java.util.concurrent.BlockingQueue
 
 object FileScanner {
   
-  def createQueue[A](capacity: Int): BlockingQueue[A] =
+  var QueueCapacity: Int = 100
+  
+  def createQueue[A](capacity: Int = QueueCapacity): BlockingQueue[A] =
     new java.util.concurrent.LinkedBlockingQueue[A]( capacity )
+  
     
-  def findMovies(baseDir: Path): BlockingQueue[FileInfo] = {
-    val q = createQueue[FileInfo](100)
+  def findMovies(baseDir: Path, q: BlockingQueue[FileInfo] = createQueue[FileInfo]()): BlockingQueue[FileInfo] = {
     val v = new MovieCollector( q )
     val s = new FileScanner(baseDir, v)
     s.submit()
