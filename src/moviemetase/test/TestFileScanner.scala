@@ -9,5 +9,12 @@ object TestFileScanner {
     val baseDir = Paths.get( args(0) )
     
     val q = FileScanner.findMovies(baseDir)
+    
+    val t = new Task[Unit] {
+      def execute(): Unit = {
+        println("TOOK " + q.take)
+      }
+    }
+    t.execute()
   }
 }

@@ -57,10 +57,10 @@ class MovieCollector(val queue: BlockingQueue[FileInfo]) extends QueueingFileVis
     val info = FileInfo(path)
         
     if (Analyzer isExt info.fileExt) {
-      trace("[Q=" + "%03d".format(queue.size()) + "] " + info)
+      trace("[Q="+("%03d" format queue.size)+"] " + info)
       queue put info // blocking
     } else {
-      trace("SKIP " + info)
+      trace("\tSKIP " + info)
     }
     
     //trace("\t path-stack: " + dirs.reverse.mkString(" / "))
