@@ -33,11 +33,11 @@ object OpenSubtitles {
   case class Login(user: String = "", password: String = "", language: String = defaultLanguage) extends XmlTask[Option[String]] with Logging {
     val logID = "OpenSubtitles.Login"
     
-    override val userAgent = API_UA
-    override val requestContentType = Some("text/xml")
-    def url: URL = new URL( API_URL )
+    override val UserAgent = API_UA
+    override val RequestContentType = Some("text/xml")
+    lazy val url: URL = new URL( API_URL )
     
-    override val requestSendData = Some( (os:OutputStream) => {
+    override val RequestSendData = Some( (os:OutputStream) => {
       trace("XML-RPC LogIn ...", ("user" -> user) :: ("password" -> password) :: ("language" -> language) :: Nil)
       
       val pw  = new PrintWriter( os )
@@ -72,11 +72,11 @@ object OpenSubtitles {
     
 //    def query = imdb.toString
     
-    override val userAgent = API_UA
-    override val requestContentType = Some("text/xml")
-    def url: URL = new URL( API_URL )
+    override val UserAgent = API_UA
+    override val RequestContentType = Some("text/xml")
+    lazy val url: URL = new URL( API_URL )
       
-    override val requestSendData = Some( (os:OutputStream) => {
+    override val RequestSendData = Some( (os:OutputStream) => {
       val pw = new PrintWriter( os )
 
       val imdbID = imdb.id.drop(2) // skip leading "tt" of ID

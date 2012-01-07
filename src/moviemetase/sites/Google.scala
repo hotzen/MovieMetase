@@ -62,6 +62,7 @@ object Google {
 case class GoogleResult(query: String, url: URL, title: String, snippet: String) //, pageMap: List[GooglePageMapDataObject]) {
 
 
+//XXX very poor result-quality :( 
 object GoogleAjax {
   val BASE_URL = "http://ajax.googleapis.com/ajax/services/search/web"
   
@@ -71,7 +72,7 @@ object GoogleAjax {
     def params: String = "v=1.0&rsz=large&hl=en"
     def limit: Int = 8
       
-    def url: URL = {
+    lazy val url: URL = {
       val sb = new StringBuilder( BASE_URL )
       sb append "?"       append params
       sb append "&start=" append ((page-1)*limit)
@@ -116,7 +117,7 @@ object GoogleWeb {
     // http://www.blueglass.com/blog/google-search-url-parameters-query-string-anatomy/
     def params: String = "ie=UTF-8&oe=UTF-8&hl=en&filter=0&safe=0&pws=0&complete=0&instant=off"
     
-    def url: URL = {
+    lazy val url: URL = {
       val q = java.net.URLEncoder.encode(query, "UTF-8")
 
       val sb = new StringBuilder( BASE_URL )
@@ -126,95 +127,23 @@ object GoogleWeb {
       trace(query, ("url" -> sb.toString) :: Nil)
       new URL( sb.toString )
     }
-       
-    def process(doc: nu.xom.Document): List[GoogleResult] = {
-      import nu.xom._
-      import XOM._
+    
+     def process(doc:  org.jsoup.nodes.Document): List[GoogleResult] = {
+      import org.jsoup.nodes._
+      import JSoup._
       
-      val ctx = Context.XHTML
+      doc.select("#ires").headOption match {
+        case Some(res) => res.select("li.g").map(li => {
+          val a     = li.select("a.l").head // fails
+          val link  = a.attrOpt("href").get // fails
+          val title = a.text
 
-      doc.xpath("""//xhtml:li[@class="g"]""", ctx).flatMap(_.toElement).flatMap( resultElem => {
-        val linkTitle = 
-          resultElem.xpath("""descendant::xhtml:a[@class="l"]""", ctx).flatMap(_.toElement).
-          flatMap(a => a.attribute("href") match {
-            case Some(href) => Some( (href, a.value) )
-            case None       => None
-          }).head // shall fail
-                
-        val snippet =
-          resultElem.xpath("""descendant::*[@class="st"]""").flatMap(_.toElement).
-          map(_.value).headOption.get // shall fail
-        
-        Some( GoogleResult(query: String, linkTitle._1.toURL, linkTitle._2, snippet) )
-      })
+          val snippet = li.select(".st").map(_.text).head // fails
+          
+          GoogleResult(query: String, link.toURL, title, snippet)
+        }).toList
+        case None => throw new Exception("no <div id=ires> results-container found")
+      }
     }
   }
 }
-
-//Disabled, limited to 100 requests a day! NONSENSE
-
-//object GoogleCSE {
-//  val API_KEY  = "AIzaSyAeeLMANIJTh5H2aZTusm1_iUyudRMQABc"
-//  val BASE_URL = "https://www.googleapis.com/customsearch/v1"
-//    
-//  val NS_ATOM = "http://www.w3.org/2005/Atom"
-//  val NS_CSE  = "http://schemas.google.com/cseapi/2010"
-//  val NS_OS   = "http://a9.com/-/spec/opensearch/1.1/"
-//  val NS_GD   = "http://schemas.google.com/g/2005"
-//
-//  case class Query(cseID: String, query: String, page: Int = 1) extends UrlTask[List[GoogleResult]] with Logging {
-//    val logID = "GoogleCSE.Query"
-//    
-//    def params: String = "alt=atom&prettyprint=true&safe=off"
-//    def limit: Int = 10
-//    
-//    def url: URL = {
-//      val sb = new StringBuilder( BASE_URL )
-//      sb append "?key="   append API_KEY
-//      sb append "&cx="    append cseID
-//      sb append "&"       append params
-//      sb append "&num="   append limit
-//      sb append "&start=" append (page + (page-1)*limit)
-//      sb append "&q="     append query.urlEncode
-//      
-//      val url = sb.toString 
-//      trace("querying '" + query + "' ...", ("url" -> url) :: Nil)
-//      new URL(url)
-//    }
-//
-//    def process(in: InputStream): List[GoogleResult] = {
-//      import XOM._
-//      
-//      val builder = new Builder()
-//      val doc = builder build in
-//      //println( doc.toXML )
-//      
-//      val results = for (entry <- doc.getRootElement.getChildElements("entry", NS_ATOM)) yield {
-//  
-////        val id = entry.
-////          getChildElements("id", NS_ATOM).
-////          map( _.getValue ).
-////          head
-//        
-//        val url = entry.
-//          getChildElements("link", NS_ATOM).
-//          map( _.getAttributeValue("href") ).
-//          head
-//  
-//        val title = entry.
-//          getChildElements("title", NS_ATOM).
-//          map( _.getValue.noTags.noEntities ).
-//          head
-//  
-//        val snippet = entry.
-//          getChildElements("summary", NS_ATOM).
-//          map( _.getValue.noTags.noEntities ).
-//          head
-//        
-//        GoogleResult(query, new URL(url), title, snippet)
-//      }
-//      
-//      results.toList
-//    }
-//  }
-//}

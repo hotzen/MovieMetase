@@ -45,11 +45,6 @@ object XOM {
       case _ => None
     }
     
-    // TODO CSS-selector
-    def select[A](sel: String): List[Node] = {
-      Nil
-    }
-    
     def xpath[A](xp: String, ctx: XPathContext = Context.None): List[Node] = {
       val res =
         if (ctx != null)

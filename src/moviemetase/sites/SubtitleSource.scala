@@ -95,7 +95,7 @@ object SubtitleSource {
   
   case class ReleasePageInfo(releasePage: URL, subtitlePage: URL, label: String, lang: String)
   
-  case class ReleasePageExtractor(url: URL) extends HtmlTask[List[ReleasePageInfo]] with Logging {
+  case class ReleasePageExtractor(url: URL) extends XhtmlTask[List[ReleasePageInfo]] with Logging {
     import XOM._
     val logID = "SubtitleSource_ReleasePageExtractor(" +  url.toString + ")"
 
@@ -135,7 +135,7 @@ object SubtitleSource {
   case class SubtitlePageInfo(subtitlePage: URL, downloadUrl: URL, moviePage: Option[MoviePageInfo])
   case class MoviePageInfo(moviePage: URL, imdbID: String)
   
-  case class SubtitlePageExtractor(url: URL) extends HtmlTask[Option[SubtitlePageInfo]] with Logging {
+  case class SubtitlePageExtractor(url: URL) extends XhtmlTask[Option[SubtitlePageInfo]] with Logging {
     import XOM._
     val logID = "SubtitleSource_SubtitlePageExtractor(" +  url.toString + ")"
     

@@ -11,13 +11,11 @@ import scala.util.parsing.json.JSON
 object InfoSpace {
   val RedirectRegex = """ru=([^&]+)""".r
   
-  def extractLinkFromRedirect(link: String): Option[String] = {
-    println( link )
+  def extractLinkFromRedirect(link: String): Option[String] =
     RedirectRegex.findFirstMatchIn(link) match {
       case Some(m) => Some( java.net.URLDecoder.decode(m.group(1), "UTF-8") )
       case None    => None
     }
-  }
 }
 
 object MetaCrawler {
@@ -26,9 +24,9 @@ object MetaCrawler {
   case class Query(query: String) extends HtmlTask[List[GoogleResult]] with Logging {
     val logID = "MetaCrawler.Query"
      
-    def params: String = ""
+    val params: String = ""
     
-    def url: URL = {
+    lazy val url: URL = {
       val q = java.net.URLEncoder.encode(query, "UTF-8")
 
       val sb = new StringBuilder( BASE_URL )
@@ -38,31 +36,23 @@ object MetaCrawler {
       trace(query, ("url" -> sb.toString) :: Nil)
       new URL( sb.toString )
     }
-       
-    def process(doc: nu.xom.Document): List[GoogleResult] = {
-      import XOM._
-      //println( doc.toXML )
+    
+    def process(doc:  org.jsoup.nodes.Document): List[GoogleResult] = {
+      import org.jsoup.nodes._
+      import JSoup._
+      
+      doc.select("#webResults").headOption match {
+        case Some(res) => res.select(".webResult").map(li => {
+          val a     = li.select("a.resultTitle").head // fails
+          val link  = InfoSpace.extractLinkFromRedirect( a.attr("href") ).get // fails
+          val title = a.text
 
-      doc.xpath("""//*[@class="searchResult webResult"]""").flatMap(_.toElement).flatMap( resultElem => {
+          val snippet = li.select(".resultDescription").map(_.text).head // fails
 
-        val optLink = 
-          resultElem.xpath("""descendant::*[@class="resultTitle"]""").flatMap(_.toElement).
-          flatMap(elem => elem.attribute("href")).
-          flatMap( InfoSpace.extractLinkFromRedirect(_) ).headOption
-          
-        val title =
-          resultElem.xpath("""descendant::*[@class="resultTitle"]""").flatMap(_.toElement).
-          map( elem => elem.value ).headOption.getOrElse("NO-TITLE")
-        
-        val snippet =
-          resultElem.xpath("""descendant::*[@class="resultDescription"]""").flatMap(_.toElement).
-          map(_.value).headOption.getOrElse("NO-SNIPPET")
-          
-        optLink match {
-          case Some(link) => Some( GoogleResult(query: String, link.toURL, title, snippet) )
-          case None       => None
-        }
-      })
+          GoogleResult(query: String, link.toURL, title, snippet)
+        }).toList
+        case None => throw new Exception("no <* class=webResult> results-container found")
+      }
     }
   }
 }
@@ -74,9 +64,9 @@ object DogPile {
   case class Query(query: String) extends HtmlTask[List[GoogleResult]] with Logging {
     val logID = "DogPile.Query"
      
-    def params: String = ""
+    val params: String = ""
     
-    def url: URL = {
+    lazy val url: URL = {
       val q = java.net.URLEncoder.encode(query, "UTF-8")
 
       val sb = new StringBuilder( BASE_URL )
@@ -86,31 +76,23 @@ object DogPile {
       trace(query, ("url" -> sb.toString) :: Nil)
       new URL( sb.toString )
     }
-       
-    def process(doc: nu.xom.Document): List[GoogleResult] = {
-      import XOM._
-      //println( doc.toXML )
+    
+    def process(doc:  org.jsoup.nodes.Document): List[GoogleResult] = {
+      import org.jsoup.nodes._
+      import JSoup._
+      
+      doc.select("#webResults").headOption match {
+        case Some(res) => res.select(".webResult").map(li => {
+          val a     = li.select("a.resultTitle").head // fails
+          val link  = InfoSpace.extractLinkFromRedirect( a.attr("href") ).get // fails
+          val title = a.text
 
-      doc.xpath("""//*[@class="searchResult webResult"]""").flatMap(_.toElement).flatMap( resultElem => {
-
-        val optLink = 
-          resultElem.xpath("""descendant::*[@class="resultTitle"]""").flatMap(_.toElement).
-          flatMap(elem => elem.attribute("href")).
-          flatMap( InfoSpace.extractLinkFromRedirect(_) ).headOption
+          val snippet = li.select(".resultDescription").map(_.text).head // fails
           
-        val title =
-          resultElem.xpath("""descendant::*[@class="resultTitle"]""").flatMap(_.toElement).
-          map( elem => elem.value ).headOption.getOrElse("NO-TITLE")
-        
-        val snippet =
-          resultElem.xpath("""descendant::*[@class="resultDescription"]""").flatMap(_.toElement).
-          map(_.value).headOption.getOrElse("NO-SNIPPET")
-          
-        optLink match {
-          case Some(link) => Some( GoogleResult(query: String, link.toURL, title, snippet) )
-          case None       => None
-        }
-      })
+          GoogleResult(query: String, link.toURL, title, snippet)
+        }).toList
+        case None => throw new Exception("no <* class=webResult> results-container found")
+      }
     }
   }
 }

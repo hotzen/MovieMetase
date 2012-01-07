@@ -9,7 +9,7 @@ object DogPileTest {
     val res = DogPile.Query("Wolfman.UNRATED.1080p.BluRay.x264-REFiNED link:imdb.com/title/").execute()
     
     for (r <- res) {
-      println(res)
+      println(r)
     }
   }
 }

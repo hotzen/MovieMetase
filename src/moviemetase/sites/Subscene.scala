@@ -18,12 +18,12 @@ object Subscene {
   val SubtitlePathRegex = """/(.+?)/(.+?)/subtitle-(\d+).aspx""".r
   
 
-  case class SearchByRelease(release: String) extends HtmlTask[List[MovieInfos.Subtitle]] with Logging {
+  case class SearchByRelease(release: String) extends XhtmlTask[List[MovieInfos.Subtitle]] with Logging {
     val logID = "Subscene.SearchByRelease(" + release + ")"
     
-    override val referer = "http://subscene.com"
+    override val Referer = "http://subscene.com"
 
-    def url: URL = {
+    lazy val url: URL = {
       val sb = new StringBuilder(BASE_URL)
       sb append "/s.aspx?q=" + release.urlEncode
       sb.toString.toURL
@@ -51,12 +51,12 @@ object Subscene {
   }
   
   
-  case class SearchByTitle(title: String) extends HtmlTask[List[MovieInfos.Subtitle]] with Logging {
+  case class SearchByTitle(title: String) extends XhtmlTask[List[MovieInfos.Subtitle]] with Logging {
     val logID = "Subscene.SearchByTitle(" + title + ")"
     
-    override val referer = "http://subscene.com"
+    override val Referer = "http://subscene.com"
     
-    def url: URL = {
+    lazy val url: URL = {
       val sb = new StringBuilder(BASE_URL)
       sb append "/filmsearch.aspx?q=" + title.urlEncode
       sb.toString.toURL
@@ -85,7 +85,7 @@ object Subscene {
   
   case class SubtitlePageInfo()
   
-  case class SubtitlePageExtractor(url: URL) extends HtmlTask[List[SubtitlePageInfo]] with Logging {
+  case class SubtitlePageExtractor(url: URL) extends XhtmlTask[List[SubtitlePageInfo]] with Logging {
     val logID = "Subscene.SubtitlePageExtractor(" + url + ")"
     
     def process(doc: nu.xom.Document): List[SubtitlePageInfo] = {
@@ -97,7 +97,7 @@ object Subscene {
     }
   }
   
-  case class FilmPageExtractor(url: URL) extends HtmlTask[List[SubtitlePageInfo]] with Logging {
+  case class FilmPageExtractor(url: URL) extends XhtmlTask[List[SubtitlePageInfo]] with Logging {
     val logID = "Subscene.FilmPageExtractor(" + url + ")"
     
     def process(doc: nu.xom.Document): List[SubtitlePageInfo] = {
@@ -187,7 +187,7 @@ object Subscene {
 ////  
 //  case class ReleasePageInfo(releasePage: URL, subtitlePage: URL, label: String, lang: String)
 //  
-//  case class ReleasePageExtractor(url: URL) extends HtmlTask[List[ReleasePageInfo]] with Logging {
+//  case class ReleasePageExtractor(url: URL) extends XhtmlTask[List[ReleasePageInfo]] with Logging {
 //    import XOM._
 //    val logID = "SubtitleSource_ReleasePageExtractor(" +  url.toString + ")"
 //
@@ -227,7 +227,7 @@ object Subscene {
 //  case class SubtitlePageInfo(subtitlePage: URL, downloadUrl: URL, moviePage: Option[MoviePageInfo])
 //  case class MoviePageInfo(moviePage: URL, imdbID: String)
 //  
-//  case class SubtitlePageExtractor(url: URL) extends HtmlTask[Option[SubtitlePageInfo]] with Logging {
+//  case class SubtitlePageExtractor(url: URL) extends XhtmlTask[Option[SubtitlePageInfo]] with Logging {
 //    import XOM._
 //    val logID = "SubtitleSource_SubtitlePageExtractor(" +  url.toString + ")"
 //    

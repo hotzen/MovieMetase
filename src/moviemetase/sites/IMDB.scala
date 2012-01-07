@@ -16,7 +16,7 @@ object IMDB {
     
   def extractId(s: String): Option[String] = extractIds(s).headOption
     
-  case class FetchByID(val id: String) extends HtmlTask[Option[Movie]] with Logging {
+  case class FetchByID(val id: String) extends XhtmlTask[Option[Movie]] with Logging {
     val logID = "IMDB.FetchByID(" + id + ")"
     
     val imdbInfo = MovieInfos.IMDB(id)

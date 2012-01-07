@@ -10,10 +10,10 @@ object Dissect {
     val ps = scala.io.Source.fromFile(f, "utf-8").getLines.toList
     
     for (p <- ps) {
-      val i = FileInfo(p)
-      val d = DissectedFileInfo(i)
+      val info = FileInfo(p)
+      val d = Analyzer.dissectFileInfo(info)
       
-      println("===\n" + p + "\n" + i + "\n" + d + "\n")
+      println("===\n" + p + "\n" + info + "\n" + d + "\n")
     }
   }
 }

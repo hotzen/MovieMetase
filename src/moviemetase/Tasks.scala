@@ -130,16 +130,16 @@ trait UrlTask[A] extends Task[A] {
   def process(is: InputStream): A
     
   // dont keep-alive
-  val connectionClose = true
+  val ConnectionClose = true
   
-  val userAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:9.0.1) Gecko/20100101 Firefox/9.0.1"
-  val referer   = "http://stackoverflow.com/questions/tagged/referer" 
+  val UserAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:9.0.1) Gecko/20100101 Firefox/9.0.1"
+  val Referer   = "http://stackoverflow.com/questions/tagged/referer" 
   
   // if sending data, define its content-type and the function to fill the OutputStream with the data
-  val requestMethod: String = "GET"
-  val requestProperties: List[(String, String)] = Nil
-  val requestContentType: Option[String]      = None
-  val requestSendData: Option[OutputStream => Unit] = None
+  val RequestMethod: String = "GET"
+  val RequestProperties: List[(String, String)] = Nil
+  val RequestContentType: Option[String]      = None
+  val RequestSendData: Option[OutputStream => Unit] = None
 
   final def execute(): A = {
     val conn: HttpURLConnection = url.openConnection() match {
@@ -150,26 +150,26 @@ trait UrlTask[A] extends Task[A] {
     conn setUseCaches true
     conn setAllowUserInteraction false
     conn setDoInput  true
-    conn setDoOutput requestSendData.isDefined
+    conn setDoOutput RequestSendData.isDefined
     
-    conn setRequestMethod requestMethod
+    conn setRequestMethod RequestMethod
     conn setInstanceFollowRedirects false
         
-    if (connectionClose)
+    if (ConnectionClose)
        conn setRequestProperty ("Connection", "Close")
     
-    if (requestContentType.isDefined)
-      conn setRequestProperty ("Content-Type", requestContentType.get);
+    if (RequestContentType.isDefined)
+      conn setRequestProperty ("Content-Type", RequestContentType.get);
     
-    conn setRequestProperty ("User-Agent", userAgent)
-    conn setRequestProperty ("Referer",    referer)
+    conn setRequestProperty ("User-Agent", UserAgent)
+    conn setRequestProperty ("Referer",    Referer)
     
-    for ((propName, propValue) <- requestProperties)
+    for ((propName, propValue) <- RequestProperties)
       conn setRequestProperty (propName, propValue)
     
     conn.connect()
     
-    requestSendData match {
+    RequestSendData match {
       case Some(f) => f( conn.getOutputStream )
       case None    => // request-parameters only encoded in URL
     }
@@ -178,12 +178,12 @@ trait UrlTask[A] extends Task[A] {
     if (respCode != HttpURLConnection.HTTP_OK)
       throw new Exception("UrlTask failed with HTTP " + respCode + ": " + conn.getResponseMessage)
         
-    val is = conn.getInputStream
+    val in = conn.getInputStream
     
     try {
-      val res = process( is )
+      val res = process( in )
       
-      if (!connectionClose)
+      if (!ConnectionClose)
         conn.disconnect()
         
       res
@@ -194,7 +194,7 @@ trait UrlTask[A] extends Task[A] {
         throw e
       }
     } finally {
-      is.close()
+      in.close()
     }
   }
 }
@@ -204,9 +204,9 @@ trait UrlTask[A] extends Task[A] {
 trait XmlTask[A] extends UrlTask[A] {
   import nu.xom.Builder
   
-  final def process(is: InputStream): A = {
+  final def process(in: InputStream): A = {
     val builder = new Builder( )
-    val doc = builder build is
+    val doc = builder build in
     
     process(doc)
   }
@@ -217,14 +217,14 @@ trait XmlTask[A] extends UrlTask[A] {
 
 // A specialisation that processes HTML-data located by the URL
 // (XML-malformed HTML is forced into XML/XHTML by the tagsoup-parser)
-trait HtmlTask[A] extends UrlTask[A] {
+trait XhtmlTask[A] extends UrlTask[A] {
   import org.xml.sax.helpers.XMLReaderFactory
   import nu.xom.Builder
   
-  val TAGSOUP_PARSER = "org.ccil.cowan.tagsoup.Parser"
+  val TagsoupParser = "org.ccil.cowan.tagsoup.Parser"
   
   final def process(is: InputStream): A = {
-    val tagsoup = XMLReaderFactory.createXMLReader( TAGSOUP_PARSER )
+    val tagsoup = XMLReaderFactory.createXMLReader( TagsoupParser )
     val builder = new Builder( tagsoup )
     val doc = builder build is
     
@@ -232,4 +232,15 @@ trait HtmlTask[A] extends UrlTask[A] {
   }
   
   def process(doc: nu.xom.Document): A
+}
+
+trait HtmlTask[A] extends UrlTask[A] {
+  import org.jsoup.Jsoup
+    
+  final def process(in: InputStream): A = {
+    val doc = Jsoup.parse(in, null /* "UTF-8" */, url.toString) 
+    process(doc)
+  }
+  
+  def process(doc: org.jsoup.nodes.Document): A
 }

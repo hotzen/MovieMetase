@@ -3,10 +3,10 @@ package moviemetase
 import scala.collection.mutable.ListBuffer
 import java.io.File
 import scala.util.matching.Regex
+import java.nio.file.Path
 
 object Analyzer {
-  
-  
+    
 // ----------------------------------------------  
   lazy val Tags =
     scala.io.Source.fromFile(App.resource("/res/tags.txt").toURI, "utf-8").
@@ -29,7 +29,16 @@ object Analyzer {
       
   def isTag(s: String):  Boolean = Tags contains s.toLowerCase
   def isExt(s: String):  Boolean = Exts contains s.toLowerCase
-    
+
+
+// ----------------------------------------------
+  def init(): Unit = {
+    Tags.head
+    Exts.head
+    SimExcludes.head
+    ReplMap.head
+    ()
+  }
 
 // ----------------------------------------------
   val TokenSplitRegex = """[^a-z0-9]""".r
@@ -45,11 +54,12 @@ object Analyzer {
     TokenSplitRegex.split( out ).map(_.trim).filter( !_.isEmpty ).toList
   }
   
-  def fuzzy(in: String): (Regex,Tokens) = {
-    val ts = tokenize(in)
-    val regex = ts.map(t => "(?:" + java.util.regex.Pattern.quote(t) + ")?").mkString(".*?").toString.r
-    (regex, ts)
-  }
+  
+//  def fuzzy(in: String): (Regex,Tokens) = {
+//    val ts = tokenize(in)
+//    val regex = ts.map(t => "(?:" + java.util.regex.Pattern.quote(t) + ")?").mkString(".*?").toString.r
+//    (regex, ts)
+//  }
   
      
   
@@ -89,41 +99,7 @@ object Analyzer {
   
   def sim(s1: String, s2: String): Float = sim(tokenize(s1), tokenize(s2)) 
 
-  //def dissect(s: String): Dissected = Dissected(s)
-  //def dissectFileInfo(info: FileInfo): DissectedFileInfo = DissectedFileInfo(info)
-}
-
-
-object FileInfo {
-  def apply(f: File): FileInfo = FileInfo(f.getAbsolutePath, f.getParentFile.getName, f.getName)
-    
-  def apply(path: String): FileInfo = apply( new File(path) )
-}
-
-case class FileInfo(path: String, dirName: String, fileName: String) {
-  
-  def fileNameWithoutExt: String = {
-    val pos = fileName.lastIndexOf(".")
-    if (pos < 0)
-      fileName
-    else
-      fileName.substring(0, pos);
-  }
-  
-  override def toString: String = {
-    val sb = new StringBuffer("FileInfo(")
-    sb append path
-    sb append ")"
-//    sb append "){\n"
-//    sb append "  path: " append path append "\n"
-//    sb append "}"
-    sb.toString
-  }
-}
-
-
-object Dissected {
-  def apply(s: String): Dissected = {
+  def dissect(s: String): Dissected = {
     var ts = Analyzer.tokenize(s)
     val names = new ListBuffer[String]
     
@@ -147,6 +123,80 @@ object Dissected {
 
     Dissected(s, names.toList, tags, year)
   }
+  
+  def dissectFileInfo(info: FileInfo): DissectedFileInfo = {
+    val dir  = Analyzer dissect info.dirName
+    val file = Analyzer dissect info.fileName
+
+    DissectedFileInfo(info, dir, file)
+  }
+}
+
+
+object FileInfo {
+  def apply(f: File): FileInfo = FileInfo(f.getAbsolutePath, f.getParentFile.getName, f.getName)
+  def apply(p: Path): FileInfo = apply( p.toFile )
+  
+  def apply(path: String): FileInfo = apply( new File(path) )
+}
+
+case class FileInfo(path: String, dirName: String, fileName: String) {
+  
+  lazy val fileExt: String = {
+    val pos = fileName.lastIndexOf(".")
+    if (pos < 0)
+      ""
+    else
+      fileName.substring(pos+1).toLowerCase
+  }
+  
+  lazy val fileNameWithoutExt: String = {
+    val pos = fileName.lastIndexOf(".")
+    if (pos < 0)
+      fileName
+    else
+      fileName.substring(0, pos)
+  }
+  
+  override def toString: String = path
+  
+//  override def toString: String = {
+//    val sb = new StringBuffer("FileInfo(")
+//    sb append path
+//    sb append ")"
+////    sb append "){\n"
+////    sb append "  path: " append path append "\n"
+////    sb append "}"
+//    sb.toString
+//  }
+}
+
+
+object Dissected {
+//  def apply(s: String): Dissected = {
+//    var ts = Analyzer.tokenize(s)
+//    val names = new ListBuffer[String]
+//    
+//    // check last part, if it is an extension ignore it
+//    if (!ts.isEmpty && Analyzer.isExt(ts.last))
+//      ts = ts.init
+//    
+//    // parts are names until a year or a tag is reached
+//    while (!ts.isEmpty && !Analyzer.toYear(ts.head).isDefined && !Analyzer.isTag(ts.head)) {
+//      names append ts.head
+//      ts = ts.tail
+//    }
+//    
+//    // try to transform the next part to a year
+//    val year = if (!ts.isEmpty) Analyzer.toYear(ts.head)
+//               else             None
+//
+//    // the rest are tags
+//    val tags = if (year.isDefined) ts.tail
+//               else                ts
+//
+//    Dissected(s, names.toList, tags, year)
+//  }
   
   def same(d1: Dissected, d2: Dissected): Dissected =
     Dissected(
@@ -213,10 +263,7 @@ object DissectedFileInfo {
   //def apply(info: FileInfo): DissectedFileInfo = DissectedFileInfo(info, Dissected(info.dirName), Dissected(info.fileName) )
 }
 
-case class DissectedFileInfo(info: FileInfo) {
-
-  val dir  = Dissected(info.dirName)
-  val file = Dissected(info.fileName)
+case class DissectedFileInfo(info: FileInfo, dir: Dissected, file: Dissected) {
   
   lazy val same = Dissected.same(dir, file)
   lazy val all  = Dissected.all(dir, file)
@@ -237,16 +284,16 @@ case class DissectedFileInfo(info: FileInfo) {
 }
 
 // TODO
-object MediaInfo {
-  import nu.xom._
-  import XOM._
-  
-  def apply(doc: Document): MediaInfo = {
-    // MediaInfo --Inform=General,Video,Audio,Text --Output=XML "...mkv"
-    null
-  }
-
-}
-
-case class MediaInfo(foo: String, bar: String)
-
+//object MediaInfo {
+//  import nu.xom._
+//  import XOM._
+//  
+//  def apply(doc: Document): MediaInfo = {
+//    // MediaInfo --Inform=General,Video,Audio,Text --Output=XML "...mkv"
+//    null
+//  }
+//
+//}
+//
+//case class MediaInfo(foo: String, bar: String)
+//

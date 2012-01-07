@@ -17,7 +17,7 @@ case class MovieSearch(val out: PrintStream = System.out) extends SearchManager[
   def searchByTerm(term: String): List[Movie] = {
     val movies = new ListBuffer[Movie]
     
-    val dis = Dissected(term)
+    val dis = Analyzer.dissect(term)
     trace(dis.toString)
     
     if (movies.isEmpty && !dis.tags.isEmpty) {
@@ -82,7 +82,7 @@ case class MovieSearch(val out: PrintStream = System.out) extends SearchManager[
   def searchByFile(fileInfo: FileInfo): List[Movie] = {
     val movies = new ListBuffer[Movie]
     
-    val dis = DissectedFileInfo(fileInfo)
+    val dis = Analyzer.dissectFileInfo(fileInfo)
     trace(dis.toString)
     
     val GoodSim = 0.7
