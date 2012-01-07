@@ -24,7 +24,7 @@ class RegexUtils(val r: scala.util.matching.Regex) {
 }
 
 class ListUtils[A](val xs: List[A]) {
-
+  
   def defaultEq(a: A, b: A): Boolean = ( a == b )
   
   def distinctWithoutCount(eq: (A,A) => Boolean = defaultEq): List[A] =

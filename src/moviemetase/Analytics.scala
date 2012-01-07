@@ -4,6 +4,7 @@ import scala.collection.mutable.ListBuffer
 import java.io.File
 import scala.util.matching.Regex
 import java.nio.file.Path
+import java.nio.file.Paths
 
 object Analyzer {
     
@@ -65,17 +66,22 @@ object Analyzer {
   
 // ----------------------------------------------
   def toYear(s: String): Option[Int] = {
-    if (s.length == 4 && s.toList.forall(_.isDigit)) {
+    if (!s.toList.forall(_.isDigit))
+      return None
+        
+    if (s.length == 4) {
       val year = s.toInt
       if (year >= 1900 && year <= 2100) Some(year)
       else                              None
-        
-    } else if (s.length == 2 && s.toList.forall(_.isDigit)) {
-      val year = s.toInt
-      if (year >= 40 && year <= 99) Some(1900 + year)
-      else                          None
+    }
     
-    } else None
+//    else if (s.length == 2) {
+//      val year = s.toInt
+//      if (year >= 40 && year <= 99) Some(1900 + year)
+//      else                          None
+//    }
+    
+    else None
   }
 
 
@@ -99,8 +105,9 @@ object Analyzer {
   
   def sim(s1: String, s2: String): Float = sim(tokenize(s1), tokenize(s2)) 
 
+  
   def dissect(s: String): Dissected = {
-    var ts = Analyzer.tokenize(s)
+    var ts = tokenize(s)
     val names = new ListBuffer[String]
     
     // check last part, if it is an extension ignore it
@@ -134,11 +141,11 @@ object Analyzer {
 
 
 object FileInfo {
-  def apply(f: File): FileInfo = FileInfo(f.getAbsolutePath, f.getParentFile.getName, f.getName)
-  def apply(p: Path): FileInfo = apply( p.toFile )
-  
+  def apply(f: File): FileInfo      = FileInfo(f.getAbsolutePath, f.getParentFile.getName, f.getName)
+  def apply(p: Path): FileInfo      = apply( p.toFile )
   def apply(path: String): FileInfo = apply( new File(path) )
 }
+
 
 case class FileInfo(path: String, dirName: String, fileName: String) {
   
@@ -173,31 +180,6 @@ case class FileInfo(path: String, dirName: String, fileName: String) {
 
 
 object Dissected {
-//  def apply(s: String): Dissected = {
-//    var ts = Analyzer.tokenize(s)
-//    val names = new ListBuffer[String]
-//    
-//    // check last part, if it is an extension ignore it
-//    if (!ts.isEmpty && Analyzer.isExt(ts.last))
-//      ts = ts.init
-//    
-//    // parts are names until a year or a tag is reached
-//    while (!ts.isEmpty && !Analyzer.toYear(ts.head).isDefined && !Analyzer.isTag(ts.head)) {
-//      names append ts.head
-//      ts = ts.tail
-//    }
-//    
-//    // try to transform the next part to a year
-//    val year = if (!ts.isEmpty) Analyzer.toYear(ts.head)
-//               else             None
-//
-//    // the rest are tags
-//    val tags = if (year.isDefined) ts.tail
-//               else                ts
-//
-//    Dissected(s, names.toList, tags, year)
-//  }
-  
   def same(d1: Dissected, d2: Dissected): Dissected =
     Dissected(
       d1.orig + " & " + d2.orig,
@@ -221,11 +203,11 @@ object Dissected {
     )
   
   // XXX remove?
-  def simExact(d1: Dissected, d2: Dissected, exact: Boolean = true): (Float, Float) = {
-    val simNames = Analyzer.sim(d1.names, d2.names)
-    val simTags  = Analyzer.sim(d1.tags, d2.tags)
-    (simNames, simTags)
-  }
+//  def simExact(d1: Dissected, d2: Dissected, exact: Boolean = true): (Float, Float) = {
+//    val simNames = Analyzer.sim(d1.names, d2.names)
+//    val simTags  = Analyzer.sim(d1.tags, d2.tags)
+//    (simNames, simTags)
+//  }
   
   def sim(d1: Dissected, d2: Dissected, exact: Boolean = true): (Float, Float) = {
     val simNames = Analyzer.sim(
@@ -256,11 +238,6 @@ case class Dissected(orig: String, names: List[String], tags: List[String], year
     sb append "})"
     sb.toString
   }
-}
-
-
-object DissectedFileInfo {
-  //def apply(info: FileInfo): DissectedFileInfo = DissectedFileInfo(info, Dissected(info.dirName), Dissected(info.fileName) )
 }
 
 case class DissectedFileInfo(info: FileInfo, dir: Dissected, file: Dissected) {

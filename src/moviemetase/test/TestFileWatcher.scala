@@ -2,18 +2,18 @@ package moviemetase
 package test
 import java.nio.file._
 
-object TestFileScanner {
+object TestFileWatcher {
 
   def main(args: Array[String]): Unit = {
     
     val baseDir = Paths.get( args(0) )
     
-    val q = FileScanner.findMovies(baseDir)
+    val q = FileWatcher.watch(baseDir)
     
     val t = new Task[Unit] {
       def execute(): Unit = {
         while (true) {
-          println("TOOK " + q.take)
+          println( q.take() )
         }
       }
     }

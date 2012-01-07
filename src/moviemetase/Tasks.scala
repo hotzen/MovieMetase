@@ -59,12 +59,15 @@ object TaskExecutor {
     submit( new Callable[T] { def call(): T = code } )
 }
 
-trait Task[A] {
+trait Task[A] extends Callable[A] {
   // executes the task synchronously
   def execute(): A
   
+  // Callable[A]
+  final def call(): A = execute()
+  
   // submits the task for later execution
-  final def submit(): Future[A] = TaskExecutor submit new Callable[A] { def call(): A = execute() }
+  final def submit(): Future[A] = TaskExecutor submit this // new Callable[A] { def call(): A = execute() }
   
   // create a new task that executes <this> and then <next>
   final def then[B](next: Task[B]): Task[B] = new SerialTask[B](this, next)
