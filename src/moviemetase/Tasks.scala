@@ -32,7 +32,7 @@ object TaskExecutor {
     }
   }
   
-  val Pool: ExecutorService = new ThreadPoolExecutor(
+  val pool: ExecutorService = new ThreadPoolExecutor(
     CorePoolSize, MaxPoolSize,
     KeepAliveTime, KeepAliveUnit,
     Queue, ThreadFactory, 
@@ -40,23 +40,34 @@ object TaskExecutor {
   )
      
   def shutdown(): Unit = {
-    Pool.shutdownNow()
-    Pool.awaitTermination(3, TimeUnit.SECONDS)
+    pool.shutdownNow()
+    pool.awaitTermination(3, TimeUnit.SECONDS)
   }
   
 //  val TaskInfos = new WeakHashMap[Callable[_], TaskInfo]()
   
-  def submit[T](task: Callable[T]): Future[T] =
-      Pool submit task
+  def submit[A](task: Task[A]): Future[A] =
+      pool submit task
+
 //  {
 //    val fut = Pool submit task
 //    TaskInfos.put(task, TaskInfo(new WeakReference(fut)))
 //    fut
 //  }
-    
   
-  def submit[T](code: => T): Future[T] = 
-    submit( new Callable[T] { def call(): T = code } )
+//  def submit[T](code: => T): Future[T] = 
+//    submit( new Task[T] { def execute(): T = code } )
+  
+}
+
+object Task {
+  def create[A](code: => A): Task[A] = new Task[A] {
+    def execute(): A = { code }
+  }
+  
+  def createSeq[A](ts: List[Task[A]]): Task[List[A]] = new Task[List[A]] {
+    def execute(): List[A] = ts.map(_.execute())
+  }
 }
 
 trait Task[A] extends Callable[A] {
@@ -66,8 +77,8 @@ trait Task[A] extends Callable[A] {
   // Callable[A]
   final def call(): A = execute()
   
-  // submits the task for later execution
-  final def submit(): Future[A] = TaskExecutor submit this // new Callable[A] { def call(): A = execute() }
+  // submits the task for concurrent execution
+  final def submit(executor: ExecutorService = TaskExecutor.pool): Future[A] = TaskExecutor submit this
   
   // create a new task that executes <this> and then <next>
   final def then[B](next: Task[B]): Task[B] = new SerialTask[B](this, next)
@@ -86,6 +97,7 @@ trait Task[A] extends Callable[A] {
 //  }
 //}
 
+
 class SerialTask[B](val t1: Task[_], val t2: Task[B]) extends Task[B] {
   final def execute(): B = {
     t1.execute()
@@ -96,7 +108,7 @@ class SerialTask[B](val t1: Task[_], val t2: Task[B]) extends Task[B] {
 class ForkingTask[A,B](val t: Task[A], val f: A => List[Task[B]]) extends Task[List[B]] {
   final def execute(): List[B] = {
     
-    // execute first task 
+    // execute task 
     val res = t.execute()
     
     // calculate tasks to be forked
@@ -137,13 +149,14 @@ trait UrlTask[A] extends Task[A] {
   
   val UserAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:9.0.1) Gecko/20100101 Firefox/9.0.1"
   val Referer   = "http://stackoverflow.com/questions/tagged/referer" 
-  
+     
   // if sending data, define its content-type and the function to fill the OutputStream with the data
   val RequestMethod: String = "GET"
   val RequestProperties: List[(String, String)] = Nil
   val RequestContentType: Option[String]      = None
   val RequestSendData: Option[OutputStream => Unit] = None
-
+  val FollowRedirects = false
+  
   final def execute(): A = {
     val conn: HttpURLConnection = url.openConnection() match {
       case http:HttpURLConnection => http
@@ -156,7 +169,7 @@ trait UrlTask[A] extends Task[A] {
     conn setDoOutput RequestSendData.isDefined
     
     conn setRequestMethod RequestMethod
-    conn setInstanceFollowRedirects false
+    conn setInstanceFollowRedirects FollowRedirects
         
     if (ConnectionClose)
        conn setRequestProperty ("Connection", "Close")
@@ -179,7 +192,7 @@ trait UrlTask[A] extends Task[A] {
     
     val respCode = conn.getResponseCode
     if (respCode != HttpURLConnection.HTTP_OK)
-      throw new Exception("UrlTask failed with HTTP " + respCode + ": " + conn.getResponseMessage)
+      throw new Exception("HTTP " + respCode + ": " + conn.getResponseMessage + " {" + url + "}")
         
     val in = conn.getInputStream
     

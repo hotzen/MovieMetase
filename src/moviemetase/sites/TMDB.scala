@@ -47,8 +47,10 @@ object TMDB {
       sb append "Movie.imdbLookup/en/xml/"
       sb append API_KEY
       sb append "/" append imdbID
-      trace("API-URL: " + sb)
-      new URL( sb.toString )
+      val url = sb.toString 
+      
+      trace("imdbLookup " + imdbID, ("url" -> url) :: Nil)
+      new URL( url )
     }
     
     def process(doc: Document): Option[Movie] = {

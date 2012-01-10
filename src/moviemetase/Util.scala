@@ -57,3 +57,13 @@ object JsonType {
   object D extends CC[Double]
   object B extends CC[Boolean]
 }
+
+object OptionDialog {
+  
+}
+
+case class DialogOption(id: Int, label: String) {
+  def unapply(res: Int): Option[DialogOption] =
+    if (id == res) Some(this)
+    else           None
+}

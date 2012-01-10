@@ -8,15 +8,17 @@ object TestFileScanner {
     
     val baseDir = Paths.get( args(0) )
     
-    val q = FileScanner.findMovies(baseDir)
+    val q = FileScanner.createQueue[Path](100)
+    val t = FileScanner.findFilesTask(baseDir, q)
     
-    val t = new Task[Unit] {
+    val t2 = new Task[Unit] {
       def execute(): Unit = {
         while (true) {
           println("TOOK " + q.take)
         }
       }
     }
-    t.execute()
+    t.submit()
+    t2.execute()
   }
 }

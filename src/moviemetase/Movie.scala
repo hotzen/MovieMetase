@@ -75,7 +75,7 @@ case class Movie(title: String, year: Int, infos: List[MovieInfo] = Nil) {
     sb append title
     sb append "/"
     sb append year
-    sb append " ["
+    sb append " [Infos="
     sb append infos.length
     sb append "])"
     sb.toString

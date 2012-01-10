@@ -2,12 +2,24 @@ package moviemetase
 
 object App {
     
-  def main(args: Array[String]) = {
-    (new ui.GUI).start
+  def main(args: Array[String]): Unit = {
+    
+    // fail fast
+    Analyzer.init()
+    
+    if (args.isEmpty) {
+      (new ui.UI).start
+    } else {
+      //TODO CLI?
+    }
+    
+    ()
   }
   
   def shutdown() = {
-    println("SHUTDOWN...")
+    println("shutting down...")
+    println("please wait until pending tasks have been properly shutdown")
+    TaskExecutor.shutdown()
     System.exit(0)
   }
   

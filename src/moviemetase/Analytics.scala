@@ -33,6 +33,7 @@ object Analyzer {
 
 
 // ----------------------------------------------
+  
   def init(): Unit = {
     Tags.head
     Exts.head
@@ -42,17 +43,17 @@ object Analyzer {
   }
 
 // ----------------------------------------------
-  val TokenSplitRegex = """[^a-z0-9]""".r
-  
   type Tokens = List[String]
   
+  val TokenSplitRegex = """[^a-z0-9]""".r
+  
   def tokenize(in: String): Tokens = {
-    var out = in.toLowerCase
+    var s = in.toLowerCase
     
-    for ( (s,r) <- ReplMap )
-      out = out.replace(s, r)
+    for ( (a,b) <- ReplMap )
+      s = s.replace(a, b)
     
-    TokenSplitRegex.split( out ).map(_.trim).filter( !_.isEmpty ).toList
+    TokenSplitRegex.split(s).map(_.trim).filter(!_.isEmpty).toList
   }
   
   
@@ -89,13 +90,13 @@ object Analyzer {
   // Jaccard similarity coefficient
   // http://en.wikipedia.org/wiki/Jaccard_index
   def sim(s1: Iterable[String], s2: Iterable[String]): Float = {
-    import scala.collection.immutable.HashSet
+    import scala.collection.immutable.Set
     
     if (s1.isEmpty || s2.isEmpty)
       return 0.0F
 
-    val hs1 = HashSet[String]() ++ s1
-    val hs2 = HashSet[String]() ++ s2
+    val hs1 = Set[String]() ++ s1
+    val hs2 = Set[String]() ++ s2
     
     val i = hs1 intersect hs2
     val u = hs1 union     hs2
@@ -133,7 +134,7 @@ object Analyzer {
   
   def dissectFileInfo(info: FileInfo): DissectedFileInfo = {
     val dir  = Analyzer dissect info.dirName
-    val file = Analyzer dissect info.fileName
+    val file = Analyzer dissect info.fileNameWithoutExt
 
     DissectedFileInfo(info, dir, file)
   }
@@ -222,7 +223,7 @@ object Dissected {
 
 case class Dissected(orig: String, names: List[String], tags: List[String], year: Option[Int]) {
   def name: String = names.mkString(" ")
-  def parts: List[String] = Analyzer.tokenize( orig )
+  def tokens: List[String] = Analyzer.tokenize( orig )
   
   def same(d2: Dissected) = Dissected.same(this, d2)
   def all(d2: Dissected)  = Dissected.all(this, d2)

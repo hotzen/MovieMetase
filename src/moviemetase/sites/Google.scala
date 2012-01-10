@@ -20,7 +20,7 @@ object Google {
   
   // generic query that tries different query-methods
   case class Query(query: String) extends Task[List[GoogleResult]] with Logging {
-    val logID = "GoogleAjax.Query"
+    val logID = "Google.Query"
       
     def execute(): List[GoogleResult] = use.get match {
       
@@ -46,12 +46,11 @@ object Google {
           case l:Logging => l.logID
           case _         => task.toString
         }
-        trace("trying " + label + " ...")
-        
+        //trace("trying " + label + " ...")
         task.execute()
 
       } catch { case e:Exception => {
-        warn(task + " failed with " + e.getMessage() + ", switching to next query")
+        warn(task + " failed with " + e.getMessage() + ", switching to next method")
         use.compareAndSet(id, id+1)
         execute()
       }}
@@ -59,7 +58,17 @@ object Google {
   }
 }
 
-case class GoogleResult(query: String, url: URL, title: String, snippet: String) //, pageMap: List[GooglePageMapDataObject]) {
+case class GoogleResult(query: String, url: URL, title: String, snippet: String) {
+//  override def toString = {
+//    val sb = new StringBuilder
+//    sb append "GoogleResult(" append query append "){\n"
+//    sb append "  url:     " append url.toString append "\n"
+//    sb append "  title:   " append title        append "\n"
+//    sb append "  snippet: " append snippet      append "\n"
+//    sb append "}"
+//    sb.toString
+//  }
+}
 
 
 //XXX very poor result-quality :( 
@@ -132,18 +141,15 @@ object GoogleWeb {
       import org.jsoup.nodes._
       import JSoup._
       
-      doc.select("#ires").headOption match {
-        case Some(res) => res.select("li.g").map(li => {
-          val a     = li.select("a.l").head // fails
-          val link  = a.attrOpt("href").get // fails
-          val title = a.text
+      doc.select("#ires li.g").map(li => {
+        val a     = li.select("a.l").head // fails
+        val link  = a.attrOpt("href").get // fails
+        val title = a.text
 
-          val snippet = li.select(".st").map(_.text).head // fails
-          
-          GoogleResult(query: String, link.toURL, title, snippet)
-        }).toList
-        case None => throw new Exception("no <div id=ires> results-container found")
-      }
+        val snippet = li.select(".st").map(_.text).head // fails
+        
+        GoogleResult(query: String, link.toURL, title, snippet)
+      }).toList
     }
   }
 }
