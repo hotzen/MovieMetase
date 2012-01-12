@@ -13,8 +13,8 @@ object FileScanner {
   def createUnboundedQueue[A](): BlockingQueue[A] = 
     new java.util.concurrent.LinkedBlockingQueue[A]( )
     
-  def findFilesTask(baseDir: Path, queue: BlockingQueue[Path]): FileScannerTask[Path] =
-    new FileScannerTask(baseDir, new FileCollector(queue))
+  def findFilesTask(baseDir: Path, filter: Path => Boolean, queue: BlockingQueue[Path]): FileScannerTask[Path] =
+    new FileScannerTask(baseDir, new FileCollector(queue, filter))
 }
 
 trait QueueingFileVisitor[A] extends FileVisitor[Path] {
@@ -37,7 +37,7 @@ case class FileScannerTask[A](baseDir: Path, visitor: QueueingFileVisitor[A]) ex
   }
 }
 
-class FileCollector(val queue: BlockingQueue[Path]) extends QueueingFileVisitor[Path] {
+class FileCollector(val queue: BlockingQueue[Path], val filter: Path => Boolean) extends QueueingFileVisitor[Path] {
   import java.nio.file.FileVisitResult._
   
   private var firstDir: Path = null
@@ -46,7 +46,8 @@ class FileCollector(val queue: BlockingQueue[Path]) extends QueueingFileVisitor[
   def postVisitDirectory(path: Path, ex: IOException): FileVisitResult =  CONTINUE
   
   def visitFile(path: Path, attrs: BasicFileAttributes): FileVisitResult = {
-    queue put path
+    if (filter(path))
+      queue put path
     CONTINUE
   }
     

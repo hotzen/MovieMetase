@@ -1,14 +1,16 @@
 package moviemetase
 
 object App {
-    
+  val name    = "MovieMetase"
+  val version = "0.1"
+  
   def main(args: Array[String]): Unit = {
     
     // fail fast
     Analyzer.init()
     
     if (args.isEmpty) {
-      (new ui.UI).start
+      ui.UI.start()
     } else {
       //TODO CLI?
     }
@@ -23,13 +25,17 @@ object App {
     System.exit(0)
   }
   
-  lazy val Toolkit = java.awt.Toolkit.getDefaultToolkit
- 
-  def image(path: String): java.awt.Image =
-    (new javax.swing.ImageIcon( resource(path) )).getImage
-    
+  //lazy val Toolkit = java.awt.Toolkit.getDefaultToolkit
+  
   def resource(path: String): java.net.URL =
     this.getClass.getResource(path)
+  
+//  def icon(path: String): javax.swing.ImageIcon =
+//    new javax.swing.ImageIcon( resource(path) )
+  
+  def image(path: String): java.awt.Image =
+    new javax.swing.ImageIcon( resource(path) ).getImage
+    
 
 //  def userDir: java.io.File = 
 //	  new java.io.File( util.Properties.userDir )

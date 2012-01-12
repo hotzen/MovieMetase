@@ -9,7 +9,7 @@ object TestFileScanner {
     val baseDir = Paths.get( args(0) )
     
     val q = FileScanner.createQueue[Path](100)
-    val t = FileScanner.findFilesTask(baseDir, q)
+    val t = FileScanner.findFilesTask(baseDir, (f => true), q)
     
     val t2 = new Task[Unit] {
       def execute(): Unit = {

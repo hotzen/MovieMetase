@@ -3,18 +3,21 @@ package ui
 
 import scala.swing._
 import scala.swing.Swing._
+import scala.swing.event._
 import moviemetase.search.MovieSearch
-import java.awt.EventQueue
 
-class DropPanel extends Label {
+case class SearchingMoviesByFile(file: FileInfo) extends Event
+case class FoundMoviesByFile(file: FileInfo, movies: List[Movie]) extends Event
+
+class DropPanel(val top: UI) extends Label {
 
   override lazy val peer: javax.swing.JLabel = new JImageLabel( App.image("/res/drop.png") )
     
-  tooltip = "DROP FILE HERE"
+  tooltip = "Drop directories, files or both here"
     
   val dropHandler = new FileDropHandler
-  listenTo(dropHandler)
   peer.setTransferHandler(dropHandler)
+  listenTo(dropHandler)
       
   reactions += {
     case FileDropHandler.FilesDropped(files) => processDroppedFiles(files)
@@ -69,10 +72,20 @@ class DropPanel extends Label {
     
     import java.nio.file._
 
+    def filter(p: Path): Boolean =
+      Analyzer.isExt( FileInfo(p).fileExt ) // only if registered extension
+          
     val q = FileScanner.createUnboundedQueue[Path]()
     
+    // create a task that pushes all files into the Q
+    val filesTask = new Task[Unit] {
+      def execute(): Unit = {
+        fs.filter(f => filter(f.toPath) ).foreach(f => q offer f.toPath)
+      }
+    }
+
     // create a ScanTask for each dir
-    val actualScanTasks = ds.flatMap(dir => dirsOption match {
+    val dirScanTasks = ds.flatMap(dir => dirsOption match {
       case ScanDirAll  => Some(dir)
       case ScanDirDont => None
       case ScanDirAsk  => {
@@ -89,14 +102,14 @@ class DropPanel extends Label {
           case Dialog.Result.No => None
         }
       }
-    }).map(dir => FileScanner.findFilesTask(dir.toPath, q))
+    }).map(dir => FileScanner.findFilesTask(dir.toPath, filter, q))
     
     // add a QueueTerminator
     val T = Paths.get("/TERMINATED/")
-    val scanTasks = actualScanTasks ::: List( QueueTerminatorTask(q, T) )
-        
+    val collectTasks: List[Task[Unit]] = filesTask :: dirScanTasks ::: List( QueueTerminatorTask(q, T) )
+    
     // search every file coming into the Q
-    val safePublish = Events.publishEDT(this) _
+    val safePublish = UI.publish(this) _
     
     val searchTask = new Task[Unit] {
       val search = new MovieSearch()
@@ -109,86 +122,17 @@ class DropPanel extends Label {
             continue = false
           } else {
             val info = FileInfo(file)
-            val movies = search searchByFile info
+            safePublish( SearchingMoviesByFile(info) )
             
-            println("RESULTS: {\n" + movies.mkString("\n") + "\n}\n")
-            safePublish( Events.SearchResult(movies) )
+            val movies = search searchByFile info
+            safePublish( FoundMoviesByFile(info, movies) )
           }
         }
       }
     }
+    
     searchTask.submit()
-        
-    // execute the ScanTasks in sequence
-    Task.createSeq( scanTasks ).submit()
-    
-    
-        
-//        None
-//        showConfirmation (parent: Component = null, message: Any, title: String = uiString("OptionPane.titleText"), optionType: Value = Options.YesNo, messageType: Value = Message.Question, icon: Icon = EmptyIcon): Value
-        
-//        JOptionPane.showConfirmDialog(
-//          comp,
-//          sb.toString,
-//          title,
-//          JOptionPane.YES_NO_OPTION,
-//          JOptionPane.QUESTION_MESSAGE
-//        ) match {
-//          case 0 => Some(dir)
-//          case _ => None
-//        }
-//      }
-//    })
-    
-//    val capacity = 10
-//    val q = 
-    
-//    val searcher = new MovieSearch
-//    val searchTask = new Task[List[Movie]] {
-//      def execute(): List[Movie] = {
-//        var ok = true
-//        while (ok) {
-//          val p = q.take()
-//          if (p == FileScanner.TerminationObject) {
-//            // done
-//          } else {
-//            // work
-//          }
-//        }
-//        Nil
-//      }
-//    }
-//    searchTask.submit()
-//    
-//    for (scanDir <- scanDirs) {
-//      val s = FileScanner.findFiles(scanDir.toPath, q)
-//      s.submit()
-//      
-//    }
-    
-    
-    
-    
-    
-//    
-//    val fileQueue = new java.util.concurrent.ConcurrentLinkedQueue[java.io.File]
-//    for (f <- fs) fileQueue offer f
-//    
-//    
-//    
-//    val scanner = new Task[List[java.io.File]] {
-//      def execute(): List[java.io.File] = {
-//        Nil
-//      }
-//    }
-//    
-//    val scanQs = scanDirs.flatMap(dir => {
-//      val q = FileScanner.findMovies( dir.toPath )
-//      
-//      
-//      None
-//    }) 
-    
-      ()
+    Task.createSeq( collectTasks ).submit()
+    ()
   }
 }
