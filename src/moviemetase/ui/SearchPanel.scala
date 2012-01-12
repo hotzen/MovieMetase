@@ -16,11 +16,11 @@ class SearchStatusRenderer extends Label with TableRendererComp[SearchRow] {
       if (o.searching)
         App.resource("/res/spinner.gif")
       else if (o.movies.isEmpty)
-        App.resource("/res/face-surprise.gif")
+        App.resource("/res/face-surprise.png")
       else if (!o.movies.isEmpty && o.movies.tail.isEmpty)
-        App.resource("/res/face-grin.gif")
+        App.resource("/res/face-grin.png")
       else
-        App.resource("/res/face-plain.gif")
+        App.resource("/res/face-plain.png")
     
     println("SearchStatusRenderer " + o + " " + url)
     icon = new ImageIcon(url)
@@ -55,7 +55,7 @@ class SearchPanel(val top: UI) extends ScrollPane {
       
       val NoIcon: Icon = null
       
-      val rdr = row match {
+      val rdr = col match {
         case 0 => new TableRenderer[SearchRow](new SearchStatusRenderer)
         case 1 => new Table.LabelRenderer[SearchRow]( row => (NoIcon, row.movies.length.toString) )
         case 2 => new Table.LabelRenderer[SearchRow]( row => (NoIcon, row.term) )
