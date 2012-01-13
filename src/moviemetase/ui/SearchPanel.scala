@@ -5,27 +5,9 @@ import scala.swing._
 import scala.swing.Swing._
 import scala.swing.event._
 import javax.swing.ImageIcon
-import scala.swing.Table.LabelRenderer
 import javax.swing.Icon
 
 case class SearchRow(searching: Boolean, term: String, dir: String, file: String, path: String, movies: List[Movie])
-
-class SearchStatusRenderer extends Label with TableRendererComp[SearchRow] {
-  def render(o: SearchRow, sel: Boolean, foc: Boolean): Unit = {
-    val url =
-      if (o.searching)
-        App.resource("/res/spinner.gif")
-      else if (o.movies.isEmpty)
-        App.resource("/res/face-surprise.png")
-      else if (!o.movies.isEmpty && o.movies.tail.isEmpty)
-        App.resource("/res/face-grin.png")
-      else
-        App.resource("/res/face-plain.png")
-    
-    println("SearchStatusRenderer " + o + " " + url)
-    icon = new ImageIcon(url)
-  }
-}
 
 case class SearchRowSelected(row: SearchRow) extends Event
 
@@ -33,7 +15,7 @@ class SearchPanel(val top: UI) extends ScrollPane {
   //border = createBorder("Searches")
     
   val cols = 
-    SmartTableCol("Searching", 10) ::
+    SmartTableCol(" ", 40) ::
     SmartTableCol("Movies found", 50)   ::
     SmartTableCol("Term", 100)          ::
     SmartTableCol("Directory", 300)     ::
@@ -41,8 +23,18 @@ class SearchPanel(val top: UI) extends ScrollPane {
     SmartTableCol("Full Path", 100)     ::
     Nil
 
-  val mdl = new SmartTableModel[SearchRow](cols)
+  def getStatusIcon(row: SearchRow): ImageIcon = {
+    val icon = 
+      if (row.searching) "clouds.png"
+      else if (row.movies.isEmpty) "fail.png"
+      else if (!row.movies.isEmpty && row.movies.tail.isEmpty) "ok.png"
+      else "plus.png"
+
+    new ImageIcon( App.resource("/res/" + icon) )
+  }
     
+  val mdl = new SmartTableModel[SearchRow](cols)
+  
   val tbl = new Table {
     model    = mdl 
     showGrid = true
@@ -53,15 +45,16 @@ class SearchPanel(val top: UI) extends ScrollPane {
       val c = peer.convertColumnIndexToModel(col)
       val o = mdl.rows(r)
       
-      val NoIcon: Icon = null
+      val NoIcon: Icon   = null
+      val NoText: String = null
       
       val rdr = col match {
-        case 0 => new TableRenderer[SearchRow](new SearchStatusRenderer)
-        case 1 => new Table.LabelRenderer[SearchRow]( row => (NoIcon, row.movies.length.toString) )
-        case 2 => new Table.LabelRenderer[SearchRow]( row => (NoIcon, row.term) )
-        case 3 => new Table.LabelRenderer[SearchRow]( row => (NoIcon, row.dir) )
-        case 4 => new Table.LabelRenderer[SearchRow]( row => (NoIcon, row.file) )
-        case 5 => new Table.LabelRenderer[SearchRow]( row => (NoIcon, row.path) )
+        case 0 => new LabelRenderer[SearchRow]( (lbl,row) => lbl.icon = getStatusIcon(row) )
+        case 1 => new LabelRenderer[SearchRow]( (lbl,row) => lbl.text = row.movies.length.toString )
+        case 2 => new LabelRenderer[SearchRow]( (lbl,row) => lbl.text = row.term )
+        case 3 => new LabelRenderer[SearchRow]( (lbl,row) => lbl.text = row.dir )
+        case 4 => new LabelRenderer[SearchRow]( (lbl,row) => lbl.text = row.file )
+        case 5 => new LabelRenderer[SearchRow]( (lbl,row) => lbl.text = row.path )
       }
       rdr.componentFor(this, sel, foc, o, row, col)
     }

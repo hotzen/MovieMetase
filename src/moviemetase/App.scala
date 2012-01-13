@@ -6,7 +6,7 @@ object App {
   
   def main(args: Array[String]): Unit = {
     
-    // fail fast
+    // please fail fast
     Analyzer.init()
     
     if (args.isEmpty) {
@@ -27,8 +27,13 @@ object App {
   
   //lazy val Toolkit = java.awt.Toolkit.getDefaultToolkit
   
-  def resource(path: String): java.net.URL =
-    this.getClass.getResource(path)
+  def resource(path: String): java.net.URL = {
+    val url = this.getClass.getResource(path)
+    if (url == null)
+      throw new Exception("resource '" + path + "' does not exist")
+    url
+  }
+    
   
 //  def icon(path: String): javax.swing.ImageIcon =
 //    new javax.swing.ImageIcon( resource(path) )

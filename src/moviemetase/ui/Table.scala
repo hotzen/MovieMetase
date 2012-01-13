@@ -105,3 +105,13 @@ class TableRenderer[A](comp: TableRendererComp[A]) extends Table.AbstractRendere
 trait TableRendererComp[A] extends Component {
   def render(a: A, sel: Boolean, foc: Boolean): Unit
 }
+
+class LabelRenderer[A](f: (Label, A) => Unit) extends Table.AbstractRenderer[A, Label](new Label) {
+  def configure(table: Table, sel: Boolean, foc: Boolean, a: A, row: Int, col: Int): Unit =
+    f(component, a)
+}
+
+class MigPanelRenderer[A](f: (MigPanel, A, Boolean, Boolean) => Unit, layoutConstr: String = "", colConstr: String = "", rowConstr: String = "") extends Table.AbstractRenderer[A, MigPanel](new MigPanel(layoutConstr, colConstr, rowConstr)) {
+  def configure(table: Table, sel: Boolean, foc: Boolean, a: A, row: Int, col: Int): Unit =
+    f(component, a, sel, foc)
+}
