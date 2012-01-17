@@ -26,14 +26,14 @@ class MigPanel(
   val columnConstraints: String = "",
   val rowConstraints: String    = "") extends Panel with LayoutContainer {
   
-  override lazy val peer = {
-    val mig = new MigLayout(
-      layoutConstraints,
-      columnConstraints,
-      rowConstraints
-    )
+  lazy val mig = new MigLayout(
+    layoutConstraints,
+    columnConstraints,
+    rowConstraints
+  ) 
+  
+  override lazy val peer =
     new javax.swing.JPanel(mig) with SuperMixin
-  }
   
   type Constraints = String
   
@@ -47,4 +47,10 @@ class MigPanel(
   def add(comp: Component, constr: String): Unit = peer.add(comp.peer, constr)
 
   def add(comp: Component): Unit = add(comp, "")
+  
+  def clear(): Unit = {
+    for (comp <- peer.getComponents) {
+      peer.remove( comp )
+    }
+  }
 }
