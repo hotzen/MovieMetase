@@ -70,6 +70,7 @@ class UI extends Frame {
   val searchPanel = new SearchPanel(this)
   val resultPanel = new ResultPanel(this)
   val infoPanel   = new InfoPanel(this)
+  val logPanel    = new LogPanel(this)
   val statusBar   = new StatusBar(this)
   
   contents = new MigPanel("fill") {
@@ -81,8 +82,10 @@ class UI extends Frame {
     }
     add(top, "dock north, grow, height 130!")
     
-    add(resultPanel, "wrap, grow, height 100:300:")
+    add(resultPanel, "wrap, grow, height 100:200:")
     add(infoPanel, "wrap, grow, height 100:200")
+    
+    add(logPanel, "wrap, grow")
     
     add(statusBar, "dock south, height 20!")
   }

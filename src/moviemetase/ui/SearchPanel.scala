@@ -62,7 +62,6 @@ class SearchPanel(val top: UI) extends ScrollPane {
   
   val colMdl = tbl.peer.getColumnModel 
   for ( (col,idx) <- cols.zipWithIndex) {
-    println(idx + ": "+ col)
     colMdl.getColumn(idx).setPreferredWidth( col.width )
   }
   

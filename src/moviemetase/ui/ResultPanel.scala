@@ -30,7 +30,7 @@ object ResultPanel {
 
       xAlignment = Alignment.Left
       yAlignment = Alignment.Top
-    }, "wrap, height 100!")
+    }, "wrap")
     
     // genres
     pnl.add(new MigPanel {
@@ -40,7 +40,7 @@ object ResultPanel {
         text = genres.map(_.capitalize).sortWith(_ < _).mkString(", ")
         font = new Font(Font.SANS_SERIF, Font.PLAIN, 11)
       })
-    }, "height 100!")
+    }, "")
     
     // webpages
     pnl.add(new MigPanel {
@@ -62,7 +62,50 @@ object ResultPanel {
           font = new Font(Font.MONOSPACED, Font.PLAIN, 9)
         })
       }
-    }, "height 100!")
+    }, "")
+  }
+}
+
+class ResultPanelEditor extends javax.swing.table.TableCellEditor {
+  import javax.swing.JTable
+  import javax.swing.event.CellEditorListener
+  import java.util.EventObject
+  
+  def addCellEditorListener(l: CellEditorListener): Unit = {
+    println("addCellEditorListener " + l)
+    () 
+  }
+  def removeCellEditorListener(l: CellEditorListener): Unit = {
+    println("removeCellEditorListener " + l)
+    () 
+  }
+   
+  def cancelCellEditing(): Unit = {
+    println("cancelCellEditing")
+    () 
+  }
+  
+  def getCellEditorValue(): AnyRef = {
+    println("getCellEditorValue")
+    "".asInstanceOf[AnyRef]
+  }
+  def isCellEditable(e: EventObject): Boolean = {
+    println("isCellEditable " + e)
+    false
+  }
+  def shouldSelectCell(e: EventObject): Boolean = {
+    println("shouldSelectCell " + e)
+    false 
+  }
+  
+  def stopCellEditing(): Boolean = {
+    println("stopCellEditing")
+    true 
+  }
+  
+  def getTableCellEditorComponent(table: JTable, value: AnyRef, sel: Boolean, row: Int, col: Int): java.awt.Component = {
+    println("getTableCellEditorComponent " + value + " sel:" + sel + " row:" + row + " col:" + col)
+    null
   }
 }
 
@@ -93,6 +136,12 @@ class ResultPanel(val top: UI) extends ScrollPane {
       rdr.componentFor(this, sel, foc, m, row, col)
     }
     
+    val cellEditor = new ResultPanelEditor
+    override protected def editor(row: Int, col: Int): javax.swing.table.TableCellEditor = {
+      println("editor row:" + row + " col:" + col)
+      cellEditor
+    }
+
     peer.setTableHeader(null)
   }
   

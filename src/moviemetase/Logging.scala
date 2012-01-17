@@ -9,7 +9,7 @@ object LogLevel {
 case class LogLevel(id: Int, label: String)
 
 object Logging {
-  var out: java.io.PrintStream = System.out
+  var out: java.io.PrintWriter = new java.io.PrintWriter( System.out )
   
   var MaxLogLineLength = 300
   var LogLineBreak = "\n  "
