@@ -21,7 +21,7 @@ object App {
   def shutdown() = {
     println("shutting down...")
     println("please wait until pending tasks have been properly shutdown")
-    TaskExecutor.shutdown()
+    TaskManager.shutdown()
     System.exit(0)
   }
   

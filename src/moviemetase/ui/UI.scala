@@ -81,13 +81,27 @@ class UI extends Frame {
       add(searchPanel, "height 120!")
     }
     add(top, "dock north, grow, height 130!")
+
+        
+    add(new SplitPane {
+      topComponent  = new SplitPane {
+        topComponent    = resultPanel
+        bottomComponent = infoPanel
     
-    add(resultPanel, "wrap, grow, height 100:200:")
-    add(infoPanel, "wrap, grow, height 100:200")
-    
-    add(logPanel, "wrap, grow")
-    
-    add(statusBar, "dock south, height 20!")
+        resizeWeight = 0.5 // auto-resize even
+        oneTouchExpandable = false 
+      }
+      
+      bottomComponent = logPanel
+      
+      resizeWeight = 0.97
+      oneTouchExpandable = false
+    }, "grow")
+        
+//    add(resultPanel, "wrap, grow, height 100:200:")
+//    add(infoPanel, "wrap, grow, height 100:200")
+//    add(logPanel, "wrap, grow")
+    add(statusBar, "dock south, grow, height 20!")
   }
   
   override val title = App.name + " " + App.version
@@ -354,15 +368,4 @@ class UI extends Frame {
 //      }
 //    }
 //  }
-}
-
-object Events {
-
-//  case class SearchResult(movies: List[Movie]) extends Event
-//  case class SelectedMovieResult(movie: Movie) extends Event
-//  case class SelectedImage(img: MovieInfos.Image) extends Event
-    
-  // publish in Event-Dispatch-Thread
-  
-
 }

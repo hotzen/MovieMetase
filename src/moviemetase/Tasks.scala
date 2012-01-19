@@ -10,17 +10,18 @@ import java.util.concurrent.ThreadPoolExecutor.AbortPolicy
 import java.net.HttpURLConnection
 import java.util.WeakHashMap
 import java.lang.ref.WeakReference
+import scala.swing.Publisher
 
-object TaskExecutor {
-  val CorePoolSize  = 4
-  val MaxPoolSize   = Integer.MAX_VALUE
-  val KeepAliveTime = 60L
-  val KeepAliveUnit = TimeUnit.SECONDS
-  val Queue         = new SynchronousQueue[Runnable]()
+object TaskManager {
+  private val CorePoolSize  = 4
+  private val MaxPoolSize   = Integer.MAX_VALUE
+  private val KeepAliveTime = 60L
+  private val KeepAliveUnit = TimeUnit.SECONDS
+  private val Queue         = new SynchronousQueue[Runnable]()
   
-  val RejectedExecHandler = new AbortPolicy()
+  private val RejectedExecHandler = new AbortPolicy()
   
-  val ThreadFactory = new ThreadFactory {
+  private val ThreadFactory = new ThreadFactory {
     val counter = new AtomicInteger(1)
 
     def newThread(r: Runnable): Thread = {
@@ -32,33 +33,38 @@ object TaskExecutor {
     }
   }
   
-  val pool: ExecutorService = new ThreadPoolExecutor(
-    CorePoolSize, MaxPoolSize,
-    KeepAliveTime, KeepAliveUnit,
-    Queue, ThreadFactory, 
-    RejectedExecHandler
-  )
+  private val executor: ExecutorService =
+    new ThreadPoolExecutor(
+      CorePoolSize, MaxPoolSize,
+      KeepAliveTime, KeepAliveUnit,
+      Queue, ThreadFactory, 
+      RejectedExecHandler
+    )
+  
+//  private val completionService = new ExecutorCompletionService(executor)
      
   def shutdown(): Unit = {
-    pool.shutdownNow()
-    pool.awaitTermination(3, TimeUnit.SECONDS)
+    executor.shutdownNow()
+    executor.awaitTermination(3, TimeUnit.SECONDS)
   }
   
-//  val TaskInfos = new WeakHashMap[Callable[_], TaskInfo]()
-  
-  def submit[A](task: Task[A]): Future[A] =
-      pool submit task
-
-//  {
-//    val fut = Pool submit task
-//    TaskInfos.put(task, TaskInfo(new WeakReference(fut)))
-//    fut
-//  }
-  
-//  def submit[T](code: => T): Future[T] = 
-//    submit( new Task[T] { def execute(): T = code } )
-  
+  def submit[A](task: Task[A]): Future[A] = {
+    ui.UI.publish(progress)( ActiveTasks(counter.incrementAndGet()) )
+        
+    executor submit new Callable[A] {
+      def call(): A = {
+        val res = task.execute()
+        ui.UI.publish(progress)( ActiveTasks(counter.decrementAndGet()) )
+        res
+      }
+    }
+  }
+    
+  private val counter = new AtomicInteger(0)
+  val progress = new Publisher { }
 }
+
+case class ActiveTasks(tasks: Int) extends scala.swing.event.Event
 
 object Task {
   def create[A](code: => A): Task[A] = new Task[A] {
@@ -78,7 +84,7 @@ trait Task[A] extends Callable[A] {
   final def call(): A = execute()
   
   // submits the task for concurrent execution
-  final def submit(executor: ExecutorService = TaskExecutor.pool): Future[A] = TaskExecutor submit this
+  final def submit(): Future[A] = TaskManager submit this
   
   // create a new task that executes <this> and then <next>
   final def then[B](next: Task[B]): Task[B] = new SerialTask[B](this, next)

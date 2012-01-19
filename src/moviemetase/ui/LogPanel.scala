@@ -4,6 +4,7 @@ package ui
 import scala.swing._
 import scala.swing.Swing._
 import java.io.Writer
+import java.awt.Font
 
 class JTextWriter(area: javax.swing.JTextArea, autoscroll: Boolean) extends java.io.Writer {
   import javax.swing.text.DefaultCaret
@@ -24,8 +25,13 @@ class JTextWriter(area: javax.swing.JTextArea, autoscroll: Boolean) extends java
 }
 
 class LogPanel(val top: UI) extends ScrollPane {
+  
+//  minimumSize = new Dimension(20, 400)
+  
   val textArea = new TextArea(5, 80)
   textArea.editable = false
+  textArea.tabSize = 2
+  textArea.font = new Font(Font.MONOSPACED, Font.PLAIN, 9)
   
   val writer = new JTextWriter( textArea.peer, true )
   

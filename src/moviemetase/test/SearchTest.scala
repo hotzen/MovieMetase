@@ -30,6 +30,6 @@ object SearchTest {
     }
     
     println("DONE, shutting down...")
-    TaskExecutor.shutdown()
+    TaskManager.shutdown()
   }
 }
