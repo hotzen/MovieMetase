@@ -40,31 +40,34 @@ object TaskManager {
       Queue, ThreadFactory, 
       RejectedExecHandler
     )
-  
-//  private val completionService = new ExecutorCompletionService(executor)
      
   def shutdown(): Unit = {
     executor.shutdownNow()
     executor.awaitTermination(3, TimeUnit.SECONDS)
   }
   
-  def submit[A](task: Task[A]): Future[A] = {
+  private def publishMoreTasks(): Unit = 
     ui.UI.publish(progress)( ActiveTasks(counter.incrementAndGet()) )
-        
-    executor submit new Callable[A] {
-      def call(): A = {
-        val res = task.execute()
-        ui.UI.publish(progress)( ActiveTasks(counter.decrementAndGet()) )
-        res
-      }
-    }
+  
+  private def publishLessTasks(): Unit =
+    ui.UI.publish(progress)( ActiveTasks(counter.decrementAndGet()) )
+      
+  def submit[A](task: Task[A]): Future[A] = {
+    publishMoreTasks()
+    executor submit new CompletionPublisher(task)
   }
-    
+        
   private val counter = new AtomicInteger(0)
   val progress = new Publisher { }
+  
+  case class ActiveTasks(tasks: Int) extends scala.swing.event.Event
+  
+  private class CompletionPublisher[A](task: Task[A]) extends Callable[A] {
+    def call(): A =
+      try     task.execute()
+      finally publishLessTasks()
+  }
 }
-
-case class ActiveTasks(tasks: Int) extends scala.swing.event.Event
 
 object Task {
   def create[A](code: => A): Task[A] = new Task[A] {

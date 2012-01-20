@@ -83,7 +83,7 @@ object TMDB {
 
           elemMovie.getChildElements("overview").
             map( _.getValue ).
-            foreach( infos append MovieInfos.Summary(_) )
+            foreach( infos append MovieInfos.Description(_) )
                    
           // collect genres
           for (elemCats <- elemMovie.getChildElements("categories");

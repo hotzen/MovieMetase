@@ -3,9 +3,10 @@ package ui
 
 import scala.swing.{Panel, Component, LayoutContainer}
 import net.miginfocom.swing.MigLayout
+import javax.swing.JComponent
 
 object MigPanel {
-  var SeparatorColor = new scala.swing.Color(0, 70, 213)
+//  var SeparatorColor = new scala.swing.Color(0, 70, 213)
     
 //  def addSeparatorTo(panel: MigPanel, label: String): MigPanel = {
 //    import scala.swing.{Label, Separator}
@@ -44,9 +45,9 @@ class MigPanel(
   
   protected def areValid(constr: Constraints): (Boolean, String) = (true, "")
   
-  def add(comp: Component, constr: String): Unit = peer.add(comp.peer, constr)
-
-  def add(comp: Component): Unit = add(comp, "")
+  def add(comp: JComponent, constr: String): Unit = peer.add(comp, constr)
+  
+  def add(comp: Component, constr: String = ""): Unit  = peer.add(comp.peer, constr)
   
   def clear(): Unit = {
     for (comp <- peer.getComponents) {

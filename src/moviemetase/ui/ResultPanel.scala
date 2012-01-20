@@ -7,24 +7,29 @@ import scala.swing.event._
 import java.awt.{Desktop, Color, Font}
 import javax.swing.{BorderFactory, JButton}
 import javax.swing.border.{BevelBorder}
+import java.net.URL
+import javax.imageio.ImageIO
+import java.awt.image.{RenderedImage, BufferedImage}
+import javax.swing.JLabel
 
 object ResultPanel {
   
 }
 
+
+
 class ResultPanel(val top: UI) extends ScrollPane {
+  
+  verticalScrollBarPolicy   = ScrollPane.BarPolicy.AsNeeded
+  horizontalScrollBarPolicy = ScrollPane.BarPolicy.Never
   
   val panel = new MigPanel("wrap, fillx", "", "")
   contents = panel
 
-  def render(cont: MigPanel, movie: Movie, sel: Boolean, foc: Boolean): Unit = {
-    cont.border =
-      if (sel)
-        BorderFactory.createLineBorder(Color.BLACK)
-      else
-        BorderFactory.createLineBorder(Color.GRAY)
+  def render(cont: MigPanel, movie: Movie): Unit = {
+    cont.border = BorderFactory.createLineBorder(Color.GRAY)
     
-    // title / year  
+    // title / year
     cont.add(new Label {
       text = {
         if (movie.year > 0)
@@ -37,20 +42,29 @@ class ResultPanel(val top: UI) extends ScrollPane {
 
       xAlignment = Alignment.Left
       yAlignment = Alignment.Top
-    }, "span, wrap")
+    }, "dock north")
     
-    // genres
-    cont.add(new MigPanel("width 50%") {
+    val images = movie.infos.collect({ case i:MovieInfos.Image => i })
+        
+    // main-image
+    cont.add(new Label {
+      text = "Main-Image"
+//      images.headOption match {
+//        case Some(img) => 
+//        case None => 
+//      }
+    }, "dock east")
+    
+    cont.add(new MigPanel("fillx") {
+      
+      // genres
       val genres = movie.infos.collect({ case MovieInfos.Genre(g) => g })
-
       add(new Label {
         text = genres.map(_.capitalize).sortWith(_ < _).mkString(", ")
         font = new Font(Font.SANS_SERIF, Font.PLAIN, 11)
-      })
-    }, "")
-    
-    // webpages
-    cont.add(new MigPanel("width 50%") {
+      }, "push")
+      
+      // webpages
       for (url <- movie.infos.collect({ case i:MovieInfos.WebPage => i.page })) {
         val host = url.getHost 
         val label = 
@@ -73,47 +87,60 @@ class ResultPanel(val top: UI) extends ScrollPane {
           font = new Font(Font.MONOSPACED, Font.PLAIN, 9)
         })
       }
-    }, "wrap")
-    
-//    cont.add(new Separator(), "gapleft rel, growx, span, wrap")
+    }, "growx, shrinkx, wrap")
     
     
-    if (movie.infos.exists( _ match { 
-      case i:MovieInfos.Description => true
-      case i:MovieInfos.Summary => true
-      case _ => false
-    })) {
-      // text
-      cont.add(new MigPanel("width 95%") {
-        
-        border = BorderFactory.createSoftBevelBorder(BevelBorder.LOWERED)
-        
-        for (desc <- movie.infos.collect({ case i:MovieInfos.Description => i.text })) {
-          add(new Label {
-            text = desc
-            font = new Font(Font.SERIF, Font.PLAIN, 11)
-            //border = null
-            //tabSize = 4
-            //editable = false
-            //lineWrap = true
-            opaque = false
-          }, "wrap")
-        }
-        
-        for (sum <- movie.infos.collect({ case i:MovieInfos.Summary => i.text })) {
-          add(new Label {
-            text = sum
-            font = new Font(Font.SERIF, Font.PLAIN, 11)
-            border = null
-            //tabSize = 4
-            //editable = false
-            //lineWrap = true
-            opaque = false
-          }, "wrap")
-        }
-        
-      }, "span, wrap, growx")
+    val QuoteBegin = "\u00AB "
+    val QuoteEnd   = " \u00BB"
+    
+    // descriptions
+    val descriptions = movie.infos.collect({ case i:MovieInfos.Description => i })
+    if (!descriptions.isEmpty) {
+      cont.add(new Label("Description"), "wrap")
+      
+      for (desc <- descriptions.map(_.text)) {
+        cont.add(new TextArea {
+          text = QuoteBegin + desc + QuoteEnd
+          font = new Font(Font.SERIF, Font.PLAIN, 12)
+          border = null
+          tabSize = 2
+          editable = false
+          lineWrap = true
+          wordWrap = true
+          opaque = false
+        }, "growx, wrap")
+      }
     }
+        
+    // summaries
+    val summaries = movie.infos.collect({ case i:MovieInfos.Summary => i })
+    if (!summaries.isEmpty) {
+      cont.add(new Label("Summary"), "wrap")
+      
+      for (summary <- summaries.map(_.text)) {
+        cont.add(new TextArea {
+          text = QuoteBegin + summary + QuoteEnd
+          font = new Font(Font.SERIF, Font.PLAIN, 12)
+          border = null
+          tabSize = 2
+          editable = false
+          lineWrap = true
+          wordWrap = true
+          opaque = false
+        }, "growx, wrap")
+      }
+    }
+        
+    // images
+    if (!images.isEmpty)
+      cont.add(new MigPanel("fillx") {
+        
+        for (url <- images.map(_.url)) {
+          val imgLbl = new ImageLabel(url, 400)
+          add(imgLbl, "")
+        }
+      
+      }, "growx")
   }
 
   listenTo( top.searchPanel )
@@ -122,8 +149,8 @@ class ResultPanel(val top: UI) extends ScrollPane {
       panel.clear()
       
       for (movie <- row.movies) {
-        val cont = new MigPanel("fill")
-        render(cont, movie, false, false)
+        val cont = new MigPanel("fillx")
+        render(cont, movie)
         panel.add(cont, "grow")
       }
       
@@ -131,10 +158,7 @@ class ResultPanel(val top: UI) extends ScrollPane {
       panel.repaint()
     }
   }
-  
 
-  
-  
   { // TEST
     val infos =
       MovieInfos.Title("Inception") ::
@@ -153,4 +177,65 @@ class ResultPanel(val top: UI) extends ScrollPane {
     val row = SearchRow(false, "term", "dir", "file", "path", movie :: Nil)
     UI.publish(top.searchPanel)( SearchRowSelected(row) )
   }
+}
+
+object ImageLabel {
+  lazy val PlaceholderImage: BufferedImage = ImageIO.read( App.resource("/res/image-loading.png") ) 
+}
+
+// http://today.java.net/pub/a/today/2007/04/03/perils-of-image-getscaledinstance.html
+class ImageLabel(url: URL, width: Int) extends JLabel {
+  import java.awt.Graphics
+  import java.awt.RenderingHints
+  
+  setOpaque(true)
+    
+  private var img: BufferedImage = ImageLabel.PlaceholderImage
+    
+  private val loadingTask = new Task[Unit] {
+    def execute(): Unit =
+      try {
+        val img = ImageIO.read(url)
+        if (img != null)
+          UI.run {
+            val that = ImageLabel.this
+            that.img = img
+            that.revalidate()
+            that.repaint()
+          }
+        else
+          println("ImageLabel.loadingTask NULL loaded " + url)
+      } catch { case e:Exception => e.printStackTrace() }
+  }
+  private var loadingTaskSubmitted = false
+  
+  def load(): Unit = {
+    loadingTask.submit()
+    loadingTaskSubmitted = true
+  }
+  
+  override def paintComponent(g: java.awt.Graphics): Unit = {
+    super.paintComponent(g)
+    
+    if (!loadingTaskSubmitted)
+      load()
+    
+    val g2 = g.asInstanceOf[Graphics2D]
+    val compSize = getSize()
+    
+    val newW = compSize.width
+    val newH = scaleHeight(newW)
+        
+    g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+    g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+    
+    g2.drawImage(img, 0, 0, newW, newH, null);
+  }
+  
+  def ratio: Float = img.getWidth.toFloat / img.getHeight
+  
+  def scaleHeight(w: Int): Int = (w / ratio).toInt
+  
+  override def getPreferredSize(): Dimension =
+    new Dimension(width, scaleHeight(width))
 }
