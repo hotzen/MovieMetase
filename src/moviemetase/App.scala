@@ -23,33 +23,32 @@ object App {
     TaskManager.shutdown()
     System.exit(0)
   }
-  
-  //lazy val Toolkit = java.awt.Toolkit.getDefaultToolkit
-  
+
   def resource(path: String): java.net.URL = {
     val url = this.getClass.getResource(path)
     if (url == null)
       throw new Exception("resource '" + path + "' does not exist")
     url
   }
-    
-  
-//  def icon(path: String): javax.swing.ImageIcon =
-//    new javax.swing.ImageIcon( resource(path) )
-//  def image(path: String): java.awt.Image =
-//    new javax.swing.ImageIcon( resource(path) ).getImage
-   
 
-//  def userDir: java.io.File = 
-//	  new java.io.File( util.Properties.userDir )
-//    
+  val userDir: java.io.File = new java.io.File( util.Properties.userDir )
+    
 //  def resourceFromUserDirectory(path: String): java.io.File =
 //    new java.io.File(userDir, path)
   
-  def configDir: java.io.File = {
-    val f = new java.io.File(util.Properties.userDir, "MovieMetase")
-    if (!f.exists)
-      f.mkdir()
-    f
+  def dataDir(subDirName: String = ""): java.io.File = {
+    val baseDir = new java.io.File(userDir, "MovieMetase")
+      
+    if (!baseDir.exists)
+      baseDir.mkdir()
+    
+    if (subDirName.isEmpty)
+      return baseDir
+    
+    val dataDir = new java.io.File(baseDir, subDirName)
+    if (!dataDir.exists)
+      dataDir.mkdir()
+    
+    dataDir
   }
 }

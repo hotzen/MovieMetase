@@ -102,3 +102,21 @@ class UI extends Frame {
   
   override def closeOperation = App.shutdown()
 }
+
+class ImageLoader(url: java.net.URL, callback: Image => Unit) extends Task[Unit] with Logging {
+  import javax.imageio.ImageIO
+  
+  val logID = "ImageLoader(" + url.toExternalForm + ")"
+  
+  def execute(): Unit =
+    try {
+      trace("ImageIO.read() ...")
+      val img = ImageIO.read(url)
+      if (img != null)
+        UI.run { callback(img) }
+      else
+        error("ImageIO returned NULL")
+    } catch {
+      case e:Exception => error(e.getMessage(), ("exception" -> e) :: Nil)
+    }
+}

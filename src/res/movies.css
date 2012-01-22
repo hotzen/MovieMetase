@@ -1,45 +1,58 @@
+* {
+	margin: 0;
+	padding: 0;
+}
+
 body {
-  background-color: #F0F0F0;
+	background-color: #F0F0F0;
 }
 
 .movie {
 	border: 1px solid #A8A8A8;
-	/* padding: 5px; */
+	margin: 5px;
+	padding: 2px;
 }
 
 h1 {
 	font-family: sans-serif;
 	font-size: 14pt;
 	margin: 5px;
-	padding: 0;
+	margin-left: 0;
 }
 
 img.main {
-	float: right;
+	float: left;
+	width: 120px;
+	border-width: 0;
+	padding-right: 5px;
 }
 
 .genres-directors-actors {
 	margin: 2px;
+	margin-left: 0;
 }
 
 .genres, .actors, .directors {
 	font-family: sans-serif;
 	font-size: 10pt;
 	display: inline-block;
-	margin: 0;
 	margin-right: 20px;
-	padding: 0;
 }
 
 blockquote {
 	font-family: serif;
 	font-size: 11pt;
-	margin: 0;
-	margin-left: 10px;
-	padding: 0;
-	/* border: 1px dotted #8E8E8E; */
+	padding: 5px;
 }
 
 .webpages a {
+	font-family: sans-serif;
+	font-size: 9pt;
 	color: #383838;
+	padding: 2px;
+	text-decoration: underline;
+}
+
+.webpages a:hover {
+	text-decoration: none;
 }
