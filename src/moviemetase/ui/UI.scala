@@ -5,10 +5,9 @@ import scala.swing._
 import scala.swing.Swing._
 import scala.swing.event.Event
 import java.awt.{Toolkit, Desktop, EventQueue}
-
+import java.net.URL
 
 object UI {
-  
   def start(): Unit = {
     import javax.swing.UIManager
     
@@ -33,7 +32,6 @@ object UI {
       top.visible = true
     }
   }
-  
   
   // run in Event-Dispatch-Thread
   def run(block: =>Any): Unit =

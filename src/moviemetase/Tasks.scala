@@ -11,6 +11,7 @@ import java.net.HttpURLConnection
 import java.util.WeakHashMap
 import java.lang.ref.WeakReference
 import scala.swing.Publisher
+import java.io.File
 
 object TaskManager {
   private val CorePoolSize  = 4
@@ -242,6 +243,8 @@ trait XmlTask[A] extends UrlTask[A] {
 
 // A specialisation that processes HTML-data located by the URL
 // (XML-malformed HTML is forced into XML/XHTML by the tagsoup-parser)
+
+@deprecated("Use HtmlTask using JSoup instead", "")
 trait XhtmlTask[A] extends UrlTask[A] {
   import org.xml.sax.helpers.XMLReaderFactory
   import nu.xom.Builder
@@ -268,4 +271,28 @@ trait HtmlTask[A] extends UrlTask[A] {
   }
   
   def process(doc: org.jsoup.nodes.Document): A
+}
+
+
+case class DownloadTask(from: URL, to: File) extends Task[(URL,File)] with Logging {
+  import java.io.FileOutputStream
+  import java.nio.channels.{Channels, ReadableByteChannel}
+  
+  val logID = "DownloadTask(" + from.toExternalForm + " => " + to + ")"
+  
+  def execute(): (URL, File) = {
+    trace("connecting ...")
+    val rbc: ReadableByteChannel = Channels.newChannel( from.openStream() )
+    
+    trace("opening target-file ...")
+    val fos: FileOutputStream = new FileOutputStream( to )
+    val fch = fos.getChannel()
+    fch.lock()
+    
+    trace("transferring ...")
+    fch.transferFrom(rbc, 0, 1 << 24)
+    
+    info("successfully downloaded")
+    (from, to)
+  }
 }

@@ -1,16 +1,15 @@
 package moviemetase
 package ui
 
+import java.net.URL
+import scala.xml.Elem
 import scala.swing._
 import scala.swing.Swing._
 import scala.swing.event._
 import org.xhtmlrenderer.simple.XHTMLPanel
-import scala.xml.Elem
 import org.xhtmlrenderer.swing.NaiveUserAgent
 import org.xhtmlrenderer.extend.UserAgentCallback
-import java.net.URL
 import org.xhtmlrenderer.swing.Java2DTextRenderer
-import org.xhtmlrenderer.simple.extend.XhtmlCssOnlyNamespaceHandler
 import org.xhtmlrenderer.simple.extend.XhtmlNamespaceHandler
 
 class MoviePanel(val top: UI) extends FS_ScrollPane {
@@ -21,10 +20,8 @@ class MoviePanel(val top: UI) extends FS_ScrollPane {
   def renderMovies(movies: List[Movie]): Elem =
     <html>
       <head>
-        <title>test</title>
-        <!--<link rel="stylesheet" href="/res/movies.css" type="text/css" media="all" />-->
-        <!--<link rel="stylesheet" href="/res/movies.css" type="text/css" media="screen" /> -->
-        <style type="text/css"> @import url("/res/movies.css") screen; </style>
+        <style type="text/css">@import url("/res/common.css") screen;</style>
+        <style type="text/css">@import url("/res/movies.css") screen;</style>
       </head>
       <body>
       { movies.map( renderMovie(_) ) }
@@ -34,7 +31,7 @@ class MoviePanel(val top: UI) extends FS_ScrollPane {
   def renderMovie(movie: Movie): Elem =
     <div class="movie">
       { for (url <- movie.infos.collect({ case MovieInfos.Poster(url, x) => url }).headOption.toList) yield {
-        <img class="main" src={ url.toExternalForm } title={movie.title} />
+        <img class="main" src={ url.toExternalForm } title={ movie.title } />
       }}
       <h1>
         { movie.title }{ if (movie.year > 0) " (" + movie.year + ")" }
@@ -68,31 +65,25 @@ class MoviePanel(val top: UI) extends FS_ScrollPane {
     </div>
   
   val uac = new FS_UserAgent
-  //val nsh = new XhtmlCssOnlyNamespaceHandler
   val nsh = new XhtmlNamespaceHandler
-        
   val panel = new FS_Panel(uac, nsh)
-  //panel.addMouseTrackingListener( new FS_MouseListener )
   
-  //val ctx = panel.getSharedContext()
-  //ctx.setUserAgentCallback( new FS_UserAgent )
-  panel.ctx.setReplacedElementFactory( new FS_ReplacedElementFactory(panel) )
-  panel.ctx.setTextRenderer({
+  panel.addMouseTrackingListener( new FS_MouseListener )
+  
+  val ctx = panel.getSharedContext()
+  ctx.setReplacedElementFactory( new FS_ReplacedElementFactory(panel) )
+  ctx.setTextRenderer({
     val r = new Java2DTextRenderer()
     r.setSmoothingThreshold(8)
     r
   })
-    
+  
   contents = Component.wrap( panel )
   
   listenTo( top.searchPanel )
   reactions += {
     case SearchRowSelected(row) => {
       panel load renderMovies( row.movies )
-      
-      //FlyingSaucer.feedXML(panel, node)
-//    panel.revalidate()
-//    panel.repaint()
     }
   }
   
@@ -107,8 +98,8 @@ class MoviePanel(val top: UI) extends FS_ScrollPane {
       MovieInfos.Actor("Leonardo DiCaprio", Some("Cobb")) ::
       MovieInfos.Actor("Joseph Gordon-Levitt", Some("Arthur")) ::
       MovieInfos.Director("Christopher Nolan") ::
-      MovieInfos.IMDB("tt123456") :: 
-      MovieInfos.TMDB("123456") ::
+      MovieInfos.IMDB("tt1375666") :: 
+      MovieInfos.TMDB("27205") ::
       //MovieInfos.Description("Test") ::
       MovieInfos.Description("In a world where technology exists to enter the human mind through dream invasion, a highly skilled thief is given a final chance at redemption which involves executing his toughest job to date: Inception.") ::
       MovieInfos.Poster(new URL("http://ia.media-imdb.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1._SX640_SY948_.jpg") ) ::

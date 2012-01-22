@@ -26,7 +26,7 @@ object TMDB {
     def execute(): Movie = {
       
       // try IMDB-ID
-      for (imdbID <- movie.infos.collect({ case MovieInfos.IMDB(id) => id }).headOption) {
+      for (imdbID <- movie.infos.collect({ case MovieInfos.IMDB(id, _) => id }).headOption) {
         trace("expanding by IMDB-ID: " + imdbID)
         for (tmdbMovie <- FetchByImdbID(imdbID).execute())
           return movie.withNewInfos( tmdbMovie.infos ) 

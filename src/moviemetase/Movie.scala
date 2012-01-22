@@ -21,12 +21,14 @@ object Movie {
     // create Movie from Title and Release
     val t = newInfos.collect({ case MovieInfos.Title(t)   => t }).headOption
     val r = newInfos.collect({ case MovieInfos.Release(d) => d }).headOption
-
-    if (t.isDefined) {
-      val title = t.head
-      val year  = if (r.isEmpty) 0 else r.head
-      Some( Movie(title, year, newInfos.distinct.toList) )
-    } else None
+    
+    if (!t.isDefined)
+      return None
+    
+    val title = t.head
+    val year  = if (r.isEmpty) 0 else r.head
+    
+    Some( Movie(title, year, newInfos.distinct.sortWith(_.order < _.order).toList) )
   }
   
   def parseAllTitleWithReleases(trs: List[String]): (Option[MovieInfos.Title], Option[MovieInfos.Release]) = {
@@ -97,7 +99,9 @@ case class Movie(title: String, year: Int, infos: List[MovieInfo] = Nil) {
   }
 }
 
-sealed trait MovieInfo {
+trait MovieInfo {
+  val order: Int
+  
   var source: String = ""
   
   def withSourceInfo(info: String): this.type = {
@@ -108,30 +112,71 @@ sealed trait MovieInfo {
 
 
 object MovieInfos {
-  trait Downloadable extends MovieInfo {
+  case class TitleWithRelease(titleRelease: String) extends MovieInfo { val order = 1 }
+  
+  case class Title(name: String) extends MovieInfo { val order = 2 }
+  case class Release(year: Int) extends MovieInfo { val order = 3 }
+  
+  case class AlternativeTitle(title: String) extends MovieInfo { val order = 4 }
+  
+  case class Genre(name: String) extends MovieInfo { val order = 10 }
+  
+  case class Actor(name: String, character: Option[String] = None) extends MovieInfo { val order = 20 }
+  case class Director(name: String) extends MovieInfo { val order = 21 }
+  case class Producer(name: String) extends MovieInfo { val order = 22 }
+  case class Writer(name: String)   extends MovieInfo { val order = 23 }
+  
+  case class Description(text: String) extends MovieInfo { val order = 30 }
+  case class Summary(text: String) extends MovieInfo { val order = 31 }
     
-    // which file to download
-    def file: URL
+  //case class Rating(rating: Double, max: Double) extends MovieInfo
+  //case class ImdbRating(rating: Double) extends MovieInfo
+      
+  case class IMDB(id: String, rating: Option[Double] = None) extends MovieInfo with WebPage {
+    val order: Int = 80
     
-    import java.io.File
-    import java.util.concurrent.Callable
-    
-    def downloadTask(target: File) = new Callable[(URL,File)] {
-      import java.io.FileOutputStream
-      import java.nio.channels.{Channels, ReadableByteChannel}
-      //import java.nio.channels._
-          
-      def call(): (URL, File) = {
-        val rbc: ReadableByteChannel = Channels.newChannel( file.openStream() )
-        val fos: FileOutputStream = new FileOutputStream( target )
-        val fch = fos.getChannel()
-        fch.lock()
-        fch.transferFrom(rbc, 0, 1 << 24)
-        (file, target)
-      }
-    }
+    lazy val page: URL = new URL( "http://www.imdb.com/title/" + id + "/" )
   }
   
+  case class TMDB(id: String) extends MovieInfo with WebPage {
+    val order: Int = 81
+    
+    lazy val page: URL = new URL( "http://www.themoviedb.org/movie/" + id )
+  }
+  
+  case class Thumbnail(url: URL) extends MovieInfo with Image {
+    val order = 50
+    val preview = Some(url)
+  }
+  
+  case class Poster(url: URL, preview: Option[URL] = None) extends MovieInfo with Image { val order = 51 }
+  case class Backdrop(url: URL, preview: Option[URL] = None) extends MovieInfo with Image { val order = 52 }
+    
+  
+  case class Subtitle(label: String, lang: String, page: URL, url: URL) extends MovieInfo with WebPage with Downloadable { val order = 60 }  
+  case class Trailer(label: String, page: URL) extends MovieInfo with WebPage { val order = 70 }
+    
+  case class Extra(name: String, value: String) extends MovieInfo { val order = 100 }
+  
+// TODO
+//  case class ResultScore(baseScore: Double) extends MovieInfo {
+//    var scores: List[Double] = baseScore :: Nil
+//    def score: Double = scores.reduceLeft(_ * _)
+//    
+//    override def toString = "ResultScore(" + score + ")"
+//  }
+  
+  
+  trait Downloadable extends MovieInfo {
+    import java.io.File
+    import java.util.concurrent.Future
+    
+    def url: URL
+    
+    def download(to: File): Future[(URL,File)] =
+      DownloadTask(url, to).submit()
+  }
+    
   trait Image extends MovieInfo with Downloadable {
     def url: URL
     def preview: Option[URL]
@@ -142,51 +187,4 @@ object MovieInfos {
   trait WebPage extends MovieInfo {
     def page: URL
   }
-    
-  case class TitleWithRelease(titleRelease: String) extends MovieInfo
-  
-  case class Title(name: String) extends MovieInfo
-  case class Release(year: Int) extends MovieInfo
-  
-  case class Genre(name: String) extends MovieInfo
-  
-  case class Description(text: String) extends MovieInfo
-  case class Summary(text: String) extends MovieInfo
-    
-  case class AlternativeTitle(title: String) extends MovieInfo
-  //case class Rating(rating: Double, max: Double) extends MovieInfo
-  case class ImdbRating(rating: Double) extends MovieInfo
-  
-  case class Actor(name: String, character: Option[String] = None) extends MovieInfo
-  case class Director(name: String) extends MovieInfo
-  case class Producer(name: String) extends MovieInfo
-  case class Writer(name: String)   extends MovieInfo
-    
-  case class IMDB(id: String) extends MovieInfo with WebPage {
-    lazy val page: URL = new URL( "http://www.imdb.com/title/" + id + "/" )
-  }
-  
-  case class TMDB(id: String) extends MovieInfo with WebPage {
-    lazy val page: URL = new URL( "http://www.themoviedb.org/movie/" + id )
-  }
-    
-  case class Trailer(label: String, page: URL) extends MovieInfo with WebPage
-  case class Subtitle(label: String, lang: String, page: URL, file: URL) extends MovieInfo with WebPage with Downloadable 
-  
-  case class Thumbnail(url: URL) extends MovieInfo with Image {
-    val preview = Some(url)
-  }
-  
-  case class Poster(url: URL, preview: Option[URL] = None) extends MovieInfo with Image
-  case class Backdrop(url: URL, preview: Option[URL] = None) extends MovieInfo with Image
-  
-  case class Extra(name: String, value: String) extends MovieInfo
-  
-// TODO
-//  case class ResultScore(baseScore: Double) extends MovieInfo {
-//    var scores: List[Double] = baseScore :: Nil
-//    def score: Double = scores.reduceLeft(_ * _)
-//    
-//    override def toString = "ResultScore(" + score + ")"
-//  }
 }

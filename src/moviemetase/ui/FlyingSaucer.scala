@@ -15,22 +15,13 @@ import org.xhtmlrenderer.render._
 import javax.imageio.ImageIO
 import scala.swing.ScrollPane
 import java.awt.Image
-import org.xhtmlrenderer.simple.extend.XhtmlCssOnlyNamespaceHandler
-import org.xhtmlrenderer.layout.SharedContext
 
 object FlyingSaucer {
-//  def loadTemplate(url: URL): Elem = {
-//    val f = new File( url.toURI )
-//    XML.loadFile( f )
-//  }
-//  def feedXML(panel: XHTMLPanel, elem: Elem): Unit = panel.setDocument( XMLUtils.toDOM(elem) )
+
 }
 
-class FS_Panel(uac: UserAgentCallback, nsh: NamespaceHandler) extends JFS_Panel {
+class FS_Panel(uac: UserAgentCallback, nsh: NamespaceHandler) extends BasicPanel(uac) {
   
-  val ctx = new SharedContext(uac);
-  setSharedContext( ctx )
-
   def load(node: Node): Unit = {
     val dom = XMLUtils.toDOM(node)
     setDocument(dom, "", nsh)
@@ -56,33 +47,9 @@ class FS_UserAgent extends NaiveUserAgent { // UserAgentCallback {
     val is = App.resource(uri).openStream()
     new CSSResource(is)
   }
-  
-//  override def getXMLResource(uri: String): XMLResource = {
-//    
-//    // start in browser
-//    if (uri.startsWith("http")) {
-//      for (desktop <- UI.desktop)
-//        desktop.browse( new URI(uri) )
-//      
-//      null
-//      
-//    // delegate to default
-//    } else {
-//      super.getXMLResource(uri)
-//    }
-//  }
-  
-//  def getCSSResource(uri: String): CSSResource = {
-//      null 
-//    }
-//     
-//    def getImageResource(uri: String): ImageResource = {
-//      null
-//    }
-//    
-//    def getXMLResource(String uri): XMLResource = {
-//      null
-//    }
+
+//    def getImageResource(uri: String): ImageResource
+//    def getXMLResource(String uri): XMLResource
 }
 
 object FS_ReplacedElementFactory {
@@ -132,7 +99,6 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
 
         // not loaded yet
         case None => {
-
           // already loading
           if (loadingImages contains src)
             new ImageReplacedElement(LoadingImg, w, h)
@@ -177,7 +143,44 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
 }
 
 class FS_MouseListener extends LinkListener {
-  override def linkClicked(panel: BasicPanel, uri: String): Unit = {
-    println("clicked " + uri)
+  override def linkClicked(panel: BasicPanel, uriString: String): Unit = {
+    val uri = URI.create(uriString)
+    val scheme = uri.getScheme
+    
+    scheme match {
+      case "http" => 
+        for (desktop <- UI.desktop)
+          desktop.browse( uri )
+      
+      case "file" =>
+        for (desktop <- UI.desktop)
+          desktop.open( new java.io.File(uri) )
+      
+      case "download" => {
+        import scala.swing.FileChooser
+        //import javax.swing.filechooser.FileFilter
+        
+        val parts = uri.getSchemeSpecificPart()
+        val url = new URL( "http:" + parts )
+        
+        val baseDir = new File("/")
+        val fc = new FileChooser(baseDir)
+        //fc.fileFilter = new FileFilter
+        fc.fileSelectionMode = FileChooser.SelectionMode.FilesOnly
+        fc.multiSelectionEnabled = false
+        fc.showSaveDialog(null) match {
+          case FileChooser.Result.Approve => {
+             val f = fc.selectedFile
+             val task = new DownloadTask(url, f)
+             task.submit()
+          }
+          case _ =>
+        }
+      }
+
+      case "display" => 
+        
+      
+    }
   }
 }
