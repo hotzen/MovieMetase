@@ -1,11 +1,11 @@
 package moviemetase
 package ui
 
-import search._
 import scala.swing._
 import scala.swing.Swing._
-import scala.swing.event._
-import java.awt.EventQueue
+import scala.swing.event.Event
+import java.awt.{Toolkit, Desktop, EventQueue}
+
 
 object UI {
   
@@ -24,12 +24,19 @@ object UI {
     Swing.onEDT {
       val top = new UI
       top.pack()
+      
+      val screenSize = toolkit.getScreenSize
+      top.size = new Dimension(
+        (screenSize.width * 0.8).toInt,
+        (screenSize.height * 0.8).toInt
+      )
       top.visible = true
     }
   }
   
+  
   // run in Event-Dispatch-Thread
-  def run(block: => Any): Unit =
+  def run(block: =>Any): Unit =
     if (EventQueue.isDispatchThread)
       block
     else
@@ -39,7 +46,9 @@ object UI {
   def publish(pub: Publisher)(evt: Event): Unit =
     run { pub publish evt }
   
-  import java.awt.Desktop
+  
+  val toolkit = Toolkit.getDefaultToolkit
+  
   val desktop: Option[Desktop] =
     try {
       if (Desktop.isDesktopSupported)
@@ -55,7 +64,7 @@ class UI extends Frame {
 
   val dropPanel   = new DropPanel(this)
   val searchPanel = new SearchPanel(this)
-  val resultPanel = new ResultPanel(this)
+  val moviePanel  = new MoviePanel(this)
   val infoPanel   = new InfoPanel(this)
   val logPanel    = new LogPanel(this)
   val statusBar   = new StatusBar(this)
@@ -72,7 +81,7 @@ class UI extends Frame {
         
     add(new SplitPane {
       topComponent  = new SplitPane {
-        topComponent    = resultPanel
+        topComponent    = moviePanel
         bottomComponent = infoPanel
     
         resizeWeight = 0.5 // auto-resize even
@@ -88,7 +97,8 @@ class UI extends Frame {
     add(statusBar, "dock south, grow, height 25!")
   }
   
-  override val title = App.name + " " + App.version
-
+  title = App.name + " " + App.version
+  iconImage = UI.toolkit.getImage("/res/icon.png")
+  
   override def closeOperation = App.shutdown()
 }

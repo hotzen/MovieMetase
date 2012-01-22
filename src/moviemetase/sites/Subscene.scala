@@ -34,7 +34,7 @@ object Subscene {
       import XOM._
       
       val futs =
-        for (aNode <- doc.xpath("""//xhtml:a""", Context.XHTML);
+        for (aNode <- doc.xpath("""//xhtml:a""", Namespaces.XHTML);
              aElem <- aNode.toElement;
              href  <- aElem.attribute("href") if SubtitlePathRegex.matches(href) ) yield {
         
@@ -66,7 +66,7 @@ object Subscene {
       import XOM._
 
       val futs =
-        for (aNode <- doc.xpath("""//xhtml:a""", Context.XHTML);
+        for (aNode <- doc.xpath("""//xhtml:a""", Namespaces.XHTML);
              aElem <- aNode.toElement;
              href  <- aElem.attribute("href") if FilmPathRegex.matches(href) ) yield {
         

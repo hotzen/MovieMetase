@@ -11,7 +11,7 @@ case class FoundMoviesByFile(file: FileInfo, movies: List[Movie]) extends Event
 
 class DropPanel(val top: UI) extends Label {
 
-  override lazy val peer: javax.swing.JLabel = new JImageLabel( App.image("/res/drop.png") )
+  override lazy val peer: javax.swing.JLabel = new ImageLabel( App.resource("/res/drop.png"), ImageLabel.OriginalWidth, ImageLabel.Blocking )
     
   tooltip = "Drop directories, files or both here"
     

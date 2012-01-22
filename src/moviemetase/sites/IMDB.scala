@@ -33,7 +33,7 @@ object IMDB {
       val infos = new ListBuffer[MovieInfo]()
       infos append imdbInfo
       
-      val ctx = Context.XHTML
+      val ctx = Namespaces.XHTML
       
       // meta-tags
       val metas =

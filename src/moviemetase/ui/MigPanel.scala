@@ -27,31 +27,27 @@ class MigPanel(
   val columnConstraints: String = "",
   val rowConstraints: String    = "") extends Panel with LayoutContainer {
   
-  lazy val mig = new MigLayout(
+  override lazy val peer = new javax.swing.JPanel(mig) with SuperMixin
+  
+  final type Constraints = String
+  
+  final lazy val mig = new MigLayout(
     layoutConstraints,
     columnConstraints,
     rowConstraints
-  ) 
+  )
   
-  override lazy val peer =
-    new javax.swing.JPanel(mig) with SuperMixin
+  final private def layoutManager = peer.getLayout.asInstanceOf[MigLayout]
   
-  type Constraints = String
-  
-  private def layoutManager = peer.getLayout.asInstanceOf[MigLayout]
-  
-  protected def constraintsFor(comp: Component): Constraints =
+  final protected def constraintsFor(comp: Component): Constraints =
     layoutManager.getComponentConstraints(comp.peer).asInstanceOf[String]
   
-  protected def areValid(constr: Constraints): (Boolean, String) = (true, "")
+  final protected def areValid(constr: Constraints): (Boolean, String) = (true, "")
   
-  def add(comp: JComponent, constr: String): Unit = peer.add(comp, constr)
+  final def add(comp: JComponent, constr: String): Unit = peer.add(comp, constr)
+  final def add(comp: Component, constr: String = ""): Unit  = peer.add(comp.peer, constr)
   
-  def add(comp: Component, constr: String = ""): Unit  = peer.add(comp.peer, constr)
-  
-  def clear(): Unit = {
-    for (comp <- peer.getComponents) {
+  final def clear(): Unit =
+    for (comp <- peer.getComponents)
       peer.remove( comp )
-    }
-  }
 }

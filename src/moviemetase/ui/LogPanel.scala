@@ -26,9 +26,7 @@ class JTextWriter(area: javax.swing.JTextArea, autoscroll: Boolean) extends java
 
 class LogPanel(val top: UI) extends ScrollPane {
   
-//  minimumSize = new Dimension(20, 400)
-  
-  val textArea = new TextArea(5, 80)
+  val textArea = new TextArea(10, 80)
   textArea.editable = false
   textArea.tabSize = 2
   textArea.font = new Font(Font.MONOSPACED, Font.PLAIN, 9)

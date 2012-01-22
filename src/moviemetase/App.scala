@@ -19,8 +19,7 @@ object App {
   }
   
   def shutdown() = {
-    println("shutting down...")
-    println("please wait until pending tasks have been properly shutdown")
+    println("shutting down ...")
     TaskManager.shutdown()
     System.exit(0)
   }
@@ -37,10 +36,9 @@ object App {
   
 //  def icon(path: String): javax.swing.ImageIcon =
 //    new javax.swing.ImageIcon( resource(path) )
-  
-  def image(path: String): java.awt.Image =
-    new javax.swing.ImageIcon( resource(path) ).getImage
-    
+//  def image(path: String): java.awt.Image =
+//    new javax.swing.ImageIcon( resource(path) ).getImage
+   
 
 //  def userDir: java.io.File = 
 //	  new java.io.File( util.Properties.userDir )

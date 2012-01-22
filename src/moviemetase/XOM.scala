@@ -5,12 +5,12 @@ import org.xml.sax.helpers.XMLReaderFactory
 
 object XOM {
   
-  object Context {
+  object Namespaces {
     val None  = null
     val XHTML = new XPathContext("xhtml", "http://www.w3.org/1999/xhtml")
   }
         
-  implicit def NodesToIterable(nodes: Nodes): Iterable[Node] = new Iterable[Node] {
+  implicit def TraversableNodes(nodes: Nodes): Traversable[Node] = new Iterable[Node] {
     var i = 0
     def iterator = new Iterator[Node] {
       def hasNext = (i < nodes.size)
@@ -24,7 +24,7 @@ object XOM {
     }
   }
   
-  implicit def ElementsToIterable(elems: Elements): Iterable[Element] = new Iterable[Element] {
+  implicit def TraversableElements(elems: Elements): Traversable[Element] = new Iterable[Element] {
     var i = 0
     def iterator = new Iterator[Element] {
       def hasNext = (i < elems.size)
@@ -38,14 +38,14 @@ object XOM {
     }
   }
 
-  implicit def ImplicitNode(node: Node): RichNode = new RichNode(node)
+  implicit def _RichNode(node: Node): RichNode = new RichNode(node)
   class RichNode(node: Node) {
     def toElement(): Option[Element] = node match {
       case elem:Element => Some(elem)
       case _ => None
     }
     
-    def xpath[A](xp: String, ctx: XPathContext = Context.None): List[Node] = {
+    def xpath[A](xp: String, ctx: XPathContext = Namespaces.None): List[Node] = {
       val res =
         if (ctx != null)
           node.query(xp, ctx)
@@ -81,7 +81,7 @@ object XOM {
   }
 
   
-  implicit def ImplicitElement(elem: Element): RichElement = new RichElement(elem)
+  implicit def _RichElement(elem: Element): RichElement = new RichElement(elem)
   class RichElement(elem: Element) extends RichNode(elem) {
         
     def name: String =
@@ -91,8 +91,7 @@ object XOM {
       elem.getValue
     
     // only direct text-nodes, no further descendants
-    def text: String = 
-      elem.query("child::text()").map(_.getValue).mkString("")
+    def text: String = elem.query("child::text()").map(_.getValue).mkString("")
     
     def attributes = new Iterable[Attribute] {
       val cnt = elem.getAttributeCount()
@@ -115,12 +114,27 @@ object XOM {
       else              Some( attr.getValue )
     }
     
-  } // EndOf RichElement
+  }
   
-  implicit def ImplicitAttribut(attrib: Attribute): RichAttribute = new RichAttribute(attrib)
+  
+  implicit def _RichAttribute(attrib: Attribute): RichAttribute = new RichAttribute(attrib)
   class RichAttribute(attrib: Attribute) extends RichNode(attrib) {
     def name = attrib.getLocalName
     def value = attrib.getValue
+  }
+  
+  
+  implicit def _RichDocument(doc: Document): RichDocument = new RichDocument(doc)
+  class RichDocument(doc: Document) {
+     
+    def toDOM(): org.w3c.dom.Document = {
+      import nu.xom.converters.DOMConverter
+      import javax.xml.parsers.DocumentBuilderFactory
+      
+      val domImpl = DocumentBuilderFactory.newInstance.newDocumentBuilder.getDOMImplementation
+    
+      DOMConverter.convert(doc, domImpl)
+    }
   }
   
   
