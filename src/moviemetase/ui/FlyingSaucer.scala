@@ -2,7 +2,6 @@ package moviemetase
 package ui
 
 import org.xhtmlrenderer.simple.{XHTMLPanel, FSScrollPane}
-import scala.xml._
 import java.net.{URI, URL}
 import java.io.File
 import org.w3c.dom.{Element => DOM_Element}
@@ -15,6 +14,9 @@ import org.xhtmlrenderer.render._
 import javax.imageio.ImageIO
 import scala.swing.ScrollPane
 import java.awt.Image
+import java.awt.Dimension
+import java.awt.image.BufferedImage
+import org.w3c.dom._
 
 object FlyingSaucer {
 
@@ -22,16 +24,22 @@ object FlyingSaucer {
 
 class FS_Panel(uac: UserAgentCallback, nsh: NamespaceHandler) extends BasicPanel(uac) {
   
-  def load(node: Node): Unit = {
-    val dom = XMLUtils.toDOM(node)
+  var dom: Document = null
+  
+  def load(node: scala.xml.Node): Unit = {
+    dom = XMLUtils.toDOM(node)
     setDocument(dom, "", nsh)
   }
-    
-  def relayout(): Unit = {
-    sharedContext.flushFonts()
-    relayout(null)
+  
+  def reload() = {
+    setDocument(dom, "", nsh)
   }
   
+  def relayout(): Unit = {
+//    sharedContext.flushFonts()
+    relayout(null)
+  }
+    
   override def setLayout(l: java.awt.LayoutManager): Unit = ()
     //throw new IllegalStateException("setLayout() not allowed on FlyingSaucer-Panel")
 }
@@ -61,7 +69,7 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
   
   val loadingImages = scala.collection.mutable.Set[String]()
   val loadedImages  = scala.collection.mutable.Map[String, Image]()
-  
+    
   def createReplacedElement(ctx: LayoutContext, box: BlockBox, uac: UserAgentCallback, w: Int, h: Int): ReplacedElement = {
     val ns = ctx.getNamespaceHandler
     val elem = box.getElement
@@ -76,19 +84,19 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
   def replaceImage(ctx: LayoutContext, box: BlockBox, uac: UserAgentCallback, elem: DOM_Element, w: Int, h: Int): ReplacedElement = {
     val ns = ctx.getNamespaceHandler 
     val src = ns.getImageSourceURI(elem);
-    println("FS_ReplacedElementFactory.replaceImage '" + src + "' w="+w+" h="+h)
+    //println("FS_ReplacedElementFactory.replaceImage '" + src + "' w="+w+" h="+h)
 
     if (src == null)
       throw new NullPointerException("NULL img.src")
     
     val url = new URL(src)
     
-    def imageLoadedCallback(img: java.awt.Image): Unit = {
+    def imageLoadedCallback(img: BufferedImage): Unit = {
       loadedImages  += (src -> img)
       loadingImages -= src
 
-      panel.relayout()
-      //comp.repaint()
+      if (loadingImages.size == 0 || loadedImages.size % 3 == 0)
+        panel.relayout()
     }
     
     if (src startsWith "http://") {
@@ -106,7 +114,9 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
           // not loading yet
           else {
             loadingImages += src
-            new ImageLoader(url, imageLoadedCallback).submit()
+            
+            val resize = (w, h)
+            new ImageLoader(url, imageLoadedCallback, Some(resize)).submit()
             
             new ImageReplacedElement(LoadingImg, w, h)
           }
@@ -129,6 +139,8 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
   }
     
   def reset(): Unit = {
+    println("RESEEEEEEEEEEEET")
+    
     loadingImages.clear()
     loadedImages.clear()
   }
@@ -142,15 +154,46 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
   }
 }
 
-class FS_MouseListener extends LinkListener {
-  override def linkClicked(panel: BasicPanel, uriString: String): Unit = {
-    val uri = URI.create(uriString)
+class FS_MouseListener extends DefaultFSMouseListener {
+  import org.w3c.dom._
+  
+  def linkClicked(panel: BasicPanel, uri: URI, elem: Element): Unit = {
     val scheme = uri.getScheme
-    
+        
     scheme match {
       case "http" => 
         for (desktop <- UI.desktop)
           desktop.browse( uri )
+          
+      case "select" => {
+        val id = uri.getSchemeSpecificPart
+        
+        val nsh = panel.getSharedContext.getNamespaceHandler
+        val clazzes = getCssClass(elem, nsh)
+        
+        val cleanClazzes = clazzes.filter(clazz => clazz != "select" && clazz != "selected")
+        
+        // is already selected?
+        val selected = if (clazzes contains "selected") true
+                       else false
+        
+        // toggle selected
+        val newClazzes = if (selected) "select" :: cleanClazzes
+                         else "selected" :: cleanClazzes 
+        
+        println("has " + clazzes.mkString(", ") + " gets " + newClazzes.mkString(", "))
+        elem.setAttribute("class", newClazzes.mkString(" "))
+        
+        val selecting = !selected
+        
+        if (selecting) {
+          println("SELECTED " + id)
+        } else {
+          println("UNSELECTED " + id)
+        }
+        
+        panel.asInstanceOf[FS_Panel].reload()
+      }
       
       case "file" =>
         for (desktop <- UI.desktop)
@@ -160,27 +203,62 @@ class FS_MouseListener extends LinkListener {
         import scala.swing.FileChooser
         //import javax.swing.filechooser.FileFilter
         
-        val parts = uri.getSchemeSpecificPart()
-        val url = new URL( "http:" + parts )
+        //XXX
+        //val parts = uri.getSchemeSpecificPart()
         
-        val baseDir = new File("/")
-        val fc = new FileChooser(baseDir)
-        //fc.fileFilter = new FileFilter
-        fc.fileSelectionMode = FileChooser.SelectionMode.FilesOnly
-        fc.multiSelectionEnabled = false
-        fc.showSaveDialog(null) match {
-          case FileChooser.Result.Approve => {
-             val f = fc.selectedFile
-             val task = new DownloadTask(url, f)
-             task.submit()
-          }
-          case _ =>
-        }
+//        val url = new URL( "http:" + parts )
+//        
+//        val baseDir = new File("/")
+//        val fc = new FileChooser(baseDir)
+//        //fc.fileFilter = new FileFilter
+//        fc.fileSelectionMode = FileChooser.SelectionMode.FilesOnly
+//        fc.multiSelectionEnabled = false
+//        fc.showSaveDialog(null) match {
+//          case FileChooser.Result.Approve => {
+//             val f = fc.selectedFile
+//             val task = new DownloadTask(url, f)
+//             task.submit()
+//          }
+//          case _ =>
+//        }
+        ()
       }
-
-      case "display" => 
-        
       
+      case "display" => 
+
     }
+  }
+  
+  override def onMouseUp(panel: BasicPanel, box: Box): Unit = {
+    if (box == null)
+      return
+    
+    val elem = box.getElement
+    if (elem == null)
+      return
+    
+    val nsh = panel.getSharedContext.getNamespaceHandler
+      
+    def find(n: Node): Option[(Element,URI)] = {
+      if (n.getNodeType == Node.ELEMENT_NODE) {
+        val elem = n.asInstanceOf[Element]
+        nsh.getLinkUri( elem ) match {
+          case null => find( n.getParentNode )
+          case uri  => Some( (elem, URI.create(uri)) )
+        }
+      } else None
+    }
+      
+    find(elem) match {
+      case Some( (elem, uri) ) => linkClicked(panel, uri, elem)
+      case None =>
+    }
+  }
+  
+  def getCssClass(elem: Element, nsh: NamespaceHandler): List[String] = {
+    val clazz = nsh.getClass(elem)
+    if (clazz == null)
+      return Nil
+    clazz.split(" ").toList //map(_.trim.toLowerCase).filter(_.length > 0).toList
   }
 }

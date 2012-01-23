@@ -11,6 +11,8 @@ import org.xhtmlrenderer.swing.NaiveUserAgent
 import org.xhtmlrenderer.extend.UserAgentCallback
 import org.xhtmlrenderer.swing.Java2DTextRenderer
 import org.xhtmlrenderer.simple.extend.XhtmlNamespaceHandler
+import org.xhtmlrenderer.swing.HoverListener
+import org.xhtmlrenderer.swing.CursorListener
 
 class MoviePanel(val top: UI) extends FS_ScrollPane {
   
@@ -68,6 +70,8 @@ class MoviePanel(val top: UI) extends FS_ScrollPane {
   val nsh = new XhtmlNamespaceHandler
   val panel = new FS_Panel(uac, nsh)
   
+  panel.addMouseTrackingListener( new HoverListener )
+  panel.addMouseTrackingListener( new CursorListener )
   panel.addMouseTrackingListener( new FS_MouseListener )
   
   val ctx = panel.getSharedContext()

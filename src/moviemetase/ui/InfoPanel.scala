@@ -11,6 +11,8 @@ import org.xhtmlrenderer.swing.NaiveUserAgent
 import org.xhtmlrenderer.extend.UserAgentCallback
 import org.xhtmlrenderer.swing.Java2DTextRenderer
 import org.xhtmlrenderer.simple.extend.XhtmlNamespaceHandler
+import org.xhtmlrenderer.swing.HoverListener
+import org.xhtmlrenderer.swing.CursorListener
 
 class InfoPanel(val top: UI) extends ScrollPane {
   verticalScrollBarPolicy   = ScrollPane.BarPolicy.AsNeeded
@@ -47,9 +49,11 @@ class InfoPanel(val top: UI) extends ScrollPane {
       </body>
     </html>;
   
-  def renderPoster(poster: MovieInfos.Poster): Elem = <img src={ poster.url.toExternalForm } />
+  def renderPoster(poster: MovieInfos.Poster): Elem =
+    <a class="select" href="select:poster"><img src={ poster.url.toExternalForm } /></a>
   
-  def renderBackdrop(backdrop: MovieInfos.Backdrop): Elem = <img src={ backdrop.url.toExternalForm } />
+  def renderBackdrop(backdrop: MovieInfos.Backdrop): Elem =
+    <a class="select" href="select:backdrop"><img src={ backdrop.url.toExternalForm } /></a>
   
   def renderSubtitle(subtitle: MovieInfos.Subtitle): Elem = <a href={ subtitle.page.toExternalForm } />
   
@@ -67,6 +71,8 @@ class InfoPanel(val top: UI) extends ScrollPane {
   val nsh = new XhtmlNamespaceHandler
   val panel = new FS_Panel(uac, nsh)
   
+  panel.addMouseTrackingListener( new HoverListener )
+  panel.addMouseTrackingListener( new CursorListener )
   panel.addMouseTrackingListener( new FS_MouseListener )
   
   val ctx = panel.getSharedContext()
@@ -102,7 +108,6 @@ class InfoPanel(val top: UI) extends ScrollPane {
       MovieInfos.Description("In a world where technology exists to enter the human mind through dream invasion, a highly skilled thief is given a final chance at redemption which involves executing his toughest job to date: Inception.") ::
       MovieInfos.Poster(new URL("http://ia.media-imdb.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1._SX640_SY948_.jpg") ) ::
       MovieInfos.Poster(new URL("http://cf2.imgobject.com/t/p/original/bNGehW2wIxagZIlZqszECzXZDck.jpg") ) ::
-      MovieInfos.Poster(new URL("http://cf2.imgobject.com/t/p/original/9YL3Frgm8LUYnoWPQXskLYYg5XZ.jpg") ) ::
       MovieInfos.Poster(new URL("http://cf2.imgobject.com/t/p/original/9YL3Frgm8LUYnoWPQXskLYYg5XZ.jpg") ) ::
       MovieInfos.Poster(new URL("http://cf2.imgobject.com/t/p/original/2VnwCwBvwYgojCvgEB4wPKsMCvF.jpg") ) ::
       MovieInfos.Backdrop(new URL("http://cf2.imgobject.com/t/p/original/vmcpt1DALqJSLHTOuN6nJSDzupS.jpg")) ::

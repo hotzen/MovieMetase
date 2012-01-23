@@ -273,26 +273,35 @@ trait HtmlTask[A] extends UrlTask[A] {
   def process(doc: org.jsoup.nodes.Document): A
 }
 
-
 case class DownloadTask(from: URL, to: File) extends Task[(URL,File)] with Logging {
   import java.io.FileOutputStream
-  import java.nio.channels.{Channels, ReadableByteChannel}
+  import java.nio.channels.{Channels, ReadableByteChannel, FileChannel}
+  import scala.util.control.Exception
   
   val logID = "DownloadTask(" + from.toExternalForm + " => " + to + ")"
   
   def execute(): (URL, File) = {
-    trace("connecting ...")
-    val rbc: ReadableByteChannel = Channels.newChannel( from.openStream() )
+    var is: InputStream = null
+    var os: FileOutputStream = null
     
-    trace("opening target-file ...")
-    val fos: FileOutputStream = new FileOutputStream( to )
-    val fch = fos.getChannel()
-    fch.lock()
-    
-    trace("transferring ...")
-    fch.transferFrom(rbc, 0, 1 << 24)
-    
-    info("successfully downloaded")
-    (from, to)
+    try {
+      trace("connecting ...")
+      is = from.openStream()
+      val ich = Channels.newChannel( is )
+      
+      trace("opening target-file ...")
+      os = new FileOutputStream( to )
+      val och = os.getChannel()
+      och.lock()
+      
+      trace("transferring ...")
+      och.transferFrom(ich, 0, 1 << 24)
+      
+      info("successfully downloaded")
+      (from, to)
+    } finally {
+      try is.close() catch { case _ => }
+      try os.close() catch { case _ => }
+    }
   }
 }
