@@ -91,7 +91,7 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
     
     val url = new URL(src)
     
-    def imageLoadedCallback(img: BufferedImage): Unit = {
+    def imageLoadedCallback(img: BufferedImage): Unit = UI run {
       loadedImages  += (src -> img)
       loadingImages -= src
 
@@ -116,7 +116,8 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
             loadingImages += src
             
             val resize = (w, h)
-            new ImageLoader(url, imageLoadedCallback, Some(resize)).submit()
+            //new ImageLoader(url, imageLoadedCallback, Some(resize)).submit()
+            new CachingImageLoader(url, imageLoadedCallback, Some(resize)).submit()
             
             new ImageReplacedElement(LoadingImg, w, h)
           }
