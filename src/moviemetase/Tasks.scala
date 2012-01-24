@@ -23,11 +23,12 @@ object TaskManager {
   private val RejectedExecHandler = new AbortPolicy()
   
   private val ThreadFactory = new ThreadFactory {
-    val counter = new AtomicInteger(1)
+    val counter = new AtomicInteger(0)
 
     def newThread(r: Runnable): Thread = {
       val t = new Thread(r)
-      t.setName( "T" + counter.getAndIncrement() )
+      t.setName( "T" + "%02d".format( counter.incrementAndGet() ) )
+            
       t.setDaemon( false )
       t.setPriority( Thread.NORM_PRIORITY )
       t
@@ -47,12 +48,16 @@ object TaskManager {
     executor.awaitTermination(3, TimeUnit.SECONDS)
   }
   
-  private def publishMoreTasks(): Unit = 
-    ui.UI.publish(progress)( ActiveTasks(counter.incrementAndGet()) )
-  
-  private def publishLessTasks(): Unit =
-    ui.UI.publish(progress)( ActiveTasks(counter.decrementAndGet()) )
-      
+  private def publishMoreTasks(): Unit = {
+    val cnt = counter.incrementAndGet()
+    ui.UI.publish(progress)( ActiveTasks(cnt) )
+  }
+
+  private def publishLessTasks(): Unit = {
+    val cnt = counter.decrementAndGet()
+    ui.UI.publish(progress)( ActiveTasks(cnt) )
+  }
+        
   def submit[A](task: Task[A]): Future[A] = {
     publishMoreTasks()
     executor submit new CompletionPublisher(task)
@@ -71,12 +76,12 @@ object TaskManager {
 }
 
 object Task {
-  def create[A](code: => A): Task[A] = new Task[A] {
+  def create[A](code: =>A): Task[A] = new Task[A] {
     def execute(): A = { code }
   }
   
   def createSeq[A](ts: List[Task[A]]): Task[List[A]] = new Task[List[A]] {
-    def execute(): List[A] = ts.map(_.execute())
+    def execute(): List[A] = ts.map( _.execute() )
   }
 }
 
@@ -97,17 +102,6 @@ trait Task[A] extends Callable[A] {
   final def thenFork[B](f: A => List[Task[B]]): Task[List[B]] = new ForkingTask[A,B](this, f)
 }
 
-//case class TaskInfo(weakFuture: WeakReference[Future[_]]) {
-//  def future: Option[Future[_]] = {
-//    val ref = weakFuture.get()
-//    if (ref == null)
-//      None
-//    else
-//      Some(ref)
-//  }
-//}
-
-
 class SerialTask[B](val t1: Task[_], val t2: Task[B]) extends Task[B] {
   final def execute(): B = {
     t1.execute()
@@ -117,30 +111,18 @@ class SerialTask[B](val t1: Task[_], val t2: Task[B]) extends Task[B] {
 
 class ForkingTask[A,B](val t: Task[A], val f: A => List[Task[B]]) extends Task[List[B]] {
   final def execute(): List[B] = {
+     
+    val res: A = t.execute()
     
-    // execute task 
-    val res = t.execute()
-    
-    // calculate tasks to be forked
+    // new tasks
     val ts = f( res )
-    
     if (ts.isEmpty)
       return Nil
     
-    // first task and rest of tasks
-    val t1 = ts.head
-    val tt = ts.tail
-    
-    // submit rest of tasks
-    val ft = tt.map( _.submit() )
-    
-    // execute first task
-    val r1 = t1.execute()
-    
-    // join rest tasks
-    val rt = ft.map( _.get() )
-    
-    r1 :: rt
+    // fork/join
+    val futs = ts.tail.map( _.submit() )
+    val res2 = ts.head.execute()
+    res2 :: futs.map( _.get() )
   }
 }
 

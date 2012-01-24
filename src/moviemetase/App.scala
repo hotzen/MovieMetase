@@ -31,7 +31,7 @@ object App {
     url
   }
 
-  val userDir: java.io.File = new java.io.File( util.Properties.userDir )
+  val userDir: java.io.File = new java.io.File( util.Properties.userHome )
     
 //  def resourceFromUserDirectory(path: String): java.io.File =
 //    new java.io.File(userDir, path)

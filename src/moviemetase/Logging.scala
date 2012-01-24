@@ -41,7 +41,7 @@ trait Logging {
         logBuf append "}"
       }
       
-      val thread = Thread.currentThread().getName()
+      val thread = Thread.currentThread.getName
       val time = Logging.TimestampFormat.format( new java.util.Date() )
       Logging.out.println("[" + thread + "][" + lvl.label + "] " + time + " " + logID + "\t" + logBuf.toString) //.grouped(Logging.MaxLogLineLength).mkString(Logging.LogLineBreak))
     }
