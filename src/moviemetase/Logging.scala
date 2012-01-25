@@ -40,7 +40,7 @@ trait Logging {
       return
     
     logBuf setLength 0 // reset
-      
+
     logBuf append "[" append Thread.currentThread.getName append "] "
     logBuf append "[" append lvl.label append "] "
     logBuf append Logging.TimestampFormat.format( new java.util.Date() ) 
