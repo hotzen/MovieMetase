@@ -13,7 +13,7 @@ class DropPanel(val top: UI) extends Label {
 
   override lazy val peer: javax.swing.JLabel = new ImageLabel( App.resource("/res/drop.png"), ImageLabel.OriginalWidth, ImageLabel.Blocking )
     
-  tooltip = "Drop directories, files or both here"
+  tooltip = "Drop directories or files or a mix of both here"
     
   val dropHandler = new FileDropHandler
   peer.setTransferHandler(dropHandler)

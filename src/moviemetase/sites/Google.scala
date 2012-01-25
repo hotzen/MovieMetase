@@ -75,7 +75,7 @@ case class GoogleResult(query: String, url: URL, title: String, snippet: String)
 object GoogleAjax {
   val BASE_URL = "http://ajax.googleapis.com/ajax/services/search/web"
   
-  case class Query(query: String, page: Int = 1) extends UrlTask[List[GoogleResult]] with Logging {
+  case class Query(query: String, page: Int = 1) extends HttpTask[List[GoogleResult]] with Logging {
     val logID = "GoogleAjax.Query"
     
     def params: String = "v=1.0&rsz=large&hl=en"

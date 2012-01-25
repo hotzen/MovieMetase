@@ -170,30 +170,15 @@ class FS_MouseListener extends DefaultFSMouseListener {
         val id = uri.getSchemeSpecificPart
         
         val nsh = panel.getSharedContext.getNamespaceHandler
-        val clazzes = getCssClass(elem, nsh)
         
-        val cleanClazzes = clazzes.filter(clazz => clazz != "select" && clazz != "selected")
-        
-        // is already selected?
-        val selected = if (clazzes contains "selected") true
-                       else false
-        
-        // toggle selected
-        val newClazzes = if (selected) "select" :: cleanClazzes
-                         else "selected" :: cleanClazzes 
-        
-        println("has " + clazzes.mkString(", ") + " gets " + newClazzes.mkString(", "))
-        elem.setAttribute("class", newClazzes.mkString(" "))
-        
-        val selecting = !selected
-        
-        if (selecting) {
-          println("SELECTED " + id)
-        } else {
-          println("UNSELECTED " + id)
+        findSelectable(elem, nsh) match {
+          case Some(selectable) => {
+            //val selected = getCssClasses(selectable, nsh) contains "selected"
+            toggleCssClass(selectable, "selected", nsh)
+            panel.asInstanceOf[FS_Panel].reload()
+          }
+          case None => println("NO SELECTABLE")
         }
-        
-        panel.asInstanceOf[FS_Panel].reload()
       }
       
       case "file" =>
@@ -239,7 +224,7 @@ class FS_MouseListener extends DefaultFSMouseListener {
       return
     
     val nsh = panel.getSharedContext.getNamespaceHandler
-      
+    
     def find(n: Node): Option[(Element,URI)] = {
       if (n.getNodeType == Node.ELEMENT_NODE) {
         val elem = n.asInstanceOf[Element]
@@ -256,10 +241,54 @@ class FS_MouseListener extends DefaultFSMouseListener {
     }
   }
   
-  def getCssClass(elem: Element, nsh: NamespaceHandler): List[String] = {
+  
+  def findSelectable(elem: Element, nsh: NamespaceHandler): Option[Element] = {
+    if (elem == null)
+      return None
+    
+    if (getCssClasses(elem, nsh).contains("selectable"))
+      return Some(elem)
+    
+    val selectables =
+      for (node       <- elem.getChildNodes if node.getNodeType == Node.ELEMENT_NODE;
+           element    =  node.asInstanceOf[Element];
+           selectable <- findSelectable(element, nsh)) 
+        yield selectable
+    
+    selectables.headOption
+  }
+    
+  def toggleCssClass(elem: Element, clazz: String, nsh: NamespaceHandler): List[String] = {
+    val classes = getCssClasses(elem, nsh)
+    val newClasses =
+      if (classes contains clazz)
+        classes.filter(_ != clazz)
+      else
+        clazz :: classes
+    
+    elem.setAttribute("class", newClasses.mkString(" "))
+    newClasses
+  }
+  
+  
+  def getCssClasses(elem: Element, nsh: NamespaceHandler): List[String] = {
     val clazz = nsh.getClass(elem)
     if (clazz == null)
       return Nil
     clazz.split(" ").toList //map(_.trim.toLowerCase).filter(_.length > 0).toList
+  }
+  
+  implicit def TraversableNodeList(nodes: NodeList): Traversable[Node] = new Iterable[Node] {
+    var i = 0
+    def iterator = new Iterator[Node] {
+      def hasNext = (i < nodes.getLength)
+      def next = {
+        val e = nodes.item(i)
+        i = i + 1
+        e
+      }
+      override def hasDefiniteSize = true
+      override def isTraversableAgain = true
+    }
   }
 }

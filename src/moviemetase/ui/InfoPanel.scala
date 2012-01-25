@@ -50,10 +50,10 @@ class InfoPanel(val top: UI) extends ScrollPane {
     </html>;
   
   def renderPoster(poster: MovieInfos.Poster): Elem =
-    <a class="select" href="select:poster"><img src={ poster.url.toExternalForm } /></a>
+    <a href="select:poster"><img class="selectable" src={ poster.url.toExternalForm } /></a>
   
   def renderBackdrop(backdrop: MovieInfos.Backdrop): Elem =
-    <a class="select" href="select:backdrop"><img src={ backdrop.url.toExternalForm } /></a>
+    <a href="select:backdrop"><img class="selectable" src={ backdrop.url.toExternalForm } /></a>
   
   def renderSubtitle(subtitle: MovieInfos.Subtitle): Elem = <a href={ subtitle.page.toExternalForm } />
   

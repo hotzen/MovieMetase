@@ -15,12 +15,10 @@ class ImageLoader(url: java.net.URL, callback: BufferedImage => Unit, resizeTo: 
       trace("ImageIO.read() ...")
       val img = ImageIO.read(url)
       
-      if (img == null) {
+      if (img == null)
         error("ImageIO returned NULL")
-        return
-      }
-      
-      callback( resize(img) )
+      else
+        callback( resize(img) )
 
     } catch {
       case e:Exception => error(e.getMessage(), ("exception" -> e) :: Nil)

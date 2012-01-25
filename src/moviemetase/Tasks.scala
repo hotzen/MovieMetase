@@ -8,10 +8,9 @@ import java.io.PrintStream
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.ThreadPoolExecutor.AbortPolicy
 import java.net.HttpURLConnection
-import java.util.WeakHashMap
-import java.lang.ref.WeakReference
 import scala.swing.Publisher
 import java.io.File
+import java.io.IOException
 
 object TaskManager {
   private val CorePoolSize  = 4
@@ -127,8 +126,8 @@ class ForkingTask[A,B](val t: Task[A], val f: A => List[Task[B]]) extends Task[L
 }
 
 
-// Task processing an URL
-trait UrlTask[A] extends Task[A] {
+// Task processing an HTTP-URL
+trait HttpTask[A] extends Task[A] {
   
   // url to process
   def url: URL
@@ -137,7 +136,7 @@ trait UrlTask[A] extends Task[A] {
   def process(is: InputStream): A
     
   // dont keep-alive
-  val ConnectionClose = true
+  val ConnectionClose = false
   
   val UserAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:9.0.1) Gecko/20100101 Firefox/9.0.1"
   val Referer   = "http://stackoverflow.com/questions/tagged/referer" 
@@ -152,7 +151,7 @@ trait UrlTask[A] extends Task[A] {
   final def execute(): A = {
     val conn: HttpURLConnection = url.openConnection() match {
       case http:HttpURLConnection => http
-      case _                      => throw new Exception("UrlTask only supports HTTP connections")
+      case _                      => throw new Exception("HttpTask only supports HTTP connections")
     }
     
     conn setUseCaches true
@@ -181,35 +180,43 @@ trait UrlTask[A] extends Task[A] {
       case Some(f) => f( conn.getOutputStream )
       case None    => // request-parameters only encoded in URL
     }
-    
-    val respCode = conn.getResponseCode
-    if (respCode != HttpURLConnection.HTTP_OK)
-      throw new Exception("HTTP " + respCode + ": " + conn.getResponseMessage + " {" + url + "}")
-        
-    val in = conn.getInputStream
-    
+
+    var in: InputStream = null
     try {
+      val respCode = conn.getResponseCode
+      
+      if (respCode != HttpURLConnection.HTTP_OK)
+        throw new IOException("HTTP " + respCode + ": " + conn.getResponseMessage + " {" + url + "}")
+      
+      in = conn.getInputStream
       val res = process( in )
       
-      if (!ConnectionClose)
+      if (ConnectionClose) {
         conn.disconnect()
-        
+      }
+      
       res
     } catch {
-      case e:Exception => {
-        System.err.println("UrlProcessor failed! URL: " + url)
-        e.printStackTrace( System.err )
-        throw e
+      // http://docs.oracle.com/javase/1.5.0/docs/guide/net/http-keepalive.html
+      case io:IOException => {
+        cleanCloseInputStream( conn.getErrorStream )
+        throw io
       }
     } finally {
-      in.close()
+      cleanCloseInputStream( in )
     }
   }
+  
+  def cleanCloseInputStream(is: InputStream): Unit =
+    try {
+      while (is.read() > 0) {}
+      is.close()
+    } catch { case e:Exception => }
 }
 
 
 // A specialisation that processes XML-data located by the URL
-trait XmlTask[A] extends UrlTask[A] {
+trait XmlTask[A] extends HttpTask[A] {
   import nu.xom.Builder
   
   final def process(in: InputStream): A = {
@@ -227,7 +234,7 @@ trait XmlTask[A] extends UrlTask[A] {
 // (XML-malformed HTML is forced into XML/XHTML by the tagsoup-parser)
 
 @deprecated("Use HtmlTask using JSoup instead", "")
-trait XhtmlTask[A] extends UrlTask[A] {
+trait XhtmlTask[A] extends HttpTask[A] {
   import org.xml.sax.helpers.XMLReaderFactory
   import nu.xom.Builder
   
@@ -244,7 +251,7 @@ trait XhtmlTask[A] extends UrlTask[A] {
   def process(doc: nu.xom.Document): A
 }
 
-trait HtmlTask[A] extends UrlTask[A] {
+trait HtmlTask[A] extends HttpTask[A] {
   import org.jsoup.Jsoup
     
   final def process(in: InputStream): A = {

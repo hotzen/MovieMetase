@@ -9,7 +9,7 @@ import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.HashMap
 import java.util.concurrent.Future
 
-sealed trait SubtitleSourceQuery extends UrlTask[List[Movie]]
+sealed trait SubtitleSourceQuery extends HttpTask[List[Movie]]
 
 object SubtitleSource {
   

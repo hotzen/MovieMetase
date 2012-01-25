@@ -4,7 +4,7 @@ package ui
 import scala.swing._
 import java.awt.Dimension
 import javax.swing.BorderFactory
-import java.awt.Color
+import java.awt.{Color, Font}
 
 class StatusBar(val top: UI) extends MigPanel("fillx, aligny center") {
   
@@ -16,6 +16,8 @@ class StatusBar(val top: UI) extends MigPanel("fillx, aligny center") {
     text    = ""
     columns = 3
     editable = false
+    enabled = false
+    font = new Font(Font.MONOSPACED, Font.PLAIN, 11)
   }
   add(taskCountLbl, "push")
 
@@ -37,19 +39,7 @@ class StatusBar(val top: UI) extends MigPanel("fillx, aligny center") {
      
       taskCountLbl.text =
         if (count > 0) count.toString
-        else ""
-
-//      progressBar.visible = true
-//      if (count > 0) {
-//        taskCountLbl.text = count.toString
-//        
-//        progressBar.indeterminate = true
-//      } else {
-//        taskCountLbl.text = "OK"
-//          
-//        progressBar.indeterminate = false
-//        progressBar.value = 100
-//      }
+        else "-"
     }
   }
 }

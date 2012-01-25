@@ -34,8 +34,6 @@ trait FileCache[A] {
 
   def write(k: String): Option[FileOutputStream] =
     Some( new FileOutputStream(file(k)) ) // fail if not writeable
-    //if (file(k).canWrite) Some( new FileOutputStream(file(k)) )
-    //else None
 
   def remove(k: String): Unit =
     if (exists(k)) file(k).delete()
@@ -55,12 +53,10 @@ class ImageCache extends FileCache[BufferedImage] with Logging {
       f.close()
       img
     })
-    //read(k).map( ImageIO.read(_) )
   
   def put(k: String, img: BufferedImage): Unit =
     write(k).foreach(f => {
       ImageIO.write(img, format, f)
       f.close()
     })
-    //write(k).foreach( ImageIO.write(img, format, _) )
 }

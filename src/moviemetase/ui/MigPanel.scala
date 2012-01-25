@@ -45,7 +45,11 @@ class MigPanel(
   final protected def areValid(constr: Constraints): (Boolean, String) = (true, "")
   
   final def add(comp: JComponent, constr: String): Unit = peer.add(comp, constr)
-  final def add(comp: Component, constr: String = ""): Unit  = peer.add(comp.peer, constr)
+  final def add(comp: Component, constr: String = ""): Unit = peer.add(comp.peer, constr)
+  
+  final def add(comps: Component*): Unit =
+    for (comp <- comps)
+      peer.add(comp.peer, "")
   
   final def clear(): Unit =
     for (comp <- peer.getComponents)

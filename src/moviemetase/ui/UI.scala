@@ -11,10 +11,9 @@ object UI {
   def start(): Unit = {
     import javax.swing.UIManager
     
-    // native Look&Feel
-    UIManager.setLookAndFeel( UIManager.getSystemLookAndFeelClassName() )
-    javax.swing.JFrame.setDefaultLookAndFeelDecorated(true)
-    
+    try UIManager setLookAndFeel "javax.swing.plaf.nimbus.NimbusLookAndFeel" 
+    catch { case e:Exception => UIManager setLookAndFeel UIManager.getSystemLookAndFeelClassName }
+        
     // apple integration
     val props = System.getProperties
     props.setProperty("apple.laf.useScreenMenuBar", "true")

@@ -11,16 +11,22 @@ h2 {
 
 .posters img {
 	width: 250px;
-	padding: 5px;
+	padding: 2px;
+	margin: 3px;
 	vertical-align: top;
-}
-
-.backdrops {
-	/* text-align: center; */
+	display: inline-block;
 }
 
 .backdrops img {
 	width: 600px;
-	padding: 5px;
+	padding: 2px;
+	margin: 3px;
 	vertical-align: top;
+	display: inline-block;
+}
+
+.posters img.selected, .backdrops img.selected {
+  padding: 0px;
+  border: 2px solid #00CC00;
+  margin: 3px;
 }
