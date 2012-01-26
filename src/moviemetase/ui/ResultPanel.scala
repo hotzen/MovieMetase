@@ -52,7 +52,7 @@ class ResultPanel(val top: UI) extends ScrollPane {
     
     // webpages
     cont.add(new MigPanel {
-      for (url <- movie.infos.collect({ case p:MovieInfos.WebPage => p.page })) {
+      for (url <- movie.infos.collect({ case p:MovieInfos.Website => p.page })) {
         val host = url.getHost 
         val label = 
           if (host startsWith WWW)

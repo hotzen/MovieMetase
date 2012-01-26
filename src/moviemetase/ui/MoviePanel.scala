@@ -22,7 +22,6 @@ class MoviePanel(val top: UI) extends FS_ScrollPane {
   def renderMovies(movies: List[Movie]): Elem =
     <html>
       <head>
-        <style type="text/css">@import url("/res/common.css") screen;</style>
         <style type="text/css">@import url("/res/movies.css") screen;</style>
       </head>
       <body>
@@ -56,7 +55,7 @@ class MoviePanel(val top: UI) extends FS_ScrollPane {
         <blockquote class="summary">\u00AB { summary } \u00BB</blockquote>
       }}
       <div class="webpages">
-        { for (url <- movie.infos.collect({ case i:MovieInfos.WebPage => i.page })) yield {
+        { for (url <- movie.infos.collect({ case i:MovieInfos.Website => i.page })) yield {
           val host = url.getHost
           val label = if (host startsWith "www.") host.substring(4)
                       else host

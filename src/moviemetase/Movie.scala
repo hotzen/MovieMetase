@@ -132,13 +132,13 @@ object MovieInfos {
   //case class Rating(rating: Double, max: Double) extends MovieInfo
   //case class ImdbRating(rating: Double) extends MovieInfo
       
-  case class IMDB(id: String, rating: Option[Double] = None) extends MovieInfo with WebPage {
+  case class IMDB(id: String, rating: Option[Double] = None) extends MovieInfo with Website {
     val order: Int = 80
     
     lazy val page: URL = new URL( "http://www.imdb.com/title/" + id + "/" )
   }
   
-  case class TMDB(id: String) extends MovieInfo with WebPage {
+  case class TMDB(id: String) extends MovieInfo with Website {
     val order: Int = 81
     
     lazy val page: URL = new URL( "http://www.themoviedb.org/movie/" + id )
@@ -153,8 +153,8 @@ object MovieInfos {
   case class Backdrop(url: URL, preview: Option[URL] = None) extends MovieInfo with Image { val order = 52 }
     
   
-  case class Subtitle(label: String, lang: String, page: URL, url: URL) extends MovieInfo with WebPage with Downloadable { val order = 60 }  
-  case class Trailer(label: String, page: URL) extends MovieInfo with WebPage { val order = 70 }
+  case class Subtitle(label: String, lang: String, page: URL, url: URL) extends MovieInfo with Website with Downloadable { val order = 60 }  
+  case class Trailer(label: String, page: URL) extends MovieInfo with Website { val order = 70 }
     
   case class Extra(name: String, value: String) extends MovieInfo { val order = 100 }
   
@@ -184,7 +184,7 @@ object MovieInfos {
     def file = url // Downloadable
   }
   
-  trait WebPage extends MovieInfo {
+  trait Website extends MovieInfo {
     def page: URL
   }
 }

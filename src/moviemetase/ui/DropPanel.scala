@@ -9,10 +9,10 @@ import moviemetase.search.MovieSearch
 case class SearchingMoviesByFile(file: FileInfo) extends Event
 case class FoundMoviesByFile(file: FileInfo, movies: List[Movie]) extends Event
 
-class DropPanel(val top: UI) extends Label {
+class DropPanel(val top: UI) extends Component {
 
-  override lazy val peer: javax.swing.JLabel = new ImageLabel( App.resource("/res/drop.png"), ImageLabel.OriginalWidth, ImageLabel.Blocking )
-    
+  override lazy val peer = new JImage( App.resource("/res/drop.png"), JImage.OriginalWidth, JImage.Blocking, JImage.NoCaching )
+  
   tooltip = "Drop directories or files or a mix of both here"
     
   val dropHandler = new FileDropHandler

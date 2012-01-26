@@ -1,6 +1,115 @@
 package moviemetase
 package ui
 
+import scala.swing._
+import scala.swing.event._
+import java.net.URL
+import javax.swing.BorderFactory
+import java.awt.Color
+
+class InfoPanel(val top: UI) extends MigPanel("fill") {
+  
+  val imagesPanel = new InfoImagesPanel(top)
+  val subsPanel   = new InfoSubtitlesPanel(top)
+  val sitesPanel  = new InfoWebsitesPanel(top)
+  
+  val tabbed = new TabbedPane {
+    pages += new TabbedPane.Page("Posters & Backdrops", imagesPanel)
+    pages += new TabbedPane.Page("Subtitles", subsPanel)
+    pages += new TabbedPane.Page("Websites & Trailers", sitesPanel)
+  }
+  add(tabbed, "grow")
+  
+  listenTo( top.searchPanel )
+  listenTo( tabbed )
+  
+  reactions += {
+    case SelectionChanged(tabbed) => {
+      println("selected tab: " + tabbed)
+    }
+    
+    case SearchRowSelected(row) => {
+      //panel load renderInfos( row.movies.head.infos )
+    }
+  }
+}
+
+class InfoImagesPanel(val top: UI) extends ScrollPane {
+  verticalScrollBarPolicy   = ScrollPane.BarPolicy.AsNeeded
+  horizontalScrollBarPolicy = ScrollPane.BarPolicy.Never
+    
+  val posterPanel = new Panel with SequentialContainer.Wrapper {
+    peer setLayout new WrapLayout
+    
+    def add(comp: JImage with Publisher): Unit = {
+      contents += Component.wrap( comp )
+      InfoImagesPanel.this listenTo comp
+    }
+  }
+  
+  val backdropPanel = new Panel with SequentialContainer.Wrapper {
+    peer setLayout new WrapLayout
+    
+    def add(comp: JImage with Publisher): Unit = {
+      contents += Component.wrap( comp )
+      InfoImagesPanel.this listenTo comp
+    }
+  }
+  
+  contents = new BoxPanel(Orientation.Vertical) {
+    contents += posterPanel += backdropPanel
+  }
+  
+  val PosterSize = (250, -1)
+  val BackdropSize = (600, -1)
+  
+  def render(infos: List[MovieInfo]): Unit = {
+    renderPosters( infos )
+    renderBackdrops( infos )
+  }
+  
+  def renderPosters(infos: List[MovieInfo]): Unit =
+    for (poster <- infos.collect({ case i:MovieInfos.Poster => i }))
+      posterPanel add new JImage(poster.url, Some(PosterSize)) with JSelectable
+  
+  def renderBackdrops(infos: List[MovieInfo]): Unit =
+    for (backdrop <- infos.collect({ case i:MovieInfos.Backdrop => i }))
+      backdropPanel add new JImage(backdrop.url, Some(BackdropSize)) with JSelectable
+ 
+  listenTo( top.searchPanel )
+  
+  reactions += {
+    case SearchRowSelected(row) => {
+      render( row.movies.head.infos ) // XXX multiple movies??
+    }
+    
+    case JSelected(comp) => comp match {
+      case img:JImage => println("selected " + img.url)
+      case _ => println("selected something")
+    }
+    
+    case JUnselected(comp) => comp match {
+      case img:JImage => println("unselected " + img.url)
+      case _ => println("unselected something")
+    }
+  }
+}
+
+class InfoSubtitlesPanel(val top: UI) extends ScrollPane {
+  verticalScrollBarPolicy   = ScrollPane.BarPolicy.AsNeeded
+  horizontalScrollBarPolicy = ScrollPane.BarPolicy.Never
+  
+  
+}
+
+class InfoWebsitesPanel(val top: UI) extends ScrollPane {
+  verticalScrollBarPolicy   = ScrollPane.BarPolicy.AsNeeded
+  horizontalScrollBarPolicy = ScrollPane.BarPolicy.Never
+  
+  
+}
+
+/*
 import java.net.URL
 import scala.xml.Elem
 import scala.swing._
@@ -121,3 +230,4 @@ class InfoPanel(val top: UI) extends ScrollPane {
     UI.publish(top.searchPanel)( SearchRowSelected(row) )
   }
 }
+*/

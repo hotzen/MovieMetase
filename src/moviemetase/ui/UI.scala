@@ -6,6 +6,9 @@ import scala.swing.Swing._
 import scala.swing.event.Event
 import java.awt.{Toolkit, Desktop, EventQueue}
 import java.net.URL
+import java.awt.Color
+import javax.swing.BorderFactory
+import javax.swing.border.EtchedBorder
 
 object UI {
   def start(): Unit = {
@@ -37,13 +40,14 @@ object UI {
     if (EventQueue.isDispatchThread)
       block
     else
-      Swing.onEDT { block }
+      EventQueue.invokeLater(new Runnable {
+        def run(): Unit = { block }
+      })
 
   // publish in EDT
   def publish(pub: Publisher)(evt: Event): Unit =
     run { pub publish evt }
-  
-  
+    
   val toolkit = Toolkit.getDefaultToolkit
   
   val desktop: Option[Desktop] =
@@ -55,6 +59,14 @@ object UI {
     } catch {
       case e:Exception => None
     }
+  
+  //val SelectionColor = new Color(131, 196, 45)
+  val SelectionColor = new Color(139, 209, 46)
+  
+  
+  //val SelectionBorder = BorderFactory createLineBorder SelectionColor
+  //val SelectionBorder = new EtchedBorder(EtchedBorder.RAISED, SelectionColor, Color.BLACK)
+  val SelectionBorder = BorderFactory.createMatteBorder(3, 3, 3, 3, SelectionColor)
 }
 
 class UI extends Frame {
@@ -98,4 +110,34 @@ class UI extends Frame {
   iconImage = UI.toolkit.getImage("/res/icon.png")
   
   override def closeOperation = App.shutdown()
+  
+  
+  { // TEST
+    val infos =
+      MovieInfos.Title("Inception") ::
+      MovieInfos.Release(2010) :: 
+      MovieInfos.Genre("Drama") ::
+      MovieInfos.Genre("SciFi") ::
+      MovieInfos.Genre("Doener") ::
+      MovieInfos.Genre("Thriller") ::
+      MovieInfos.Actor("Leonardo DiCaprio", Some("Cobb")) ::
+      MovieInfos.Actor("Joseph Gordon-Levitt", Some("Arthur")) ::
+      MovieInfos.Director("Christopher Nolan") ::
+      MovieInfos.IMDB("tt1375666") :: 
+      MovieInfos.TMDB("27205") ::
+      MovieInfos.Description("In a world where technology exists to enter the human mind through dream invasion, a highly skilled thief is given a final chance at redemption which involves executing his toughest job to date: Inception.") ::
+      MovieInfos.Poster(new URL("http://ia.media-imdb.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1._SX640_SY948_.jpg") ) ::
+      MovieInfos.Poster(new URL("http://cf2.imgobject.com/t/p/original/bNGehW2wIxagZIlZqszECzXZDck.jpg") ) ::
+      MovieInfos.Poster(new URL("http://cf2.imgobject.com/t/p/original/9YL3Frgm8LUYnoWPQXskLYYg5XZ.jpg") ) ::
+      MovieInfos.Poster(new URL("http://cf2.imgobject.com/t/p/original/2VnwCwBvwYgojCvgEB4wPKsMCvF.jpg") ) ::
+      MovieInfos.Backdrop(new URL("http://cf2.imgobject.com/t/p/original/vmcpt1DALqJSLHTOuN6nJSDzupS.jpg")) ::
+      MovieInfos.Backdrop(new URL("http://cf2.imgobject.com/t/p/original/hloLHcDVdFoB7eFvLiKpQPqieFP.jpg")) ::
+      MovieInfos.Backdrop(new URL("http://cf2.imgobject.com/t/p/original/zHl0p6NGVdJgFAEjtEZKhmq7EvM.jpg")) ::
+      Nil
+      
+    val movie = Movie(infos).get
+    
+    val row = SearchRow(false, "term", "dir", "file", "path", movie :: Nil)
+    UI.publish(searchPanel)( SearchRowSelected(row) )
+  }
 }

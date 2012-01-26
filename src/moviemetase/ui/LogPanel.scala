@@ -42,14 +42,15 @@ class LogPanel(val top: UI) extends MigPanel("fill") {
     add(Trace, Info, Warn, Error)
   }
   add(buttons, "dock north, gap 0")
-  
-  
+    
   val textArea = new TextArea(3, 80)
   textArea.editable = false
   textArea.tabSize = 2
   textArea.font = logFont
   
-  val writer = new JTextWriter( textArea.peer, true )
+  val writer = new JTextWriter(textArea.peer, true)
+  Logging.out = new java.io.PrintWriter( writer )
+  
   add(new ScrollPane(textArea), "grow")
     
   listenTo(Trace, Info, Warn, Error)
@@ -60,6 +61,5 @@ class LogPanel(val top: UI) extends MigPanel("fill") {
     case ButtonClicked(Error) => Logging.level = LogLevel.Error
   }
   
-  Logging.out = new java.io.PrintWriter( writer )
   Trace.doClick()
 }
