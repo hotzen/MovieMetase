@@ -61,5 +61,6 @@ class LogPanel(val top: UI) extends MigPanel("fill") {
     case ButtonClicked(Error) => Logging.level = LogLevel.Error
   }
   
+  // enable Tracing
   Trace.doClick()
 }

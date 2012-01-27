@@ -13,22 +13,30 @@ case class JSelected(comp: JComponent) extends Event
 case class JUnselected(comp: JComponent) extends Event
 
 trait JSelectable extends Publisher { self: JComponent =>
-  var selected: Boolean = false
+  private var _selected: Boolean = false
   
+  def selected: Boolean = _selected
+
+  def select(): Unit = {
+    _selected = true
+    this setBorder UI.SelectionBorder
+    this publish JSelected( this )
+  }
+
+  def unselect(): Unit = {
+    _selected = false
+    this setBorder null
+    this publish JUnselected( this )
+  }
+  
+  def select(sel: Boolean): Unit =
+    if (sel)
+      select()
+    else
+      unselect()
+
   addMouseListener(new MouseAdapter {
-    override def mouseClicked(e: MouseEvent): Unit = {
-      val thiz = JSelectable.this
-      
-      selected = !selected
-      
-      if (selected) {
-        thiz.setBorder( UI.SelectionBorder )
-        thiz publish JSelected( thiz )
-      } else {
-        thiz.setBorder( null )
-        thiz publish JUnselected( thiz )
-      }
-    }
+    override def mouseClicked(e: MouseEvent): Unit = select( !_selected )
   })
 }
 

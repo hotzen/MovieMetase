@@ -17,13 +17,13 @@ import java.awt.Image
 import java.awt.Dimension
 import java.awt.image.BufferedImage
 import org.w3c.dom._
+import scala.swing.Publisher
 
 object FlyingSaucer {
 
 }
 
 class FS_Panel(uac: UserAgentCallback, nsh: NamespaceHandler) extends BasicPanel(uac) {
-  
   var dom: Document = null
   
   def load(node: scala.xml.Node): Unit = {
@@ -31,17 +31,11 @@ class FS_Panel(uac: UserAgentCallback, nsh: NamespaceHandler) extends BasicPanel
     setDocument(dom, "", nsh)
   }
   
-  def reload() = {
+  def reload() =
     setDocument(dom, "", nsh)
-  }
-  
-  def relayout(): Unit = {
-//    sharedContext.flushFonts()
-    relayout(null)
-  }
     
-  override def setLayout(l: java.awt.LayoutManager): Unit = ()
-    //throw new IllegalStateException("setLayout() not allowed on FlyingSaucer-Panel")
+  def relayout(): Unit =
+    relayout(null) // sharedContext.flushFonts()
 }
 
 class FS_ScrollPane extends ScrollPane {
@@ -52,6 +46,7 @@ class FS_UserAgent extends NaiveUserAgent { // UserAgentCallback {
 
   // load css as resources from classpath
   override def getCSSResource(uri: String): CSSResource = {
+    //println("loading css " + uri)
     val is = App.resource(uri).openStream()
     new CSSResource(is)
   }
@@ -76,9 +71,8 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
     
     if (ns isImageElement elem)
       replaceImage(ctx, box, uac, elem, w, h)
-    
-    // nothing to replace
-    else null
+    else
+      null
   }
     
   def replaceImage(ctx: LayoutContext, box: BlockBox, uac: UserAgentCallback, elem: DOM_Element, w: Int, h: Int): ReplacedElement = {
@@ -101,23 +95,19 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
     
     if (src startsWith "http://") {
       loadedImages get src match {
-        
-        // already loaded
-        case Some(img) => new ImageReplacedElement(img, w, h)
+        case Some(img) => // already loaded
+          new ImageReplacedElement(img, w, h)
 
-        // not loaded yet
-        case None => {
-          // already loading
-          if (loadingImages contains src)
+        case None => { // not loaded yet
+          if (loadingImages contains src) // already loading
             new ImageReplacedElement(LoadingImg, w, h)
 
-          // not loading yet
-          else {
+          else { // not loading yet
             loadingImages += src
             
-            val resize = (w, h)
-            //new ImageLoader(url, imageLoadedCallback, Some(resize)).submit()
-            new CachingImageLoader(url, imageLoadedCallback, Some(resize)).submit()
+            val resizeTo = (w, h)
+            val loader = new CachingImageLoader(url, imageLoadedCallback, Some(resizeTo))
+            loader.submit()
             
             new ImageReplacedElement(LoadingImg, w, h)
           }
@@ -138,10 +128,9 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
       new ImageReplacedElement(img, w, h)
     }
   }
-    
+
   def reset(): Unit = {
-    println("RESEEEEEEEEEEEET")
-    
+    //println("RESEEEEEEEEEEEET")
     loadingImages.clear()
     loadedImages.clear()
   }
@@ -158,40 +147,27 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
 class FS_MouseListener extends DefaultFSMouseListener {
   import org.w3c.dom._
   
-  def linkClicked(panel: BasicPanel, uri: URI, elem: Element): Unit = {
+  def link(panel: BasicPanel, uri: URI, elem: Element): Unit = {
     val scheme = uri.getScheme
-        
+
     scheme match {
       case "http" => 
         for (desktop <- UI.desktop)
           desktop.browse( uri )
-          
-      case "select" => {
-        val id = uri.getSchemeSpecificPart
-        
-        val nsh = panel.getSharedContext.getNamespaceHandler
-        
-        findSelectable(elem, nsh) match {
-          case Some(selectable) => {
-            //val selected = getCssClasses(selectable, nsh) contains "selected"
-            toggleCssClass(selectable, "selected", nsh)
-            panel.asInstanceOf[FS_Panel].reload()
-          }
-          case None => println("NO SELECTABLE")
-        }
-      }
-      
+     
       case "file" =>
         for (desktop <- UI.desktop)
           desktop.open( new java.io.File(uri) )
-      
-      case "download" => {
-        import scala.swing.FileChooser
-        //import javax.swing.filechooser.FileFilter
-        
-        //XXX
-        //val parts = uri.getSchemeSpecificPart()
-        
+
+      case x => println("unknown scheme " + x)
+
+//      case "download" => {
+//        import scala.swing.FileChooser
+//        //import javax.swing.filechooser.FileFilter
+//        
+//        //XXX
+//        //val parts = uri.getSchemeSpecificPart()
+//        
 //        val url = new URL( "http:" + parts )
 //        
 //        val baseDir = new File("/")
@@ -207,12 +183,15 @@ class FS_MouseListener extends DefaultFSMouseListener {
 //          }
 //          case _ =>
 //        }
-        ()
-      }
-      
-      case "display" => 
-
+//        ()
+//      }
+//      
+//      case "display" => 
     }
+  }
+  
+  def select(panel: BasicPanel, id: String, elem: Element): Unit = {
+    println("selected " + id + " / " + elem)
   }
   
   override def onMouseUp(panel: BasicPanel, box: Box): Unit = {
@@ -225,59 +204,42 @@ class FS_MouseListener extends DefaultFSMouseListener {
     
     val nsh = panel.getSharedContext.getNamespaceHandler
     
-    def find(n: Node): Option[(Element,URI)] = {
-      if (n.getNodeType == Node.ELEMENT_NODE) {
-        val elem = n.asInstanceOf[Element]
-        nsh.getLinkUri( elem ) match {
-          case null => find( n.getParentNode )
-          case uri  => Some( (elem, URI.create(uri)) )
-        }
-      } else None
-    }
+    findLink(elem, nsh) match {
+      case Some( (uri, elem) ) => link(panel, uri, elem)
       
-    find(elem) match {
-      case Some( (elem, uri) ) => linkClicked(panel, uri, elem)
-      case None =>
+      case None => findSelectable(elem, nsh) match {
+        case Some( (id, elem) ) => select(panel, id, elem)
+        case None => 
+      }
     }
   }
   
-  
-  def findSelectable(elem: Element, nsh: NamespaceHandler): Option[Element] = {
-    if (elem == null)
+  def findLink(node: Node, nsh: NamespaceHandler): Option[(URI, Element)] = {
+    if (node == null || node.getNodeType != Node.ELEMENT_NODE)
       return None
     
-    if (getCssClasses(elem, nsh).contains("selectable"))
-      return Some(elem)
-    
-    val selectables =
-      for (node       <- elem.getChildNodes if node.getNodeType == Node.ELEMENT_NODE;
-           element    =  node.asInstanceOf[Element];
-           selectable <- findSelectable(element, nsh)) 
-        yield selectable
-    
-    selectables.headOption
+    val elem = node.asInstanceOf[Element]
+      
+    nsh.getLinkUri( elem ) match {
+      case null => findLink(node.getParentNode, nsh)
+      case uri  => Some( (URI.create(uri), elem) )
+    }
   }
+
+  def findSelectable(node: Node, nsh: NamespaceHandler): Option[(String, Element)] = {
+    if (node == null || node.getNodeType != Node.ELEMENT_NODE)
+      return None
     
-  def toggleCssClass(elem: Element, clazz: String, nsh: NamespaceHandler): List[String] = {
-    val classes = getCssClasses(elem, nsh)
-    val newClasses =
-      if (classes contains clazz)
-        classes.filter(_ != clazz)
-      else
-        clazz :: classes
+    val elem = node.asInstanceOf[Element]
     
-    elem.setAttribute("class", newClasses.mkString(" "))
-    newClasses
+    elem getAttribute "select" match {
+      case null => findSelectable(node.getParentNode, nsh)
+      case ""   => findSelectable(node.getParentNode, nsh)
+      case id   => Some( (id,elem) )
+    }
   }
   
-  
-  def getCssClasses(elem: Element, nsh: NamespaceHandler): List[String] = {
-    val clazz = nsh.getClass(elem)
-    if (clazz == null)
-      return Nil
-    clazz.split(" ").toList //map(_.trim.toLowerCase).filter(_.length > 0).toList
-  }
-  
+/*
   implicit def TraversableNodeList(nodes: NodeList): Traversable[Node] = new Iterable[Node] {
     var i = 0
     def iterator = new Iterator[Node] {
@@ -291,4 +253,23 @@ class FS_MouseListener extends DefaultFSMouseListener {
       override def isTraversableAgain = true
     }
   }
+  
+  def cssClasses(elem: Element, nsh: NamespaceHandler): List[String] =
+    nsh.getClass(elem) match {
+      case null  => Nil
+      case clazz => clazz.split(" ").toList
+    }
+
+  def toggleCssClass(elem: Element, clazz: String, nsh: NamespaceHandler): List[String] = {
+    val classes = getCssClasses(elem, nsh)
+    val newClasses =
+      if (classes contains clazz)
+        classes.filter(_ != clazz)
+      else
+        clazz :: classes
+    
+    elem.setAttribute("class", newClasses.mkString(" "))
+    newClasses
+  }
+*/
 }

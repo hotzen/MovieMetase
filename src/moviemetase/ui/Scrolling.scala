@@ -1,27 +1,40 @@
 package moviemetase.ui
 
-import javax.swing.{JComponent, SwingConstants}
-import java.awt.{Dimension, Rectangle}
+import javax.swing.JPanel
+import javax.swing.{Scrollable => JScrollable}
+import javax.swing.BoxLayout
+import java.awt.Dimension
+import java.awt.Rectangle
+import scala.swing.SequentialContainer
+import scala.swing.Orientation
+import scala.swing.Scrollable
+import scala.swing.Panel
 
-// http://stackoverflow.com/questions/2716274/jscrollpane-needs-to-shrink-its-width/2814718#2814718
-trait OnlyVerticallyScrollable extends javax.swing.Scrollable { self: JComponent =>
+class ScrollablePanel extends Panel with SequentialContainer.Wrapper with Scrollable.Wrapper {
+  
+  val scrollIncrement: Int = 10
+  val blockScrollIncrement: Int = 50
+  
+  val allowVerticalScrolling: Boolean   = true
+  val allowHorizontalScrolling: Boolean = false
+  
+  override lazy val peer = new JPanel with SuperMixin with JScrollable {
+    def getPreferredScrollableViewportSize: Dimension =
+      getPreferredSize
+  
+    def getScrollableTracksViewportHeight: Boolean =
+      !allowVerticalScrolling
     
-  def getScrollableTracksViewportWidth(): Boolean  = true
-  def getScrollableTracksViewportHeight(): Boolean = false
-  
-  def getPreferredScrollableViewportSize(): Dimension = this.getPreferredSize
-  
-  val ScrollIncrement = 10
-  
-  def getScrollableUnitIncrement(visibleRect: Rectangle, orientation: Int, direction: Int): Int = ScrollIncrement;
-
-  def getScrollableBlockIncrement(visibleRect: Rectangle, orientation: Int, direction: Int): Int = {
-    val incr =   
-      if (orientation == SwingConstants.VERTICAL)
-        visibleRect.height / 2
-      else
-        visibleRect.width / 2
+    def getScrollableTracksViewportWidth: Boolean =
+      !allowHorizontalScrolling
     
-    incr - ScrollIncrement
+    def getScrollableBlockIncrement(visibleRect: Rectangle, orientation: Int, direction: Int): Int =
+      scrollIncrement
+    
+    def getScrollableUnitIncrement(visibleRect: Rectangle, orientation: Int, direction: Int): Int =
+      blockScrollIncrement
   }
+  
+  final protected def scrollablePeer: JScrollable = peer
 }
+

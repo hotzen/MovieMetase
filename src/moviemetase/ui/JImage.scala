@@ -22,7 +22,7 @@ object JImage {
   val Caching   = true
   val NoCaching = false
   
-  lazy val PlaceholderImage: BufferedImage = ImageIO.read( App.resource("/res/image-loading.png") ) 
+  lazy val LoadingImage: BufferedImage = ImageIO.read( App.resource("/res/image-loading.png") ) 
 }
 
 class JImage(val url: URL, resizeTo: Option[(Int, Int)], parLoad: Boolean = true, caching: Boolean = true) extends JComponent {
@@ -31,7 +31,7 @@ class JImage(val url: URL, resizeTo: Option[(Int, Int)], parLoad: Boolean = true
   
   setOpaque(true)
   
-  private var img: BufferedImage = JImage.PlaceholderImage
+  private var img: BufferedImage = JImage.LoadingImage
   private var loading: Boolean = false
   private var loaded: Boolean  = false
   
@@ -41,8 +41,10 @@ class JImage(val url: URL, resizeTo: Option[(Int, Int)], parLoad: Boolean = true
     
     img = loadedImg
     
-    revalidate()
-    repaint()
+    if (parLoad) {
+      revalidate()
+      repaint()
+    }
   }
     
   private val loader =
@@ -86,22 +88,26 @@ class ImageLoader(url: java.net.URL, callback: BufferedImage => Unit, resizeTo: 
       case e:Exception => error(e.getMessage(), ("exception" -> e) :: Nil)
     }
 
+
+  // http://stackoverflow.com/questions/4220612/scaling-images-with-java-jai
+  // http://stackoverflow.com/questions/932479/java2d-scaling-issues
+  // TODO this? http://blogs.warwick.ac.uk/mmannion/entry/using_subsample_averaging/
+  // TODO or that? https://github.com/thebuzzmedia/imgscalr
   def resize(img: BufferedImage): BufferedImage = resizeTo match {
     case None => img
-    case Some(size) => {
-      val w = img.getWidth
-      val h = img.getHeight
+    case Some(targetSize) => {
+      val actualSize = (img.getWidth, img.getHeight)
+      val (w, h) = calcSize(actualSize, targetSize)
+      trace("resizing from "+actualSize+" to "+targetSize+" => "+(w,h))
       
-      val (destW, destH) = calcSize(size, w, h)
-      trace("resizing from "+w+"/"+h+" to " + size + " => " + (destW,destH))
-      
-      val dest = new BufferedImage(destW, destH, BufferedImage.TYPE_INT_RGB)
+      val dest = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB)
       val g = dest.createGraphics()
       
-      g.setRenderingHint(RenderingHints.KEY_RENDERING,     RenderingHints.VALUE_RENDER_QUALITY)
-      g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
-      g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,  RenderingHints.VALUE_ANTIALIAS_ON)
-      g.drawImage(img, 0, 0, destW, destH, null)
+      g.setRenderingHint(RenderingHints.KEY_RENDERING,       RenderingHints.VALUE_RENDER_QUALITY)
+      g.setRenderingHint(RenderingHints.KEY_COLOR_RENDERING, RenderingHints.VALUE_COLOR_RENDER_QUALITY)
+      g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,   RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+      g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,    RenderingHints.VALUE_ANTIALIAS_ON)
+      g.drawImage(img, 0, 0, w, h, null)
 
       g.dispose()
       img.flush()
@@ -110,8 +116,9 @@ class ImageLoader(url: java.net.URL, callback: BufferedImage => Unit, resizeTo: 
     }
   }
   
-  def calcSize(target: (Int, Int), w: Int, h: Int): (Int, Int) = {
-    val ratio = w.toDouble / h
+  def calcSize(actual: (Int, Int), target: (Int, Int)): (Int, Int) = {
+    val (actualW, actualH) = actual
+    val ratio = actualW.toDouble / actualH
     target match {
       case (w, -1) => (w, (w / ratio).toInt) 
       case (-1, h) => ((h * ratio).toInt, h)
@@ -123,13 +130,13 @@ class ImageLoader(url: java.net.URL, callback: BufferedImage => Unit, resizeTo: 
 class CachingImageLoader(url: java.net.URL, callback: BufferedImage => Unit, resize: Option[(Int,Int)] = None) extends Task[Unit] with Logging {
   val logID = "CachingImageLoader(" + url.toExternalForm + ")"
   
-  val loader = new ImageLoader(url, cachePutCallback _, resize)
   val cache = new ImageCache
+  lazy val loader = new ImageLoader(url, cachePutCallback _, resize)
   
   val key = url.toExternalForm + { resize match {
-    case Some((w, -1)) => "___w"+w
-    case Some((-1, h)) => "___h"+h
-    case Some((w, h))  => "___w"+w+"h"+h
+    case Some((w, -1)) => "___W"+w
+    case Some((-1, h)) => "___H"+h
+    case Some((w, h))  => "___W"+w+"H"+h
     case None          => ""
   }}
 
@@ -150,7 +157,9 @@ class CachingImageLoader(url: java.net.URL, callback: BufferedImage => Unit, res
     }
 
   def cachePutCallback(img: BufferedImage): Unit = {
+    trace("PUT")
     cache put (key, img)
+    
     callback(img)
   }
 }
