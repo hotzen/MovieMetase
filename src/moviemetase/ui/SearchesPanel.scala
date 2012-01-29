@@ -12,15 +12,13 @@ case class SearchRow(searching: Boolean, term: String, dir: String, file: String
 case class SearchSelected(row: SearchRow) extends Event
 
 class SearchesPanel(val top: UI) extends ScrollPane {
-  //border = createBorder("Searches")
-    
   val cols = 
-    SmartTableCol(" ", 40) ::
-    SmartTableCol("Movies found", 50)   ::
-    SmartTableCol("Term", 100)          ::
-    SmartTableCol("Directory", 300)     ::
-    SmartTableCol("File", 300)          ::
-    SmartTableCol("Full Path", 100)     ::
+    TableCol(" ", 40) ::
+    TableCol("Movies found", 50)   ::
+    TableCol("Term", 100)          ::
+    TableCol("Directory", 250)     ::
+    TableCol("File", 250)          ::
+    TableCol("Full Path", 400)     ::
     Nil
 
   def getStatusIcon(row: SearchRow): ImageIcon = {
@@ -32,8 +30,8 @@ class SearchesPanel(val top: UI) extends ScrollPane {
 
     new ImageIcon( App.resource("/res/" + icon) )
   }
-    
-  val mdl = new SmartTableModel[SearchRow](cols)
+
+  val mdl = new TableModel[SearchRow](cols)
   
   val tbl = new Table {
     model    = mdl 
@@ -59,14 +57,9 @@ class SearchesPanel(val top: UI) extends ScrollPane {
       rdr.componentFor(this, sel, foc, o, row, col)
     }
   }
-  
-  val colMdl = tbl.peer.getColumnModel 
-  for ( (col,idx) <- cols.zipWithIndex) {
-    colMdl.getColumn(idx).setPreferredWidth( col.width )
-  }
+  mdl registerColumnSettingsWith tbl
   
   contents = tbl
-//  mdl.setPrefSize(tbl, 100)
   
   listenTo( tbl.selection )
   listenTo( top.dropPanel )

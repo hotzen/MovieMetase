@@ -60,7 +60,8 @@ object UI {
       case e:Exception => None
     }
   
-  val SelectionColor = new Color(139, 209, 46)
+  val SelectionColor = new Color(139, 209, 46) // #8BD12E
+  
   val SelectionBorder = BorderFactory.createMatteBorder(3, 3, 3, 3, SelectionColor)
 }
 

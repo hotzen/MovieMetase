@@ -43,32 +43,45 @@ class MoviesPanel(val top: UI) extends FS_ScrollPane {
       </h1>
       <div class="genres-directors-actors">
         <span class="genres">
-          { movie.infos.collect({ case MovieInfos.Genre(genre) => genre }).mkString("Genres: ", ", ", "") }
+          <span class="label">Genres:</span>
+          { for (info <- movie.infos.collect({ case i:MovieInfos.Genre => i })) yield {
+            <span class="genre">{ info.name }</span>
+          }}
         </span>
         <span class="directors">
-          { movie.infos.collect({ case MovieInfos.Director(director) => director }).mkString("Director: ", ", ", "") }
+          <span class="label">Director:</span>
+          { for (info <- movie.infos.collect({ case i:MovieInfos.Director => i })) yield {
+            <span class="director">{ info.name }</span>
+          }}
         </span>
         <span class="actors">
-          { movie.infos.collect({ case MovieInfos.Actor(name, x) => name }).mkString("Actors: ", ", ", "") }
+          <span class="label">Actors:</span>
+          { for (info <- movie.infos.collect({ case i:MovieInfos.Actor => i })) yield {
+            <span class="actor">{ info.name }</span>
+          }}
         </span>
       </div>
-      {for (desc <- movie.infos.collect({ case MovieInfos.Description(text) => text })) yield {
-        <blockquote class="description">\u00AB { desc } \u00BB</blockquote>
+      {for (info <- movie.infos.collect({ case i:MovieInfos.Description => i})) yield {
+        <blockquote class="description">\u00AB { info.text } \u00BB</blockquote>
       }}
-      {for (summary <- movie.infos.collect({ case MovieInfos.Summary(text) => text })) yield {
-        <blockquote class="summary">\u00AB { summary } \u00BB</blockquote>
+      {for (info <- movie.infos.collect({ case i:MovieInfos.Summary => i })) yield {
+        <blockquote class="summary">\u00AB { info.text } \u00BB</blockquote>
       }}
       <div class="webpages">
-        { for (url <- movie.infos.collect({ case i:MovieInfos.Website => i.page })) yield {
+        { for (info <- movie.infos.collect({ case i:MovieInfos.Website => i })) yield {
+          val url = info.page
           val host = url.getHost
           val label = if (host startsWith "www.") host.substring(4)
                       else host
+
           <a href={ url.toExternalForm }>{ label }</a>
         }}
       </div>
       <div style="clear: both;" />
     </div>
   
+  def selector(m: Movie, i: MovieInfo): String = m.id + "/" + i.id
+
   val movies = scala.collection.mutable.Map[String, Movie]()
         
   val uac = new FS_UserAgent
@@ -79,9 +92,20 @@ class MoviesPanel(val top: UI) extends FS_ScrollPane {
   panel.addMouseTrackingListener( new CursorListener )
   panel.addMouseTrackingListener( new FS_MouseListener {
     
-    override def select(panel: BasicPanel, id: String, elem: Element): Unit = movies.get(id) match {
-      case Some(movie) => MoviesPanel.this.publish( MovieSelected(movie) ) 
-      case None => println("MoviePanel selected Non-Movie ?!")
+    override def select(panel: FS_Panel, id: String, elem: Element): Unit = {
+      val nsh = panel.getSharedContext.getNamespaceHandler
+
+      toggleCssClass(elem, "selected", nsh)
+      
+      panel.reload()
+      panel.relayout()
+      
+      println("MoviesPanel.select(" + id + ")")
+      
+      movies.get(id) match {
+        case Some(movie) => MoviesPanel.this.publish( MovieSelected(movie) ) 
+        case None => println("no movie")
+      }
     }
   })
   

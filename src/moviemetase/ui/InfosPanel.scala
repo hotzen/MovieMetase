@@ -55,6 +55,9 @@ class InfoPostersPanel(val top: UI) extends ScrollPane {
   
   contents = new ScrollablePanel {
     peer.setLayout( new BoxLayout(peer, BoxLayout.Y_AXIS) )
+    
+    scrollIncrement = 100
+    
     contents += panel
   }
     
@@ -72,7 +75,7 @@ class InfoPostersPanel(val top: UI) extends ScrollPane {
   
   reactions += {
     case SearchSelected(row) => {
-      println("InfosPanel: SearchSelected " + row)
+      println("InfoPostersPanel: SearchSelected " + row)
       row.movies.headOption match {
         case Some(movie) => render( movie.infos )
         case None =>
@@ -80,18 +83,18 @@ class InfoPostersPanel(val top: UI) extends ScrollPane {
     }
       
     case MovieSelected(movie) => {
-      println("InfosPanel: MovieSelected " + movie)
+      println("InfoPostersPanel: MovieSelected " + movie)
       render( movie.infos )
     }
     
     case JSelected(comp) => comp match {
-      case img:JImage => println("selected " + img.url)
-      case _ => println("selected something")
+      case img:JImage => println("InfoPostersPanel selected " + img.url)
+      case _ => println("InfoPostersPanel selected something")
     }
     
     case JUnselected(comp) => comp match {
-      case img:JImage => println("unselected " + img.url)
-      case _ => println("unselected something")
+      case img:JImage => println("InfoPostersPanelunselected " + img.url)
+      case _ => println("InfoPostersPanel unselected something")
     }
   }
 }
@@ -112,6 +115,9 @@ class InfoBackdropsPanel(val top: UI) extends ScrollPane {
   
   contents = new ScrollablePanel {
     peer.setLayout( new BoxLayout(peer, BoxLayout.Y_AXIS) )
+    
+    scrollIncrement = 100
+    
     contents += panel
   }
     
@@ -129,7 +135,7 @@ class InfoBackdropsPanel(val top: UI) extends ScrollPane {
   
   reactions += {
     case SearchSelected(row) => {
-      println("InfosPanel: SearchSelected " + row)
+      println("InfoBackdropsPanel: SearchSelected " + row)
       row.movies.headOption match {
         case Some(movie) => render( movie.infos )
         case None =>
@@ -137,18 +143,18 @@ class InfoBackdropsPanel(val top: UI) extends ScrollPane {
     }
       
     case MovieSelected(movie) => {
-      println("InfosPanel: MovieSelected " + movie)
+      println("InfoBackdropsPanel: MovieSelected " + movie)
       render( movie.infos )
     }
     
     case JSelected(comp) => comp match {
-      case img:JImage => println("selected " + img.url)
-      case _ => println("selected something")
+      case img:JImage => println("InfoBackdropsPanel selected " + img.url)
+      case _ => println("InfoBackdropsPanel selected something")
     }
     
     case JUnselected(comp) => comp match {
-      case img:JImage => println("unselected " + img.url)
-      case _ => println("unselected something")
+      case img:JImage => println("InfoBackdropsPanel unselected " + img.url)
+      case _ => println("InfoBackdropsPanel unselected something")
     }
   }
 }

@@ -79,7 +79,7 @@ object OpenSubtitles {
     override val RequestSendData = Some( (os:OutputStream) => {
       val pw = new PrintWriter( os )
 
-      val imdbID = imdb.id.drop(2) // skip leading "tt" of ID
+      val imdbID = imdb.imdbID.drop(2) // skip leading "tt" of ID
       val searchStruct = ("sublanguageid" -> language) :: ("imdbid" -> imdbID) :: Nil
       val searches = Array( searchStruct )
       val rpc = XmlRpc.methodCall("SearchSubtitles", token :: searches :: Nil)

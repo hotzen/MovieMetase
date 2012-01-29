@@ -4,7 +4,7 @@ package ui
 import org.xhtmlrenderer.simple.{XHTMLPanel, FSScrollPane}
 import java.net.{URI, URL}
 import java.io.File
-import org.w3c.dom.{Element => DOM_Element}
+import org.w3c.dom.{Element => DOM_Element, Text => DOM_Text}
 import org.xhtmlrenderer.layout.LayoutContext
 import org.xhtmlrenderer.simple.extend.FormSubmissionListener
 import org.xhtmlrenderer.swing._
@@ -18,6 +18,7 @@ import java.awt.Dimension
 import java.awt.image.BufferedImage
 import org.w3c.dom._
 import scala.swing.Publisher
+import javax.swing.JCheckBox
 
 object FlyingSaucer {
 
@@ -69,17 +70,21 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
     val ns = ctx.getNamespaceHandler
     val elem = box.getElement
     
+    if (elem == null)
+      return null
+    
     if (ns isImageElement elem)
       replaceImage(ctx, box, uac, elem, w, h)
+    else if (elem.getTagName == "input")
+      replaceInput(ctx, box, uac, elem, w, h)
     else
       null
   }
     
   def replaceImage(ctx: LayoutContext, box: BlockBox, uac: UserAgentCallback, elem: DOM_Element, w: Int, h: Int): ReplacedElement = {
     val ns = ctx.getNamespaceHandler 
+    
     val src = ns.getImageSourceURI(elem);
-    //println("FS_ReplacedElementFactory.replaceImage '" + src + "' w="+w+" h="+h)
-
     if (src == null)
       throw new NullPointerException("NULL img.src")
     
@@ -109,7 +114,8 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
             val loader = new CachingImageLoader(url, imageLoadedCallback, Some(resizeTo))
             loader.submit()
             
-            new ImageReplacedElement(LoadingImg, w, h)
+            //new ImageReplacedElement(LoadingImg, w, h)
+            new ImageReplacedElement(LoadingImg, 0, 0) // don't rescale again
           }
         }
       }
@@ -127,6 +133,35 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
       
       new ImageReplacedElement(img, w, h)
     }
+  }
+  
+  def replaceInput(ctx: LayoutContext, box: BlockBox, uac: UserAgentCallback, elem: DOM_Element, w: Int, h: Int): ReplacedElement = {
+    val ns = ctx.getNamespaceHandler
+    
+    val n = ns.getAttributeValue(elem, "name")
+    val v = ns.getAttributeValue(elem, "value")
+    
+    ns.getAttributeValue(elem, "type") match {
+      case "checkbox" => {
+        val label = getParentText(elem).getOrElse("")
+        val sel   = (elem.getAttributeNode("checked") != null)
+        
+        val checkbox = new JCheckBox(label, sel)
+        new SwingReplacedElement(checkbox)
+      }
+      case x => throw new UnsupportedOperationException("<input type="+x+" /> is unsupported")
+    }
+  }
+  
+  def getParentText(elem: DOM_Element): Option[String] = {
+    val text = elem.getParentNode.getTextContent.trim
+    
+    println("text of " + elem.getTagName + ": " + text)
+    
+    if (text.length > 0)
+      Some(text)
+    else
+      None
   }
 
   def reset(): Unit = {
@@ -147,7 +182,7 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
 class FS_MouseListener extends DefaultFSMouseListener {
   import org.w3c.dom._
   
-  def link(panel: BasicPanel, uri: URI, elem: Element): Unit = {
+  def link(panel: FS_Panel, uri: URI, elem: Element): Unit = {
     val scheme = uri.getScheme
 
     scheme match {
@@ -160,39 +195,10 @@ class FS_MouseListener extends DefaultFSMouseListener {
           desktop.open( new java.io.File(uri) )
 
       case x => println("unknown scheme " + x)
-
-//      case "download" => {
-//        import scala.swing.FileChooser
-//        //import javax.swing.filechooser.FileFilter
-//        
-//        //XXX
-//        //val parts = uri.getSchemeSpecificPart()
-//        
-//        val url = new URL( "http:" + parts )
-//        
-//        val baseDir = new File("/")
-//        val fc = new FileChooser(baseDir)
-//        //fc.fileFilter = new FileFilter
-//        fc.fileSelectionMode = FileChooser.SelectionMode.FilesOnly
-//        fc.multiSelectionEnabled = false
-//        fc.showSaveDialog(null) match {
-//          case FileChooser.Result.Approve => {
-//             val f = fc.selectedFile
-//             val task = new DownloadTask(url, f)
-//             task.submit()
-//          }
-//          case _ =>
-//        }
-//        ()
-//      }
-//      
-//      case "display" => 
     }
   }
   
-  def select(panel: BasicPanel, id: String, elem: Element): Unit = {
-    println("selected " + id + " / " + elem)
-  }
+  def select(panel: FS_Panel, id: String, elem: Element): Unit = { }
   
   override def onMouseUp(panel: BasicPanel, box: Box): Unit = {
     if (box == null)
@@ -205,10 +211,10 @@ class FS_MouseListener extends DefaultFSMouseListener {
     val nsh = panel.getSharedContext.getNamespaceHandler
     
     findLink(elem, nsh) match {
-      case Some( (uri, elem) ) => link(panel, uri, elem)
+      case Some( (uri, elem) ) => link(panel.asInstanceOf[FS_Panel], uri, elem)
       
       case None => findSelectable(elem, nsh) match {
-        case Some( (id, elem) ) => select(panel, id, elem)
+        case Some( (id, elem) ) => select(panel.asInstanceOf[FS_Panel], id, elem)
         case None => 
       }
     }
@@ -238,22 +244,7 @@ class FS_MouseListener extends DefaultFSMouseListener {
       case id   => Some( (id,elem) )
     }
   }
-  
-/*
-  implicit def TraversableNodeList(nodes: NodeList): Traversable[Node] = new Iterable[Node] {
-    var i = 0
-    def iterator = new Iterator[Node] {
-      def hasNext = (i < nodes.getLength)
-      def next = {
-        val e = nodes.item(i)
-        i = i + 1
-        e
-      }
-      override def hasDefiniteSize = true
-      override def isTraversableAgain = true
-    }
-  }
-  
+
   def cssClasses(elem: Element, nsh: NamespaceHandler): List[String] =
     nsh.getClass(elem) match {
       case null  => Nil
@@ -261,7 +252,7 @@ class FS_MouseListener extends DefaultFSMouseListener {
     }
 
   def toggleCssClass(elem: Element, clazz: String, nsh: NamespaceHandler): List[String] = {
-    val classes = getCssClasses(elem, nsh)
+    val classes = cssClasses(elem, nsh)
     val newClasses =
       if (classes contains clazz)
         classes.filter(_ != clazz)
@@ -271,5 +262,4 @@ class FS_MouseListener extends DefaultFSMouseListener {
     elem.setAttribute("class", newClasses.mkString(" "))
     newClasses
   }
-*/
 }

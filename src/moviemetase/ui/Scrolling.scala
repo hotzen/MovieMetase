@@ -12,8 +12,8 @@ import scala.swing.Panel
 
 class ScrollablePanel extends Panel with SequentialContainer.Wrapper with Scrollable.Wrapper {
   
-  val scrollIncrement: Int = 10
-  val blockScrollIncrement: Int = 50
+  var scrollIncrement: Int = 10
+  var blockScrollIncrement: Int = 50
   
   val allowVerticalScrolling: Boolean   = true
   val allowHorizontalScrolling: Boolean = false

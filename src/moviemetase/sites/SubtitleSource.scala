@@ -83,7 +83,7 @@ object SubtitleSource {
             val moviePage = subInfo.moviePage.get
             movieInfos append MovieInfos.IMDB(
               moviePage.imdbID
-            ).withSourceInfo( moviePage.moviePage.toString )
+            ) //.withSourceInfo( moviePage.moviePage.toString )
           }
           
           movieInfos.toList

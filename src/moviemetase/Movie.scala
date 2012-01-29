@@ -1,6 +1,7 @@
 package moviemetase
 
 import java.net.URL
+import scala.collection.mutable.Set
 
 object Movie {
   
@@ -60,14 +61,16 @@ object Movie {
 
 case class Movie(title: String, year: Int, infos: List[MovieInfo] = Nil) {
   
-  val label = title + "/" + year
+  def id: String = hashCode.toString //title + "@" + year
   
-  var attributedTo: Option[String] = None
-  def attributeTo(s: String): Movie = {
-    attributedTo = Some(s)
-    this
-  }
+  def label: String = title + "/" + year
   
+//  var attributedTo: Option[String] = None
+//  def attributeTo(s: String): Movie = {
+//    attributedTo = Some(s)
+//    this
+//  }
+    
   def withNewInfos(infos2: List[MovieInfo]): Movie =
     Movie(title, year, (infos ::: infos2).distinct)
     
@@ -100,14 +103,15 @@ case class Movie(title: String, year: Int, infos: List[MovieInfo] = Nil) {
 }
 
 trait MovieInfo {
-  val order: Int
+  def order: Int
+  def id: String = hashCode.toString
   
-  var source: String = ""
-  
-  def withSourceInfo(info: String): this.type = {
-    source = info
-    this
-  }
+//  var source: String = ""
+//  
+//  def withSourceInfo(info: String): this.type = {
+//    source = info
+//    this
+//  }
 }
 
 
@@ -129,19 +133,14 @@ object MovieInfos {
   case class Description(text: String) extends MovieInfo { val order = 30 }
   case class Summary(text: String) extends MovieInfo { val order = 31 }
     
-  //case class Rating(rating: Double, max: Double) extends MovieInfo
-  //case class ImdbRating(rating: Double) extends MovieInfo
-      
-  case class IMDB(id: String, rating: Option[Double] = None) extends MovieInfo with Website {
+  case class IMDB(imdbID: String, rating: Option[Float] = None) extends MovieInfo with Website {
     val order: Int = 80
-    
-    lazy val page: URL = new URL( "http://www.imdb.com/title/" + id + "/" )
+    lazy val page: URL = new URL( "http://www.imdb.com/title/" + imdbID + "/" )
   }
   
-  case class TMDB(id: String) extends MovieInfo with Website {
+  case class TMDB(tmdbID: String, rating: Option[Float] = None) extends MovieInfo with Website {
     val order: Int = 81
-    
-    lazy val page: URL = new URL( "http://www.themoviedb.org/movie/" + id )
+    lazy val page: URL = new URL( "http://www.themoviedb.org/movie/" + tmdbID )
   }
   
   case class Thumbnail(url: URL) extends MovieInfo with Image {
@@ -151,7 +150,6 @@ object MovieInfos {
   
   case class Poster(url: URL, preview: Option[URL] = None) extends MovieInfo with Image { val order = 51 }
   case class Backdrop(url: URL, preview: Option[URL] = None) extends MovieInfo with Image { val order = 52 }
-    
   
   case class Subtitle(label: String, lang: String, page: URL, url: URL) extends MovieInfo with Website with Downloadable { val order = 60 }  
   case class Trailer(label: String, page: URL) extends MovieInfo with Website { val order = 70 }
