@@ -130,7 +130,7 @@ object MovieInfos {
   case class Producer(name: String) extends MovieInfo { val order = 22 }
   case class Writer(name: String)   extends MovieInfo { val order = 23 }
   
-  case class Description(text: String) extends MovieInfo { val order = 30 }
+  case class Tagline(text: String) extends MovieInfo { val order = 30 }
   case class Summary(text: String) extends MovieInfo { val order = 31 }
     
   case class IMDB(imdbID: String, rating: Option[Float] = None) extends MovieInfo with Website {

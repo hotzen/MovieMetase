@@ -61,7 +61,7 @@ class MoviesPanel(val top: UI) extends FS_ScrollPane {
           }}
         </span>
       </div>
-      {for (info <- movie.infos.collect({ case i:MovieInfos.Description => i})) yield {
+      {for (info <- movie.infos.collect({ case i:MovieInfos.Tagline => i})) yield {
         <blockquote class="description">\u00AB { info.text } \u00BB</blockquote>
       }}
       {for (info <- movie.infos.collect({ case i:MovieInfos.Summary => i })) yield {

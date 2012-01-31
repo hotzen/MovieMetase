@@ -60,9 +60,9 @@ object IMDB {
         warn("Could not extract Title!")
       
       
-      // description    
+      // tagline    
       for ( (name,value) <- metas if name == "description")
-        infos append MovieInfos.Description(value)
+        infos append MovieInfos.Tagline(value)
 
       
       // thumbnails

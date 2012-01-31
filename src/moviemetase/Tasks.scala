@@ -13,8 +13,8 @@ import java.io.File
 import java.io.IOException
 
 object TaskManager {
-  private val CorePoolSize  = 4
-  private val MaxPoolSize   = Integer.MAX_VALUE
+  private val CorePoolSize  = 8
+  private val MaxPoolSize   = 16
   private val KeepAliveTime = 60L
   private val KeepAliveUnit = TimeUnit.SECONDS
   private val Queue         = new SynchronousQueue[Runnable]()
@@ -26,8 +26,8 @@ object TaskManager {
 
     def newThread(r: Runnable): Thread = {
       val t = new Thread(r)
-      t.setName( "T" + "%02d".format( counter.incrementAndGet() ) )
-            
+      val id = counter.incrementAndGet()
+      t.setName( "T" + "%02d".format( id ) )
       t.setDaemon( false )
       t.setPriority( Thread.NORM_PRIORITY )
       t
@@ -59,7 +59,7 @@ object TaskManager {
         
   def submit[A](task: Task[A]): Future[A] = {
     publishMoreTasks()
-    executor submit new CompletionPublisher(task)
+    executor submit new CompletionCallbackTask(task)
   }
         
   private val counter = new AtomicInteger(0)
@@ -67,7 +67,7 @@ object TaskManager {
   
   case class ActiveTasks(tasks: Int) extends scala.swing.event.Event
   
-  private class CompletionPublisher[A](task: Task[A]) extends Callable[A] {
+  private class CompletionCallbackTask[A](task: Task[A]) extends Callable[A] {
     def call(): A =
       try     task.execute()
       finally publishLessTasks()
@@ -85,6 +85,7 @@ object Task {
 }
 
 trait Task[A] extends Callable[A] {
+    
   // executes the task synchronously
   def execute(): A
   
@@ -94,36 +95,86 @@ trait Task[A] extends Callable[A] {
   // submits the task for concurrent execution
   final def submit(): Future[A] = TaskManager submit this
   
-  // create a new task that executes <this> and then <next>
-  final def then[B](next: Task[B]): Task[B] = new SerialTask[B](this, next)
-  
-  // create a new task that executes <this> and then forks the tasks produced by <f>
-  final def thenFork[B](f: A => List[Task[B]]): Task[List[B]] = new ForkingTask[A,B](this, f)
-}
-
-class SerialTask[B](val t1: Task[_], val t2: Task[B]) extends Task[B] {
-  final def execute(): B = {
-    t1.execute()
-    t2.execute()
-  }
-}
-
-class ForkingTask[A,B](val t: Task[A], val f: A => List[Task[B]]) extends Task[List[B]] {
-  final def execute(): List[B] = {
-     
-    val res: A = t.execute()
-    
-    // new tasks
-    val ts = f( res )
+  final def forkJoin[B](ts: Traversable[Task[B]]): List[B] = {
     if (ts.isEmpty)
       return Nil
     
-    // fork/join
     val futs = ts.tail.map( _.submit() )
-    val res2 = ts.head.execute()
-    res2 :: futs.map( _.get() )
+    val res  = ts.head.execute()
+    val res2 = futs.map( _.get() ).toList
+    
+    res :: res2
   }
 }
+
+//  // create a new task that executes <this> and then <next>
+//  final def then[B](next: Task[B]): Task[B] = new SerialTask[B](this, next)
+//  
+//  // create a new task that executes <this> and then forks the tasks produced by <f>
+//  final def thenFork[B](f: A => List[Task[B]]): Task[List[B]] = new ForkingTask[A,B](this, f)
+//
+//class SerialTask[B](val t1: Task[_], val t2: Task[B]) extends Task[B] {
+//  final def execute(): B = {
+//    t1.execute()
+//    t2.execute()
+//  }
+//}
+//
+//class ForkingTask[A,B](val t: Task[A], val f: A => List[Task[B]]) extends Task[List[B]] {
+//  final def execute(): List[B] = {
+//     
+//    val res: A = t.execute()
+//    
+//    // new tasks
+//    val ts = f( res )
+//    if (ts.isEmpty)
+//      return Nil
+//    
+//    // fork/join
+//    val futs = ts.tail.map( _.submit() )
+//    val res2 = ts.head.execute()
+//    res2 :: futs.map( _.get() )
+//  }
+//}
+
+//trait ConnectionTask {
+//  
+//  // host to which the connection is made
+//  def host: String
+//}
+//
+//class HostConnectionProcessor extends Task[Unit] {
+//  val q = new ConcurrentLinkedQueue[Task[_]]
+//    
+//  def execute(): Unit = {
+//    
+//  }
+//  
+//  def submit(t: ConnectionTask): Unit = {
+//    q offer t
+//  }
+//}
+
+
+//object HostConnection {
+//  import scala.collection.mutable.Map
+//  
+//  val Limit = 4
+//  val Fair  = true
+//  
+//  val sems = Map[String, Semaphore]()
+//  
+//  def getSemaphore(host: String): Semaphore = sems.synchronized {
+//    sems get host match {
+//      case Some(sem) => sem
+//      case None => {
+//        val sem = new Semaphore(Limit, Fair)
+//        sems put (host, sem)
+//        sem
+//      }
+//    }
+//  }
+//}
 
 
 // Task processing an HTTP-URL
@@ -131,6 +182,9 @@ trait HttpTask[A] extends Task[A] {
   
   // url to process
   def url: URL
+  
+  // ConnectionTask 
+  def host = url.getHost
   
   // processor of the response
   def process(is: InputStream): A
@@ -173,16 +227,16 @@ trait HttpTask[A] extends Task[A] {
     
     for ((propName, propValue) <- RequestProperties)
       conn setRequestProperty (propName, propValue)
-    
-    conn.connect()
-    
-    RequestSendData match {
-      case Some(f) => f( conn.getOutputStream )
-      case None    => // request-parameters only encoded in URL
-    }
-
+  
     var in: InputStream = null
     try {
+      conn.connect()
+      
+      RequestSendData match {
+        case Some(f) => f( conn.getOutputStream )
+        case None    => // request-parameters only encoded in URL
+      }
+      
       val respCode = conn.getResponseCode
       
       if (respCode != HttpURLConnection.HTTP_OK)
@@ -207,11 +261,17 @@ trait HttpTask[A] extends Task[A] {
     }
   }
   
-  def cleanCloseInputStream(is: InputStream): Unit =
+  def cleanCloseInputStream(is: InputStream): Unit = {
+    if (is == null)
+      return ()
+    
     try {
       while (is.read() > 0) {}
       is.close()
-    } catch { case e:Exception => }
+    } catch {
+      case e:Exception =>
+    }
+  }
 }
 
 
@@ -237,6 +297,7 @@ trait XmlTask[A] extends HttpTask[A] {
 trait XhtmlTask[A] extends HttpTask[A] {
   import org.xml.sax.helpers.XMLReaderFactory
   import nu.xom.Builder
+  import nu.xom.Document
   
   val TagsoupParser = "org.ccil.cowan.tagsoup.Parser"
   
@@ -248,18 +309,19 @@ trait XhtmlTask[A] extends HttpTask[A] {
     process(doc)
   }
   
-  def process(doc: nu.xom.Document): A
+  def process(doc: Document): A
 }
 
 trait HtmlTask[A] extends HttpTask[A] {
   import org.jsoup.Jsoup
+  import org.jsoup.nodes.Document
     
   final def process(in: InputStream): A = {
     val doc = Jsoup.parse(in, null /* "UTF-8" */, url.toString) 
     process(doc)
   }
   
-  def process(doc: org.jsoup.nodes.Document): A
+  def process(doc: Document): A
 }
 
 case class DownloadTask(from: URL, to: File) extends Task[(URL,File)] with Logging {
@@ -267,7 +329,7 @@ case class DownloadTask(from: URL, to: File) extends Task[(URL,File)] with Loggi
   import java.nio.channels.{Channels, ReadableByteChannel, FileChannel}
   import scala.util.control.Exception
   
-  val logID = "DownloadTask(" + from.toExternalForm + " => " + to + ")"
+  val logID = "DownloadTask(" + from.toExternalForm + " => " + to.getAbsolutePath + ")"
   
   def execute(): (URL, File) = {
     var is: InputStream = null
@@ -278,7 +340,7 @@ case class DownloadTask(from: URL, to: File) extends Task[(URL,File)] with Loggi
       is = from.openStream()
       val ich = Channels.newChannel( is )
       
-      trace("opening target-file ...")
+      trace("opening & locking target-file ...")
       os = new FileOutputStream( to )
       val och = os.getChannel()
       och.lock()
@@ -288,6 +350,7 @@ case class DownloadTask(from: URL, to: File) extends Task[(URL,File)] with Loggi
       
       info("successfully downloaded")
       (from, to)
+    
     } finally {
       try is.close() catch { case _ => }
       try os.close() catch { case _ => }

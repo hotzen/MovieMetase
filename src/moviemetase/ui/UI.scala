@@ -121,7 +121,7 @@ class UI extends Frame {
       MovieInfos.Director("Christopher Nolan") ::
       MovieInfos.IMDB("tt1375666") :: 
       MovieInfos.TMDB("27205") ::
-      MovieInfos.Description("In a world where technology exists to enter the human mind through dream invasion, a highly skilled thief is given a final chance at redemption which involves executing his toughest job to date: Inception.") ::
+      MovieInfos.Tagline("In a world where technology exists to enter the human mind through dream invasion, a highly skilled thief is given a final chance at redemption which involves executing his toughest job to date: Inception.") ::
       MovieInfos.Poster(new URL("http://ia.media-imdb.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1._SX640_SY948_.jpg") ) ::
       MovieInfos.Poster(new URL("http://cf2.imgobject.com/t/p/original/ajRNzCiXHBMYmA6kswjMyiqRLVT.jpg") ) ::
       MovieInfos.Poster(new URL("http://cf2.imgobject.com/t/p/original/uUoE76P0bkyBpDKcAY0B5SE2EnR.jpg") ) ::
