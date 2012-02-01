@@ -71,8 +71,10 @@ class JImage(val url: URL, resizeTo: Option[(Int, Int)], parLoad: Boolean = true
 }
 
 
-class ImageLoader(url: java.net.URL, callback: BufferedImage => Unit, resizeTo: Option[(Int,Int)] = None) extends Task[Unit] with Logging {
+class ImageLoader(url: java.net.URL, callback: BufferedImage => Unit, resizeTo: Option[(Int,Int)] = None) extends Task[Unit] with IOTask with Logging {
   val logID = "ImageLoader(" + url.toExternalForm + ")"
+  
+  val target = url.getHost
   
   def execute(): Unit =
     try {
@@ -127,8 +129,10 @@ class ImageLoader(url: java.net.URL, callback: BufferedImage => Unit, resizeTo: 
   }
 }
 
-class CachingImageLoader(url: java.net.URL, callback: BufferedImage => Unit, resize: Option[(Int,Int)] = None) extends Task[Unit] with Logging {
+class CachingImageLoader(url: java.net.URL, callback: BufferedImage => Unit, resize: Option[(Int,Int)] = None) extends Task[Unit] with IOTask with Logging {
   val logID = "CachingImageLoader(" + url.toExternalForm + ")"
+  
+  val target = url.getHost
   
   val cache = new ImageCache
   lazy val loader = new ImageLoader(url, cachePutCallback _, resize)

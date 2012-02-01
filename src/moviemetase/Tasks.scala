@@ -12,39 +12,84 @@ import scala.swing.Publisher
 import java.io.File
 import java.io.IOException
 
-object TaskManager {
-  private val CorePoolSize  = 8
-  private val MaxPoolSize   = 16
-  private val KeepAliveTime = 60L
-  private val KeepAliveUnit = TimeUnit.SECONDS
-  private val Queue         = new SynchronousQueue[Runnable]()
-  
-  private val RejectedExecHandler = new AbortPolicy()
-  
-  private val ThreadFactory = new ThreadFactory {
-    val counter = new AtomicInteger(0)
+case class TaskThreadFactory(prefix: String, daemon: Boolean = false, priority: Int = Thread.NORM_PRIORITY) extends ThreadFactory {
+  val counter = new AtomicInteger(0)
 
-    def newThread(r: Runnable): Thread = {
-      val t = new Thread(r)
-      val id = counter.incrementAndGet()
-      t.setName( "T" + "%02d".format( id ) )
-      t.setDaemon( false )
-      t.setPriority( Thread.NORM_PRIORITY )
-      t
+  def newThread(r: Runnable): Thread = {
+    val id = counter.incrementAndGet()
+    val name = prefix + "%02d".format( id )
+    
+    val t = new Thread(r)
+    t setName name
+    t setDaemon daemon
+    t setPriority priority
+    
+    t
+  }
+}
+
+object TaskManager {
+//  private val CorePoolSize  = 8
+//  private val MaxPoolSize   = 16
+//  private val KeepAliveTime = 60L
+//  private val KeepAliveUnit = TimeUnit.SECONDS
+//  private val Queue         = new SynchronousQueue[Runnable]()
+//  
+//  private val RejectedExecHandler = new AbortPolicy()
+//  
+//  private val ThreadFactory = new ThreadFactory {
+//    val counter = new AtomicInteger(0)
+//
+//    def newThread(r: Runnable): Thread = {
+//      val t = new Thread(r)
+//      val id = counter.incrementAndGet()
+//      t.setName( "T" + "%02d".format( id ) )
+//      t.setDaemon( false )
+//      t.setPriority( Thread.NORM_PRIORITY )
+//      t
+//    }
+//  }
+//  
+//  private val executor: ExecutorService =
+//    new ThreadPoolExecutor(
+//      CorePoolSize, MaxPoolSize,
+//      KeepAliveTime, KeepAliveUnit,
+//      Queue, ThreadFactory, 
+//      RejectedExecHandler
+//    )
+  
+  val MaxWorkerThreads = 4
+  val MaxIOThreads = 16
+  val MaxThreadsPerIOTarget = 4
+
+  val workerPool = Executors.newFixedThreadPool(MaxWorkerThreads, TaskThreadFactory("WORK_") )
+  val ioPools    = scala.collection.mutable.Map[String, ExecutorService]()
+  //val ioPools    = Executors.newFixedThreadPool(MaxIOThreads)
+  //val ioSemaphores = scala.collection.mutable.Map[String, ExecutorService]()
+  val indispensablePool = Executors.newCachedThreadPool( TaskThreadFactory("JOIN_") )
+  
+  def ioPool(target: String): ExecutorService = ioPools.synchronized {
+    ioPools get target match {
+      case Some(pool) => pool
+      case None => {
+        val pool = Executors.newFixedThreadPool(MaxThreadsPerIOTarget, TaskThreadFactory("IO_" + target + "_"))
+        ioPools put (target, pool)
+        pool
+      }
     }
   }
   
-  private val executor: ExecutorService =
-    new ThreadPoolExecutor(
-      CorePoolSize, MaxPoolSize,
-      KeepAliveTime, KeepAliveUnit,
-      Queue, ThreadFactory, 
-      RejectedExecHandler
-    )
-     
   def shutdown(): Unit = {
-    executor.shutdownNow()
-    executor.awaitTermination(3, TimeUnit.SECONDS)
+    workerPool.shutdownNow()
+    workerPool.awaitTermination(3, TimeUnit.SECONDS)
+    
+    for ( (target, pool) <- ioPools) {
+      pool.shutdownNow()
+      pool.awaitTermination(3, TimeUnit.SECONDS)
+    }
+    
+    indispensablePool.shutdownNow()
+    indispensablePool.awaitTermination(3, TimeUnit.SECONDS)
   }
   
   private def publishMoreTasks(): Unit = {
@@ -56,10 +101,18 @@ object TaskManager {
     val cnt = counter.decrementAndGet()
     ui.UI.publish(progress)( ActiveTasks(cnt) )
   }
-        
-  def submit[A](task: Task[A]): Future[A] = {
-    publishMoreTasks()
-    executor submit new CompletionCallbackTask(task)
+    
+  def submit[A](task: Task[A]): Future[A] = task match {
+    case x:IndispensableTask =>
+      indispensablePool submit task
+
+    case io:IOTask =>
+      ioPool( io.target ) submit task
+
+    case _ => {
+      publishMoreTasks()
+      workerPool submit new CompletionCallbackTask(task)
+    }
   }
         
   private val counter = new AtomicInteger(0)
@@ -93,98 +146,46 @@ trait Task[A] extends Callable[A] {
   final def call(): A = execute()
   
   // submits the task for concurrent execution
-  final def submit(): Future[A] = TaskManager submit this
-  
-  final def forkJoin[B](ts: Traversable[Task[B]]): List[B] = {
+  def submit(): Future[A] = TaskManager submit this
+ 
+  // forks all tasks for asynchronous execution,
+  // then submits a special task that is joining the results and then executes the callback
+  def fork[B](ts: Traversable[Task[B]], callback: List[B] => Unit): Unit = {
     if (ts.isEmpty)
-      return Nil
+      return ()
+      
+    // execute one task directly
+    if (ts.tail.isEmpty) {
+      callback( ts.head.execute() :: Nil )
     
-    val futs = ts.tail.map( _.submit() )
-    val res  = ts.head.execute()
-    val res2 = futs.map( _.get() ).toList
-    
-    res :: res2
+    // execute multiple tasks asynchronously
+    // submit a special JoiningTask that joins the results, then calls back
+    } else {
+      val futs = ts.map( _.submit() )
+      new JoiningTask(futs, callback).submit()
+    }
   }
 }
 
-//  // create a new task that executes <this> and then <next>
-//  final def then[B](next: Task[B]): Task[B] = new SerialTask[B](this, next)
-//  
-//  // create a new task that executes <this> and then forks the tasks produced by <f>
-//  final def thenFork[B](f: A => List[Task[B]]): Task[List[B]] = new ForkingTask[A,B](this, f)
-//
-//class SerialTask[B](val t1: Task[_], val t2: Task[B]) extends Task[B] {
-//  final def execute(): B = {
-//    t1.execute()
-//    t2.execute()
-//  }
-//}
-//
-//class ForkingTask[A,B](val t: Task[A], val f: A => List[Task[B]]) extends Task[List[B]] {
-//  final def execute(): List[B] = {
-//     
-//    val res: A = t.execute()
-//    
-//    // new tasks
-//    val ts = f( res )
-//    if (ts.isEmpty)
-//      return Nil
-//    
-//    // fork/join
-//    val futs = ts.tail.map( _.submit() )
-//    val res2 = ts.head.execute()
-//    res2 :: futs.map( _.get() )
-//  }
-//}
+trait IOTask {
+  def target: String
+}
 
-//trait ConnectionTask {
-//  
-//  // host to which the connection is made
-//  def host: String
-//}
-//
-//class HostConnectionProcessor extends Task[Unit] {
-//  val q = new ConcurrentLinkedQueue[Task[_]]
-//    
-//  def execute(): Unit = {
-//    
-//  }
-//  
-//  def submit(t: ConnectionTask): Unit = {
-//    q offer t
-//  }
-//}
+trait IndispensableTask
 
-
-//object HostConnection {
-//  import scala.collection.mutable.Map
-//  
-//  val Limit = 4
-//  val Fair  = true
-//  
-//  val sems = Map[String, Semaphore]()
-//  
-//  def getSemaphore(host: String): Semaphore = sems.synchronized {
-//    sems get host match {
-//      case Some(sem) => sem
-//      case None => {
-//        val sem = new Semaphore(Limit, Fair)
-//        sems put (host, sem)
-//        sem
-//      }
-//    }
-//  }
-//}
-
+final class JoiningTask[A](ts: Traversable[Future[A]], callback: List[A] => Unit) extends Task[Unit] with IndispensableTask {
+  def execute(): Unit =
+    callback( ts.map( _.get() ).toList )
+}
 
 // Task processing an HTTP-URL
-trait HttpTask[A] extends Task[A] {
+trait HttpTask[A] extends Task[A] with IOTask {
   
   // url to process
   def url: URL
   
-  // ConnectionTask 
-  def host = url.getHost
+  // IOTask
+  def target: String = url.getHost
   
   // processor of the response
   def process(is: InputStream): A
