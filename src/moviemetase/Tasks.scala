@@ -66,7 +66,7 @@ object TaskManager {
   val ioPools    = scala.collection.mutable.Map[String, ExecutorService]()
   //val ioPools    = Executors.newFixedThreadPool(MaxIOThreads)
   //val ioSemaphores = scala.collection.mutable.Map[String, ExecutorService]()
-  val indispensablePool = Executors.newCachedThreadPool( TaskThreadFactory("JOIN_") )
+  val joinerPool = Executors.newCachedThreadPool( TaskThreadFactory("JOIN_") )
   
   def ioPool(target: String): ExecutorService = ioPools.synchronized {
     ioPools get target match {
@@ -88,8 +88,8 @@ object TaskManager {
       pool.awaitTermination(3, TimeUnit.SECONDS)
     }
     
-    indispensablePool.shutdownNow()
-    indispensablePool.awaitTermination(3, TimeUnit.SECONDS)
+    joinerPool.shutdownNow()
+    joinerPool.awaitTermination(3, TimeUnit.SECONDS)
   }
   
   private def publishMoreTasks(): Unit = {
@@ -103,8 +103,8 @@ object TaskManager {
   }
     
   def submit[A](task: Task[A]): Future[A] = task match {
-    case x:IndispensableTask =>
-      indispensablePool submit task
+    case x:JoiningTask[_] =>
+      joinerPool submit task
 
     case io:IOTask =>
       ioPool( io.target ) submit task
@@ -150,7 +150,7 @@ trait Task[A] extends Callable[A] {
  
   // forks all tasks for asynchronous execution,
   // then submits a special task that is joining the results and then executes the callback
-  def fork[B](ts: Traversable[Task[B]], callback: List[B] => Unit): Unit = {
+  def fork[B](ts: Seq[Task[B]], callback: List[B] => Unit): Unit = {
     if (ts.isEmpty)
       return ()
       
@@ -162,7 +162,7 @@ trait Task[A] extends Callable[A] {
     // submit a special JoiningTask that joins the results, then calls back
     } else {
       val futs = ts.map( _.submit() )
-      new JoiningTask(futs, callback).submit()
+      new TaskJoiner(futs, callback).submit()
     }
   }
 }
@@ -171,9 +171,25 @@ trait IOTask {
   def target: String
 }
 
-trait IndispensableTask
+trait JoiningTask[A] { self: Task[A] =>
+  
+  def forkJoin[B](ts: Seq[Task[B]]): Seq[B] = {
+    if (ts.isEmpty)
+      return Nil
+    
+    // execute one task directly
+    if (ts.tail.isEmpty) {
+      ts.head.execute() :: Nil
+    
+    // execute multiple tasks asynchronously
+    // join the results
+    } else {
+      ts.map( _.submit() ).map( _.get() )
+    }
+  }
+}
 
-final class JoiningTask[A](ts: Traversable[Future[A]], callback: List[A] => Unit) extends Task[Unit] with IndispensableTask {
+final class TaskJoiner[A](ts: Traversable[Future[A]], callback: List[A] => Unit) extends Task[Unit] with JoiningTask[Unit] {
   def execute(): Unit =
     callback( ts.map( _.get() ).toList )
 }
