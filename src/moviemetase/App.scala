@@ -20,7 +20,7 @@ object App {
   
   def shutdown() = {
     println("shutting down ...")
-    TaskManager.shutdown()
+    Scheduler.shutdown()
     System.exit(0)
   }
 
