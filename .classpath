@@ -12,5 +12,6 @@
 	<classpathentry kind="lib" path="lib/flyingsaucer/core-renderer-minimal.jar" sourcepath="C:/Users/kai/git/MovieMetase/extra/flyingsaucer-R8-src/src/java/"/>
 	<classpathentry kind="lib" path="lib/flyingsaucer/core-renderer.jar" sourcepath="C:/Users/kai/git/MovieMetase/extra/flyingsaucer-R8-src/src/java"/>
 	<classpathentry kind="lib" path="lib/flyingsaucer/xml-apis-xerces-2.9.1.jar"/>
+	<classpathentry kind="lib" path="lib/async-http-client-1.7.0.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

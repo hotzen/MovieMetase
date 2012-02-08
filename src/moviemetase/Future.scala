@@ -64,8 +64,6 @@ case class Failure[A](t: Throwable) extends Result[A] {
 }
 
 object Future {
-  //case class PredicateNotSatisfied() extends Exception
-  
   def const[A](b: Result[A]): Future[A] =
     new Future[A]( Some(b) )
 
@@ -101,7 +99,7 @@ object Future {
 
     create[Seq[A]] { newFut =>
       for ( (fut,i) <- fs.zipWithIndex) {
-        fut whenDone {
+        fut onResult {
           case Value(v) => {
             res.set(i, v)
             if (count.decrementAndGet() == 0)
@@ -141,9 +139,7 @@ class Future[A](initialValue: Option[Result[A]] = None) {
         callback(b, q)
         sync.countDown() // notify synchronous consumers
         true
-      } else {
-        tryBind(b) // try again
-      }
+      } else tryBind(b) // try again
     }
   }
 
@@ -167,34 +163,31 @@ class Future[A](initialValue: Option[Result[A]] = None) {
       throw new IllegalStateException("already bound")
 
   def isDefined: Boolean = state match {
-    case Waiting(_)   => false
     case Completed(_) => true
-    //case Completed(Value(_))   => true
-    //case Completed(Failure(_)) => false
+    case _            => false
   }
   
   def isFailed: Boolean = state match {
-    case Waiting(_)            => false
-    case Completed(Value(_))   => false
-    case Completed(Failure(_)) => true
+     case Completed(Failure(_)) => true
+     case _                     => false
   }
   
   // register callback to react on the future's result which can be a Value or a Failure
-  def whenDone(cb: Result[A] => Unit): Future[A] = {
+  def onResult(cb: Result[A] => Unit): Future[A] = {
     register(cb)
     this
   }
   
   // register callback to react if and when the future's result is a Value
   def onValue(cb: A => Unit): Future[A] =
-    whenDone {
+    onResult {
       case Value(v) => cb(v)
       case _ =>
     }
   
   // register callback to react if and when the future's result is a Failure
   def onFailure(cb: Throwable => Unit): Future[A] =
-    whenDone {
+    onResult {
       case Failure(t) => cb(t)
       case _ =>
     }
@@ -234,30 +227,29 @@ class Future[A](initialValue: Option[Result[A]] = None) {
       
   def flatMap[B](f: A => Future[B]): Future[B] =
     Future.create[B] { newFut =>
-      whenDone {
-        case Value(a)   => f(a) whenDone { newFut bind _ }
+      onResult {
+        case Value(a)   => f(a) onResult { newFut bind _ }
         case Failure(t) => newFut fail t
       }
     }
   
   def map[B](f: A => B): Future[B] =
     Future.create[B] { newFut =>
-      whenDone {
+      onResult {
         case Value(a)   => newFut set f(a)
         case Failure(t) => newFut fail t
       }
     }
   
   def foreach(f: A => Unit): Unit =
-    whenDone {
+    onResult {
       case Value(a)   => f(a)
       case Failure(t) => //throw t //XXX throw?
     }
-  
-  
+
   def filter(p: A => Boolean): Future[A] =
     Future.create[A] { newFut =>
-      whenDone {
+      onResult {
         case r@Value(v) =>
           if (p(v)) newFut bind r
           //else newFut fail new Future.PredicateNotSatisfied
@@ -265,32 +257,11 @@ class Future[A](initialValue: Option[Result[A]] = None) {
         case Failure(t) => newFut fail t
       }
     }
-  
+
   override def toString = "Future(%s)@%s".format(state, hashCode)
 }
 
-//class SyncFuture[A](f: Future[A]) { 
-//  private val sync = new CountDownLatch(1)
-//  private var res: Result[A] = null
-//    
-//  private def callback(r: Result[A]): Unit = {
-//    res = r
-//    sync.countDown()
-//  }
-//
-//  f whenDone callback _
-//  
-//  def await(): A = {
-//    sync.await()
-//    res match {
-//      case Value(v)   => v
-//      case Failure(t) => throw t
-//    }
-//  }
-//}
-
-
-object AsyncFutureTest {
+object FutureTest {
   
   val f1 = new Future[Boolean]
   val f2 = new Future[Boolean]
@@ -318,7 +289,7 @@ object AsyncFutureTest {
   def testMap {
     val x = for (a <- f1; b <- f2) yield (a,b)
     
-    x whenDone { out("yield", _) }
+    x onResult { out("yield", _) }
     
     f1 set true
     //f1 fail new Exception("fail")
@@ -327,10 +298,10 @@ object AsyncFutureTest {
   }
   
   def testJoin {
-    f1 whenDone (v => out("f1", v))
-    f2 whenDone (v => out("f2", v))
+    f1 onResult (v => out("f1", v))
+    f2 onResult (v => out("f2", v))
     val j = Future.join( f1 :: f2 :: Nil)
-    j whenDone (b => out("joined", b))
+    j onResult (b => out("joined", b))
     
     f2 set true
     //f1 set false

@@ -60,12 +60,10 @@ object Scheduler {
     }
   }
   
-  class ComputationRunner(c: =>Unit) extends Runnable {
-    def run(): Unit = { c }
-  }
-  
   def schedule(c: =>Unit): Unit =
-    pool execute new ComputationRunner(c)
+    pool execute new  Runnable {
+      def run(): Unit = { c }
+    }
   
   def schedule(r: Runnable): Unit =
     pool execute r
