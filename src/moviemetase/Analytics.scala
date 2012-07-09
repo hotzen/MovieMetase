@@ -27,7 +27,7 @@ object Analyzer {
       map( _.split("->").map(_.trim) ).
       filter(xs => !xs.isEmpty && !xs.head.isEmpty).
       map(xs => (xs.head, if (xs.tail.isEmpty) "" else xs.tail.head)).toList
-      
+
   def isTag(s: String):  Boolean = Tags contains s.toLowerCase
   def isExt(s: String):  Boolean = Exts contains s.toLowerCase
 
@@ -75,13 +75,11 @@ object Analyzer {
       if (year >= 1900 && year <= 2100) Some(year)
       else                              None
     }
-    
 //    else if (s.length == 2) {
 //      val year = s.toInt
 //      if (year >= 40 && year <= 99) Some(1900 + year)
 //      else                          None
 //    }
-    
     else None
   }
 

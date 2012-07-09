@@ -2,6 +2,7 @@ package moviemetase
 
 import java.net.URL
 import scala.collection.mutable.Set
+import scala.concurrent.Future
 
 object Movie {
   
@@ -64,12 +65,6 @@ case class Movie(title: String, year: Int, infos: List[MovieInfo] = Nil) {
   def id: String = hashCode.toString //title + "@" + year
   
   def label: String = title + "/" + year
-  
-//  var attributedTo: Option[String] = None
-//  def attributeTo(s: String): Movie = {
-//    attributedTo = Some(s)
-//    this
-//  }
     
   def withNewInfos(infos2: List[MovieInfo]): Movie =
     Movie(title, year, (infos ::: infos2).distinct)
@@ -155,26 +150,17 @@ object MovieInfos {
   case class Trailer(label: String, page: URL) extends MovieInfo with Website { val order = 70 }
     
   case class Extra(name: String, value: String) extends MovieInfo { val order = 100 }
-  
-// TODO
-//  case class ResultScore(baseScore: Double) extends MovieInfo {
-//    var scores: List[Double] = baseScore :: Nil
-//    def score: Double = scores.reduceLeft(_ * _)
-//    
-//    override def toString = "ResultScore(" + score + ")"
-//  }
-  
+    
   
   trait Downloadable extends MovieInfo {
     import java.io.File
-    import java.util.concurrent.Future
-    
+        
     def url: URL
     
-    def download(to: File): Future[(URL,File)] =
-      DownloadTask(url, to).submit()
+    def downloader(to: File): Task[(URL,File)] = DownloadTask(url, to)
   }
     
+  
   trait Image extends MovieInfo with Downloadable {
     def url: URL
     def preview: Option[URL]

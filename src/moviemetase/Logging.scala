@@ -32,10 +32,10 @@ trait Logging {
   
   private val logBuf = new StringBuffer()
   
-  final def trace(msg: =>String, infos: List[(String,Any)] = Nil): Unit   = log(LogLevel.Trace, msg, infos)
-  final def info(msg: String,  infos: List[(String,Any)] = Nil): Unit     = log(LogLevel.Info,  msg, infos)
-  final def warn(msg: String,  infos: List[(String,Any)] = Nil): Unit     = log(LogLevel.Warn,  msg, infos)
-  final def error(msg: String, infos: List[(String,Any)] = Nil): Unit     = log(LogLevel.Error, msg, infos)
+  final def trace(msg: =>String, infos: List[(String,Any)] = Nil): Unit = log(LogLevel.Trace, msg, infos)
+  final def info(msg: String,  infos: List[(String,Any)] = Nil): Unit   = log(LogLevel.Info,  msg, infos)
+  final def warn(msg: String,  infos: List[(String,Any)] = Nil): Unit   = log(LogLevel.Warn,  msg, infos)
+  final def error(msg: String, infos: List[(String,Any)] = Nil): Unit   = log(LogLevel.Error, msg, infos)
   
   final def log(lvl: LogLevel, msg: String, infos: List[(String,Any)]): Unit = {
     if (!isLogging(lvl))
@@ -57,5 +57,6 @@ trait Logging {
     }
     
     Logging.out println logBuf.toString
+    Logging.out.flush()
   }
 }

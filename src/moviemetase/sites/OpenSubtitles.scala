@@ -48,7 +48,7 @@ object OpenSubtitles {
       os.close()
     })
         
-    def process(doc: nu.xom.Document): Option[String] = {
+    def processDocument(doc: nu.xom.Document): Option[String] = {
       import XOM._
       
       val tokens =
@@ -91,7 +91,7 @@ object OpenSubtitles {
       os.close()
     })
     
-    def process(doc: nu.xom.Document): List[MovieInfos.Subtitle] = {
+    def processDocument(doc: nu.xom.Document): List[MovieInfos.Subtitle] = {
       import XOM._
       
       for (structNode <- doc.xpath("""//member[name="data"]//struct""");

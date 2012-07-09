@@ -29,7 +29,7 @@ object Subscene {
       sb.toString.toURL
     }
     
-    def process(doc: nu.xom.Document): List[MovieInfos.Subtitle] = {
+    def processDocument(doc: nu.xom.Document): List[MovieInfos.Subtitle] = {
       import Util._
       import XOM._
       
@@ -37,7 +37,7 @@ object Subscene {
         for (aNode <- doc.xpath("""//xhtml:a""", Namespaces.XHTML);
              aElem <- aNode.toElement;
              href  <- aElem.attribute("href") if SubtitlePathRegex.matches(href) ) yield {
-        
+
           val pageUrl = BASE_URL + href
           trace("Subtitle-Page: " + pageUrl)
   
@@ -62,7 +62,7 @@ object Subscene {
       sb.toString.toURL
     }
     
-    def process(doc: nu.xom.Document): List[MovieInfos.Subtitle] = {
+    def processDocument(doc: nu.xom.Document): List[MovieInfos.Subtitle] = {
       import XOM._
 
       val futs =
@@ -88,7 +88,7 @@ object Subscene {
   case class SubtitlePageExtractor(url: URL) extends XhtmlTask[List[SubtitlePageInfo]] with Logging {
     val logID = "Subscene.SubtitlePageExtractor(" + url + ")"
     
-    def process(doc: nu.xom.Document): List[SubtitlePageInfo] = {
+    def processDocument(doc: nu.xom.Document): List[SubtitlePageInfo] = {
       import XOM._
       
       // TODO
@@ -100,7 +100,7 @@ object Subscene {
   case class FilmPageExtractor(url: URL) extends XhtmlTask[List[SubtitlePageInfo]] with Logging {
     val logID = "Subscene.FilmPageExtractor(" + url + ")"
     
-    def process(doc: nu.xom.Document): List[SubtitlePageInfo] = {
+    def processDocument(doc: nu.xom.Document): List[SubtitlePageInfo] = {
       import XOM._
       
       // TODO

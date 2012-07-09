@@ -14,9 +14,9 @@ object UI {
   def start(): Unit = {
     import javax.swing.UIManager
     
-    try UIManager setLookAndFeel "javax.swing.plaf.nimbus.NimbusLookAndFeel" 
+    try   { UIManager setLookAndFeel "javax.swing.plaf.nimbus.NimbusLookAndFeel" } 
     catch { case e:Exception => UIManager setLookAndFeel UIManager.getSystemLookAndFeelClassName }
-        
+
     // apple integration
     val props = System.getProperties
     props.setProperty("apple.laf.useScreenMenuBar", "true")
@@ -28,7 +28,7 @@ object UI {
       
       val screenSize = toolkit.getScreenSize
       top.size = new Dimension(
-        (screenSize.width * 0.8).toInt,
+        (screenSize.width  * 0.8).toInt,
         (screenSize.height * 0.8).toInt
       )
       top.visible = true
@@ -81,9 +81,8 @@ class UI extends Frame {
       add(dropPanel, "width 120!, height 120!")
       add(searchesPanel, "height 120!")
     }
-    add(top, "dock north, grow, height 130!")
+    add(top, "dock north, height 130!")
 
-        
     add(new SplitPane {
       topComponent  = new SplitPane {
         topComponent    = moviesPanel
@@ -177,6 +176,6 @@ class UI extends Frame {
     val movie = Movie(infos).get
     
     val row = SearchRow(false, "term", "dir", "file", "path", movie :: Nil)
-    UI.publish(searchesPanel)( SearchSelected(row) )
+    //UI.publish(searchesPanel)( SearchSelected(row) )
   }
 }

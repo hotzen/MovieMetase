@@ -5,9 +5,11 @@ import org.jsoup.nodes._
 import org.jsoup.select._
 
 object JSoup {
+  import language.implicitConversions
   
   implicit def _IterableElements(elems: Elements): Iterable[Element] =
     scala.collection.JavaConversions.JIteratorWrapper( elems.iterator() ).toIterable
+    //scala.collection.convert.Wrappers.IteratorWrapper( elems.iterator() ).toIterable
 
   implicit def _IterableAttributes(attrs: Attributes): Iterable[Attribute] =
     scala.collection.JavaConversions.JIteratorWrapper( attrs.iterator() ).toIterable

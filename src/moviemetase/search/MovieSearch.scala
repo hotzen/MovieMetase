@@ -11,20 +11,25 @@ import scala.util.matching.Regex
 
 class MovieSearch() extends SearchManager[Movie] with Logging {
   val logID = "MovieSearch"
-    
+  
   def searchByTerm(term: String): List[Movie] = {
     val movies = new ListBuffer[Movie]
     
     val dis = Analyzer.dissect(term)
     trace(dis.toString)
     
+    // contains tags, EXACT search
     if (movies.isEmpty && !dis.tags.isEmpty) {
       trace("Exact-Term linking to IMDB")
       
       val t = "\"" + term + "\""
-      movies appendAll GoogleTermWithImdbLink(t, Some(resultMustContain(dis.tokens))).execute().filter(postFilter(dis, _))
+      val f1 = containsAllTokensFilter(dis.tokens) _
+      val f2 = satisfiesDissectedInfos(dis) _
+      
+      movies appendAll GoogleTermWithImdbLink(t, Some(f1)).execute().filter(f2)
     }
     
+    // contains tags, search for the EXACT name, year and use tag-hints
     if (movies.isEmpty && !dis.names.isEmpty) {
       trace("Exact-Name & Any Year & Any Tags search linking to IMDB")
       
@@ -34,9 +39,13 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
         case None       => t1
       }
       val t3 = t2 + " " + dis.tags.mkString(" ")
-      movies appendAll GoogleTermWithImdbLink(t3).execute().filter(postFilter(dis, _))
+      
+      val f = satisfiesDissectedInfos(dis) _
+      
+      movies appendAll GoogleTermWithImdbLink(t3).execute().filter(f)
     }
     
+    // contains name, search for the name and year
     if (movies.isEmpty && !dis.names.isEmpty) {
       trace("Name & Any Year search at IMDB")
       
@@ -46,7 +55,10 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
         case None       => t1
       }
       val t3 = t2 + " " + dis.tags.mkString(" ")
-      movies appendAll GoogleTermAtImdbSite( t3 ).execute().filter(postFilter(dis, _))
+      
+      val f = satisfiesDissectedInfos(dis) _
+      
+      movies appendAll GoogleTermAtImdbSite( t3 ).execute().filter(f)
     }
             
     // NOTHING FOUND
@@ -54,9 +66,9 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
       warn("no results for " + term)
       return Nil
     }
-
-    // auto-complete with TMDB
+    
     movies.map( TMDB.AutoExpandMovie(_).submit() ).map(_.get()).toList
+    //movies.toList
   }
   
   def searchByFile(fileInfo: FileInfo): List[Movie] = {
@@ -73,9 +85,13 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
       if (movies.isEmpty) {
         trace("Exact-FileName linking to IMDB")
         
-        val fileName = fileInfo.fileName //WithoutExt
+        val fileName = fileInfo.fileNameWithoutExt
         val t = "\"" + fileName + "\""
-        movies appendAll GoogleTermWithImdbLink(t, Some(resultMustContain(dis.file.tokens) _)).execute().filter(postFilter(dis, _))
+        
+        val f1 = containsAllTokensFilter(dis.file.tokens) _
+        val f2 = satisfiesDissectedFileInfos(dis) _
+        
+        movies appendAll GoogleTermWithImdbLink(t, Some(f1)).execute().filter(f2)
       }
     }
     
@@ -85,7 +101,11 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
         
         val dirName = fileInfo.dirName
         val t = "\"" + dirName + "\""
-        movies appendAll GoogleTermWithImdbLink(t, Some(resultMustContain(dis.dir.tokens) _)).execute().filter(postFilter(dis, _))
+        
+        val f1 = containsAllTokensFilter(dis.dir.tokens) _
+        val f2 = satisfiesDissectedFileInfos(dis) _
+        
+        movies appendAll GoogleTermWithImdbLink(t, Some(f1)).execute().filter(f2)
       }
     }
     
@@ -106,7 +126,10 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
         case None       => t1
       }
       val t3 = t2 + " " + dis.all.tags.mkString(" ")
-      movies appendAll GoogleTermWithImdbLink( t3 ).execute().filter(postFilter(dis, _))
+      
+      val f = satisfiesDissectedFileInfos(dis) _
+      
+      movies appendAll GoogleTermWithImdbLink( t3 ).execute().filter(f)
     }
     
     if (movies.isEmpty && !dis.same.names.isEmpty && !dis.same.tags.isEmpty) {
@@ -118,7 +141,10 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
         case None       => t1
       }
       val t3 = t2 + " " + dis.same.tags.mkString(" ")
-      movies appendAll GoogleTermWithImdbLink( t3 ).execute().filter(postFilter(dis, _))
+      
+      val f = satisfiesDissectedFileInfos(dis) _
+      
+      movies appendAll GoogleTermWithImdbLink( t3 ).execute().filter(f)
     }
     
     if (movies.isEmpty && !dis.file.names.isEmpty && !dis.file.tags.isEmpty) {
@@ -130,7 +156,10 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
         case None       => t1
       }
       val t3 = t2 + " " + dis.file.tags.mkString(" ")
-      movies appendAll GoogleTermWithImdbLink( t3 ).execute().filter(postFilter(dis, _))
+      
+      val f = satisfiesDissectedFileInfos(dis) _
+      
+      movies appendAll GoogleTermWithImdbLink( t3 ).execute().filter(f)
     }
     
     if (movies.isEmpty && !dis.dir.names.isEmpty && !dis.dir.tags.isEmpty) {
@@ -142,7 +171,10 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
         case None       => t1
       }
       val t3 = t2 + " " + dis.dir.tags.mkString(" ")
-      movies appendAll GoogleTermWithImdbLink( t3 ).execute().filter(postFilter(dis, _))
+      
+      val f = satisfiesDissectedFileInfos(dis) _
+      
+      movies appendAll GoogleTermWithImdbLink( t3 ).execute().filter(f)
     }
     
     // NOTHING FOUND
@@ -153,19 +185,21 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
 
     // auto-complete with TMDB
     movies.map( TMDB.AutoExpandMovie(_).submit() ).map(_.get()).toList
+    //movies.toList
   }
   
-  def resultMustContain(reqTokens: List[String])(res: GoogleResult): Boolean = {
+  def containsAllTokensFilter(reqTokens: List[String])(res: GoogleResult): Boolean = {
     val resTokens = Analyzer.tokenize(res.title) ::: Analyzer.tokenize(res.snippet)
     val allContained = reqTokens.forall( resTokens contains _ )
     
     if (!allContained) {
       trace("IGNORE " + res + "\n  required:  [" + reqTokens.mkString(", ") + "]:\n  result  : [" + resTokens.mkString(", ") + "]")
     }
+    
     allContained
   }
   
-  def postFilter(dis: Dissected, movie: Movie): Boolean = {
+  def satisfiesDissectedInfos(dis: Dissected)(movie: Movie): Boolean = {
     
     if (dis.year.isDefined && (movie.year == 0 || movie.year != dis.year.get)) {
       trace("IGNORE " + movie + " because it specifies different year than " + dis)
@@ -175,7 +209,7 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
     true
   }
   
-  def postFilter(dis: DissectedFileInfo, movie: Movie): Boolean = {
+  def satisfiesDissectedFileInfos(dis: DissectedFileInfo)(movie: Movie): Boolean = {
     
     if (dis.all.year.isDefined && (movie.year == 0 || movie.year != dis.all.year.get)) {
       trace("IGNORE " + movie + " because it specifies different year than " + dis)
@@ -184,27 +218,4 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
     
     true
   }
-  
-//  def resultMustContain(ss: List[String])(res: GoogleResult): Boolean = {
-//    val title   = Analyzer.tokenize(res.title).mkString("")
-//    val snippet = Analyzer.tokenize(res.snippet).mkString("")
-//    
-//    val search  = ss.map(Analyzer.tokenize(_).mkString(""))
-//
-//    search.exists(s => title.contains(s) || snippet.contains(s))
-//  }
-        
-//  def sortMovies(ms: List[Movie]): List[Movie] =
-//    ms.sortWith( (m1,m2) => {
-//      val scores1 = m1.infos.collect({ case MovieInfos.Score(score) => score})
-//      val scores2 = m2.infos.collect({ case MovieInfos.Score(score) => score})
-//      
-//      val s1 = if (scores1.isEmpty) 0.3
-//               else scores1.max
-//      
-//      val s2 = if (scores2.isEmpty) 0.3
-//               else scores2.max
-//      
-//      s1 <= s2
-//    })
 }

@@ -35,7 +35,7 @@ class JImage(val url: URL, resizeTo: Option[(Int, Int)], parLoad: Boolean = true
   private var loading: Boolean = false
   private var loaded: Boolean  = false
   
-  private def loaderCallback(loadedImg: BufferedImage): Unit = UI run {
+  private def onImageLoaded(loadedImg: BufferedImage): Unit = UI run {
     loaded  = true
     loading = false
     
@@ -48,8 +48,8 @@ class JImage(val url: URL, resizeTo: Option[(Int, Int)], parLoad: Boolean = true
   }
     
   private val loader =
-    if (caching) new CachingImageLoader(url, loaderCallback, resizeTo)
-    else new ImageLoader(url, loaderCallback, resizeTo)
+    if (caching) new CachingImageLoader(url, onImageLoaded, resizeTo)
+    else new ImageLoader(url, onImageLoaded, resizeTo)
 
   override def paintComponent(g: Graphics): Unit = {
     super.paintComponent(g)
@@ -135,7 +135,7 @@ class CachingImageLoader(url: java.net.URL, callback: BufferedImage => Unit, res
   val target = url.getHost
   
   val cache = new ImageCache
-  lazy val loader = new ImageLoader(url, cachePutCallback _, resize)
+  lazy val loader = new ImageLoader(url, onImageLoaded _, resize)
   
   val key = url.toExternalForm + { resize match {
     case Some((w, -1)) => "___W"+w
@@ -160,7 +160,7 @@ class CachingImageLoader(url: java.net.URL, callback: BufferedImage => Unit, res
       case e:Exception => error(e.getMessage(), ("exception" -> e) :: Nil)
     }
 
-  def cachePutCallback(img: BufferedImage): Unit = {
+  def onImageLoaded(img: BufferedImage): Unit = {
     trace("PUT")
     cache put (key, img)
     

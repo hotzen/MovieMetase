@@ -52,7 +52,6 @@ class FileDropHandler extends TransferHandler with Publisher {
     
     data match {
       case dataList: java.util.List[_] => {
-        val dataList = data.asInstanceOf[java.util.List[_]]
         val it = dataList.iterator
         while (it.hasNext) {
           val o = it.next.asInstanceOf[AnyRef]

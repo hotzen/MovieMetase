@@ -1,6 +1,6 @@
 package moviemetase
 
-import java.security.MessageDigest
+//import java.security.MessageDigest
 import java.io.InputStream
 import java.io.File
 import java.io.FileInputStream
@@ -34,25 +34,10 @@ trait FileCache[A] {
   def write(k: String): FileOutputStream =
     new FileOutputStream( file(k) ) 
   
-  // try reading if exists
   def tryRead(k: String): Option[FileInputStream] =
     if (file(k).exists) Some( read(k) )
     else None
  
-  // try writing if XXX
-  def tryWrite(k: String): Option[FileOutputStream] =
-    Some( write(k) )
-  
-  // only read if readable
-  def safeRead(k: String): Option[FileInputStream] =
-    if (file(k).canRead) Some( read(k) )
-    else None
-
-  // only write if writeable
-  def safeWrite(k: String): Option[FileOutputStream] =
-    if (file(k).canWrite) Some( write(k) )
-    else None
-  
   def remove(k: String): Unit =
     if (exists(k))
       file(k).delete()
@@ -61,21 +46,18 @@ trait FileCache[A] {
   def get(k: String): Option[A]
 }
 
-class ImageCache extends FileCache[BufferedImage] with Logging {
+class ImageCache(format: String = "JPEG") extends FileCache[BufferedImage] with Logging {
   val logID = "ImageCache"
-  
-  val format = "JPEG"
-  
+    
   def get(k: String): Option[BufferedImage] =
-    tryRead(k).map(f => {
-      val img = ImageIO.read(f)
-      f.close()
-      img
-    })
+    tryRead(k).map(f =>
+      try { ImageIO.read(f) }
+      finally { f.close() }
+    )
   
   def put(k: String, img: BufferedImage): Unit =
-    tryWrite(k).foreach(f => { // fail if not writeable
-      ImageIO.write(img, format, f)
-      f.close()
-    })
+    Some( write(k) ).foreach(f =>
+      try { ImageIO.write(img, format, f) }
+      finally { f.close() }
+    )
 }

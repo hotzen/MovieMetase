@@ -6,7 +6,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.{Future => JFuture}
+import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.Callable
 import java.net.URL
@@ -20,7 +20,7 @@ import scala.swing.Publisher
 import java.io.File
 import java.io.IOException
 
-case class TaskThreadFactory(prefix: String, daemon: Boolean = false, priority: Int = Thread.NORM_PRIORITY) extends ThreadFactory {
+case class TaskThreadFactory(prefix: String = "", daemon: Boolean = false, priority: Int = Thread.NORM_PRIORITY) extends ThreadFactory {
   val counter = new AtomicInteger(0)
 
   def newThread(r: Runnable): Thread = {
@@ -37,23 +37,29 @@ case class TaskThreadFactory(prefix: String, daemon: Boolean = false, priority: 
 }
 
 object Scheduler {
-  val MaxTaskThreads     = 4
-  val MinIOTargetThreads = 1
-  val MaxIOTargetThreads = 4
-  val IOTargetThreadTimeout: Long = 60 * 1000
-
-  val pool    = new ForkJoinPool
+  
+  val MinPoolSize = 4
+  val MaxPoolSize = Integer.MAX_VALUE
+  
+  val MinIOPoolSize = 2
+  val MaxIOPoolSize = 4
+  
+  val ThreadKeepAlive = 60L
+    
+  def createPool(size: Int, limit: Int): ExecutorService = {
+    val q  = new LinkedBlockingQueue[Runnable]()
+    val tf = new TaskThreadFactory()
+    new ThreadPoolExecutor(size, limit, ThreadKeepAlive, TimeUnit.SECONDS, q, tf)
+  }
+  
+  val pool = createPool(MinPoolSize, MaxPoolSize)
   val ioPools = scala.collection.mutable.Map[String, ExecutorService]()
   
   def ioPool(target: String): ExecutorService = ioPools.synchronized {
     ioPools get target match {
       case Some(pool) => pool
       case None => {
-        val pool = new ThreadPoolExecutor(
-          MinIOTargetThreads, MaxIOTargetThreads,
-          IOTargetThreadTimeout, TimeUnit.MILLISECONDS,
-          new LinkedBlockingQueue[Runnable]()
-        );
+        val pool = createPool(MinIOPoolSize, MaxIOPoolSize)
         ioPools put (target, pool)
         pool
       }
@@ -78,8 +84,7 @@ object Scheduler {
 //      Scheduler.pool submit task
 //    }
 //  }
-  
-    
+      
   def shutdown(): Unit = {
     pool.shutdownNow()
 
@@ -94,25 +99,22 @@ object Scheduler {
 }
 
 object TaskManager {
-
-  def submit[A](task: Task[A]): JFuture[A] = task match {
+  
+  private val counter = new AtomicInteger(0)
+  
+  def submit[A](task: Task[A]): Future[A] = task match {
     case io:IOTask[_] =>
       Scheduler.ioPool( io.target ) submit task
 
-    case _ => {
-      //publishMoreTasks()
-      //taskPool submit new CompletionCallbackTask(task)
+    case _ =>
       Scheduler.pool submit task
-    }
   }
   
   def shutdown(): Unit = Scheduler.shutdown
   
-  val progress = new Publisher { }
-  case class ActiveTasks(tasks: Int) extends scala.swing.event.Event
-
-//  private val counter = new AtomicInteger(0)
-//  
+//  val progress = new Publisher { }
+//  case class ActiveTasks(tasks: Int) extends scala.swing.event.Event
+//    
 //  private def publishMoreTasks(): Unit = {
 //    val cnt = counter.incrementAndGet()
 //    ui.UI.publish(progress)( ActiveTasks(cnt) )
@@ -135,9 +137,9 @@ object Task {
     def execute(): A = { code }
   }
   
-  def createSeq[A](ts: List[Task[A]]): Task[List[A]] = new Task[List[A]] {
-    def execute(): List[A] = ts.map( _.execute() )
-  }
+//  def wrap[A](ts: List[Task[A]]): Task[List[A]] = new Task[List[A]] {
+//    def execute(): List[A] = ts.map( _.execute() )
+//  }
 }
 
 trait Task[A] extends Callable[A] {
@@ -149,23 +151,9 @@ trait Task[A] extends Callable[A] {
   final def call(): A = execute()
   
   // submits the task for concurrent execution
-  def submit(): JFuture[A] =
+  def submit(): Future[A] =
     TaskManager submit this
   
-  // submits but returns a truly asynchronous future
-  def submitAsync(): Future[A] = {
-    val task = this
-    val fut  = new Future[A]()
-    
-    TaskManager submit new Task[Unit] {
-      def execute(): Unit = {
-        fut bind Result( task.execute() ) 
-      }
-    }
-    
-    fut
-  }
- 
   // forks all tasks for asynchronous execution,
   // then submits a special task that is joining the results and then executes the callback
 //  def fork[B](ts: Seq[Task[B]], callback: List[B] => Unit): Unit = {
@@ -207,7 +195,7 @@ trait IOTask[A] extends Task[A] {
 //  }
 //}
 
-//final class TaskJoiner[A](ts: Traversable[JFuture[A]], callback: List[A] => Unit) extends Task[Unit] with JoiningTask[Unit] {
+//final class TaskJoiner[A](ts: Traversable[Future[A]], callback: List[A] => Unit) extends Task[Unit] with JoiningTask[Unit] {
 //  def execute(): Unit =
 //    callback( ts.map( _.get() ).toList )
 //}
@@ -222,7 +210,7 @@ trait HttpTask[A] extends IOTask[A] {
   def target: String = url.getHost
   
   // processor of the response
-  def process(is: InputStream): A
+  def processResponse(is: InputStream): A
     
   // dont keep-alive
   val ConnectionClose = false
@@ -278,7 +266,7 @@ trait HttpTask[A] extends IOTask[A] {
         throw new IOException("HTTP " + respCode + ": " + conn.getResponseMessage + " {" + url + "}")
       
       in = conn.getInputStream
-      val res = process( in )
+      val res = processResponse( in )
       
       if (ConnectionClose) {
         conn.disconnect()
@@ -314,21 +302,20 @@ trait HttpTask[A] extends IOTask[A] {
 trait XmlTask[A] extends HttpTask[A] {
   import nu.xom.Builder
   
-  final def process(in: InputStream): A = {
+  final def processResponse(in: InputStream): A = {
     val builder = new Builder( )
     val doc = builder build in
     
-    process(doc)
+    processDocument(doc)
   }
   
-  def process(doc: nu.xom.Document): A
+  def processDocument(doc: nu.xom.Document): A
 }
 
 
 // A specialisation that processes HTML-data located by the URL
 // (XML-malformed HTML is forced into XML/XHTML by the tagsoup-parser)
-
-@deprecated("Use HtmlTask using JSoup instead", "")
+//@deprecated("Use HtmlTask using JSoup instead", "")
 trait XhtmlTask[A] extends HttpTask[A] {
   import org.xml.sax.helpers.XMLReaderFactory
   import nu.xom.Builder
@@ -336,27 +323,28 @@ trait XhtmlTask[A] extends HttpTask[A] {
   
   val TagsoupParser = "org.ccil.cowan.tagsoup.Parser"
   
-  final def process(is: InputStream): A = {
+  final def processResponse(is: InputStream): A = {
     val tagsoup = XMLReaderFactory.createXMLReader( TagsoupParser )
     val builder = new Builder( tagsoup )
     val doc = builder build is
     
-    process(doc)
+    processDocument(doc)
   }
   
-  def process(doc: Document): A
+  def processDocument(doc: Document): A
 }
 
+// lazy parsing with JSoup
 trait HtmlTask[A] extends HttpTask[A] {
   import org.jsoup.Jsoup
   import org.jsoup.nodes.Document
     
-  final def process(in: InputStream): A = {
+  final def processResponse(in: InputStream): A = {
     val doc = Jsoup.parse(in, null /* "UTF-8" */, url.toString) 
-    process(doc)
+    processDocument(doc)
   }
   
-  def process(doc: Document): A
+  def processDocument(doc: Document): A
 }
 
 case class DownloadTask(from: URL, to: File) extends Task[(URL,File)] with Logging {

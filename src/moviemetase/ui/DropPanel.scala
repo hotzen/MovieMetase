@@ -38,7 +38,7 @@ class DropPanel(val top: UI) extends Component {
     
     var (ds, fs) = files.partition(_.isDirectory)
     
-    val droppedDirsCount = files.count( _.isDirectory )
+    val droppedDirsCount = ds.length
     val droppedDirs      = ( droppedDirsCount > 0)
     val droppedMultiDirs = ( droppedDirsCount > 1)
         
@@ -72,15 +72,15 @@ class DropPanel(val top: UI) extends Component {
     
     import java.nio.file._
 
-    def filter(p: Path): Boolean =
+    def checkPath(p: Path): Boolean =
       Analyzer.isExt( FileInfo(p).fileExt ) // only if registered extension
           
-    val q = FileScanner.createUnboundedQueue[Path]()
+    val q = FileScanner.createQueue[Path]()
     
     // create a task that pushes all files into the Q
     val filesTask = new Task[Unit] {
       def execute(): Unit = {
-        fs.filter(f => filter(f.toPath) ).foreach(f => q offer f.toPath)
+        fs.filter(f => checkPath(f.toPath) ).foreach(f => q offer f.toPath)
       }
     }
 
@@ -102,37 +102,38 @@ class DropPanel(val top: UI) extends Component {
           case Dialog.Result.No => None
         }
       }
-    }).map(dir => FileScanner.findFilesTask(dir.toPath, filter, q))
+    }).map(dir => FileScanner.findFilesTask(dir.toPath, checkPath, q))
     
-    // add a QueueTerminator
+    // Queue-Terminator
     val T = Paths.get("/TERMINATED/")
-    val collectTasks: List[Task[Unit]] = filesTask :: dirScanTasks ::: List( QueueTerminatorTask(q, T) )
-    
-    // search every file coming into the Q
-    val safePublish = UI.publish(this) _
+        
+    val scannerTask = new Task[List[Unit]] {
+      val terminatorTask = FileScanner.createTerminatorTask(q, T)
+      val tasks: List[Task[Unit]] = filesTask :: dirScanTasks ::: terminatorTask :: Nil
+      
+      def execute(): List[Unit] = tasks.map( _.execute() ) // process in sequence
+    }
+
+    val publish = UI.publish(this) _
     
     val searchTask = new Task[Unit] {
       val search = new MovieSearch()
       def execute(): Unit = {
-        var continue = true
-        while (continue) {
+        while (true) {
           val file = q.take() // blocking
-          if (file == T) {
-            println("TERMINATOR")
-            continue = false
-          } else {
-            val info = FileInfo(file)
-            safePublish( SearchingMoviesByFile(info) )
-            
-            val movies = search searchByFile info
-            safePublish( FoundMoviesByFile(info, movies) )
-          }
+          if (file == T)
+            return ()
+        
+          val fileInfo = FileInfo(file)
+          publish( SearchingMoviesByFile(fileInfo) )
+          val movies = search searchByFile fileInfo // blocking
+          publish( FoundMoviesByFile(fileInfo, movies) )
         }
       }
     }
     
     searchTask.submit()
-    Task.createSeq( collectTasks ).submit()
+    scannerTask.submit()
     ()
   }
 }

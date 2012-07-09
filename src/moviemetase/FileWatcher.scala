@@ -24,12 +24,13 @@ object FileWatcher {
 }
 
 sealed trait FileWatchEvent
-  case object Overflow               extends FileWatchEvent 
-  case class EntryCreate(path: Path) extends FileWatchEvent 
-  case class EntryDelete(path: Path) extends FileWatchEvent 
-  case class EntryModify(path: Path) extends FileWatchEvent 
-
-
+object FileWatchEvent {
+  case object Overflow           extends FileWatchEvent 
+  case class Create(path: Path)  extends FileWatchEvent 
+  case class Delete(path: Path)  extends FileWatchEvent 
+  case class Modify(path: Path)  extends FileWatchEvent 
+}
+  
 final class FileWatcher(path: Path, queue: BlockingQueue[FileWatchEvent]) extends Task[Unit] {
   import scala.collection.JavaConversions._
   import java.nio.file.StandardWatchEventKinds._
@@ -56,13 +57,11 @@ final class FileWatcher(path: Path, queue: BlockingQueue[FileWatchEvent]) extend
   
   private def processEvent(evt: WatchEvent[Path]): Unit = {
     val kind: WatchEvent.Kind[_] = evt.kind
-    
     kind match {
-      case OVERFLOW     => queue offer Overflow 
-      case ENTRY_CREATE => queue offer EntryCreate(evt.context)
-      case ENTRY_DELETE => queue offer EntryDelete(evt.context)
-      case ENTRY_MODIFY => queue offer EntryModify(evt.context)
+      case OVERFLOW     => queue offer FileWatchEvent.Overflow 
+      case ENTRY_CREATE => queue offer FileWatchEvent.Create(evt.context)
+      case ENTRY_DELETE => queue offer FileWatchEvent.Delete(evt.context)
+      case ENTRY_MODIFY => queue offer FileWatchEvent.Modify(evt.context)
     }
   }
 }
-

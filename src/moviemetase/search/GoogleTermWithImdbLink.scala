@@ -5,33 +5,53 @@ import Util._
 import sites._
 import scala.collection.mutable.ListBuffer
 
-case class GoogleTermWithImdbLink(term: String, requiresMatch: Option[GoogleResult => Boolean] = None) extends Task[List[Movie]] with Logging {
+case class GoogleTermWithImdbLink(term: String, filter: Option[GoogleResult => Boolean] = None) extends Task[List[Movie]] with Logging {
   val logID = "GoogleTermWithImdbLink"
   
   val query = term + " linkto:imdb.com/title/"
   
-  final def execute(): List[Movie] = {
-    val googleRes = Google.Query(query).execute()
+  def execute(): List[Movie] = {
+    val results  = Google.Query(query).execute()
     
-    val imdbTitleUrls = googleRes.filter(res => requiresMatch match {
-      case Some(f) => f(res)
-      case None    => true
-    }).flatMap(res => {
+    val filtered = results.filter( filterResult(_) )
+    if (filtered.isEmpty)
+      return Nil
+    
+    processResults( filtered )
+  }
+  
+  def filterResult(res: GoogleResult): Boolean = filter match {
+    case Some(f) => f(res)
+    case None    => true
+  }
+  
+  def processResults(results: List[GoogleResult]): List[Movie] = {
+        
+    val imdbUrls = results.flatMap(res => {
       val snippet = WhitespaceRegex.replaceAllIn(res.snippet.toLowerCase, "")
       IMDB.extractTitleUrls(snippet).headOption
     })
     
-    if (imdbTitleUrls.isEmpty) {
-      trace("Nothing found")
+    if (imdbUrls.isEmpty) {
+      trace("No IMDB-Links found")
       return Nil 
     }
 
-    val totalUrls = imdbTitleUrls.length
-    val distinctUrls = imdbTitleUrls.distinctWithCount()
+    val totalUrls = imdbUrls.length
+    
+    val candidates = imdbUrls.distinctWithCount()
 
-    if (isLogging(LogLevel.Trace))
-      for (url <- distinctUrls)
-        trace("IMDB URL: '" + url._1 + "' (" + url._2 + ")")
+    if (isLogging(LogLevel.Trace)) {
+      val t = candidates.length
+      for ( (url,i) <- candidates.zipWithIndex) {
+        trace("IMDB-Page ("+(i+1)+"/"+t+"): '" + url._1 + "' (found " + url._2 + " times)")
+      }
+    }
+        
+    
+//    if (candidates.length > Max)
+//      warn("More than " + Max + " IMDB-URLs found, restricting to top " + Max)
+
     
     //val firstUrl   = imdbTitleUrls.head
     //val firstCount = distinctTitleUrls.find(dis => dis._1 == firstUrl).get._2
@@ -58,14 +78,14 @@ case class GoogleTermWithImdbLink(term: String, requiresMatch: Option[GoogleResu
 //      set.toList.reverse
 //    }
 
-    val tryUrls = distinctUrls.flatMap( dis => {
+    val tryUrls = candidates.flatMap( dis => {
       val (url, count) = dis
       val ratio = count.toFloat / totalUrls
       if (ratio > 0.35) {
-        trace("using " + url + " (" + count + ") good ratio " + ratio)
+        trace("PostFilter OK: " + url + " (" + count + ") good ratio " + ratio)
         Some(url)
       } else {
-        trace("ignoring " + url + " (" + count + ") bad ratio " + ratio)
+        trace("PostFilter Ignore: " + url + " (" + count + ") bad ratio " + ratio)
         None
       }
     })
@@ -81,7 +101,7 @@ case class GoogleTermWithImdbLink(term: String, requiresMatch: Option[GoogleResu
     // IMDB-Title-URL => IMDB-ID
     val tryIds =
       for (url <- tryUrls)
-        yield IMDB.extractId(url).head
+        yield IMDB.extractID(url).head
     
     // fetch
     val futs =

@@ -37,7 +37,7 @@ object MetaCrawler {
       new URL( sb.toString )
     }
     
-    def process(doc:  org.jsoup.nodes.Document): List[GoogleResult] = {
+    def processDocument(doc: org.jsoup.nodes.Document): List[GoogleResult] = {
       import org.jsoup.nodes._
       import JSoup._
       
@@ -77,7 +77,7 @@ object DogPile {
       new URL( sb.toString )
     }
     
-    def process(doc:  org.jsoup.nodes.Document): List[GoogleResult] = {
+    def processDocument(doc:  org.jsoup.nodes.Document): List[GoogleResult] = {
       import org.jsoup.nodes._
       import JSoup._
       

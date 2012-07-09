@@ -8,6 +8,7 @@ import java.io.InputStream
 import scala.io.Source
 import scala.util.parsing.json.JSON
 import java.util.concurrent.atomic.AtomicInteger
+import scala.concurrent.{Future, future}
 
 object Google {
   val UseAjax        = 1
@@ -16,45 +17,45 @@ object Google {
   val UseDogPile     = 4
   val UseNothing     = 5
   
-  val use = new AtomicInteger( UseWeb ) //XXX Skip AJAX since it finds considerably fewer results than the web-search :/
+  val use = new AtomicInteger( UseMetaCrawler ) //XXX Skip AJAX since it finds considerably fewer results than the web-search :/
   
   // generic query that tries different query-methods
-  case class Query(query: String) extends Task[List[GoogleResult]] with Logging {
-    val logID = "Google.Query"
-      
-    def execute(): List[GoogleResult] = use.get match {
-      
-      case id@UseAjax          => tryOrNext(id, GoogleAjax.Query(query)   )
-      case id@UseWeb           => tryOrNext(id, GoogleWeb.Query(query)    )
-      case id@UseMetaCrawler   => tryOrNext(id, MetaCrawler.Query(query)  )
-      case id@UseDogPile       => tryOrNext(id, DogPile.Query(query)      )
-      
-      case id if id >= UseNothing => {
-        warn("No more Query-Methods to try, aborting.")
-        Nil
-      }
-      case id => {
-        warn("Unknown Query-Method #" + id + ", resetting to AJAX")
-        use.compareAndSet(id, UseAjax)
-        Nil
-      }
-    }
+  case class Query(query: String) extends Task[List[GoogleResult]] {
     
-    def tryOrNext(id: Int, task: Task[List[GoogleResult]]): List[GoogleResult] = {
-      try {
-        val label = task match {
-          case l:Logging => l.logID
-          case _         => task.toString
-        }
-        //trace("trying " + label + " ...")
-        task.execute()
-
-      } catch { case e:Exception => {
-        warn(task + " failed with " + e.getMessage() + ", switching to next method")
-        use.compareAndSet(id, id+1)
-        execute()
-      }}
-    }
+    def execute(): List[GoogleResult] = MetaCrawler.Query(query).execute()
+    
+//    def executeQuery(): List[GoogleResult] = use.get match {
+//      case id@UseAjax          => tryOrNext(id, GoogleAjax.Query(query)   )
+//      case id@UseWeb           => tryOrNext(id, GoogleWeb.Query(query)    )
+//      case id@UseMetaCrawler   => tryOrNext(id, MetaCrawler.Query(query)  )
+//      case id@UseDogPile       => tryOrNext(id, DogPile.Query(query)      )
+//      
+//      case id if id >= UseNothing => {
+//        warn("No more Query-Methods to try, aborting.")
+//        Nil
+//      }
+//      case id => {
+//        warn("Unknown Query-Method #" + id + ", resetting to AJAX")
+//        use.compareAndSet(id, UseAjax)
+//        Nil
+//      }
+//    }
+//    
+//    def tryOrNext(id: Int, task: Task[List[GoogleResult]]): List[GoogleResult] = {
+//      try {
+//        val label = task match {
+//          case l:Logging => l.logID
+//          case _         => task.toString
+//        }
+//        //trace("trying " + label + " ...")
+//        task.execute()
+//
+//      } catch { case e:Exception => {
+//        warn(task + " failed with " + e.getMessage() + ", switching to next method")
+//        use.compareAndSet(id, id+1)
+//        execute()
+//      }}
+//    }
   }
 }
 
@@ -70,8 +71,7 @@ case class GoogleResult(query: String, url: URL, title: String, snippet: String)
 //  }
 }
 
-
-//XXX very poor result-quality :( 
+////XXX very poor result-quality :( 
 object GoogleAjax {
   val BASE_URL = "http://ajax.googleapis.com/ajax/services/search/web"
   
@@ -92,7 +92,7 @@ object GoogleAjax {
       new URL(url)
     }
     
-    def process(in: InputStream): List[GoogleResult] = {
+    def processResponse(in: InputStream): List[GoogleResult] = {
       import Util._
       import JsonType._
 
@@ -137,7 +137,7 @@ object GoogleWeb {
       new URL( sb.toString )
     }
     
-     def process(doc:  org.jsoup.nodes.Document): List[GoogleResult] = {
+     def processDocument(doc:  org.jsoup.nodes.Document): List[GoogleResult] = {
       import org.jsoup.nodes._
       import JSoup._
       

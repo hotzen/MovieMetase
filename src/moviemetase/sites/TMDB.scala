@@ -53,7 +53,7 @@ object TMDB {
       new URL( url )
     }
     
-    def process(doc: Document): Option[Movie] = {
+    def processDocument(doc: Document): Option[Movie] = {
       import XOM._
       //println(doc.toXML)
       

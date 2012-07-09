@@ -6,6 +6,8 @@ import search.MovieSearch
 object SearchTest {
   def main(args: Array[String]) = {
     
+    Logging.level = LogLevel.Trace
+    
     val ms = new MovieSearch
     
     val paths = if (!args.isEmpty) {
@@ -30,6 +32,6 @@ object SearchTest {
     }
     
     println("DONE, shutting down...")
-    TaskManager.shutdown()
+    Scheduler.shutdown()
   }
 }

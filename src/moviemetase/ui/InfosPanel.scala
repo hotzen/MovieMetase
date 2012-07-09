@@ -24,7 +24,7 @@ class InfosPanel(val top: UI) extends MigPanel("fill") {
   listenTo( tabbed )
   reactions += {
     case SelectionChanged(tabbed) => {
-      println("selected tab: " + tabbed)
+      println("InfosPanel selected tab: " + tabbed)
     }
   }
 }
@@ -110,6 +110,7 @@ class InfoBackdropsPanel(val top: UI) extends ScrollPane {
       contents += Component.wrap( comp )
       InfoBackdropsPanel.this listenTo comp
     }
+    
     def clear(): Unit = contents.clear()
   }
   

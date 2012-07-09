@@ -156,7 +156,7 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
   def getParentText(elem: DOM_Element): Option[String] = {
     val text = elem.getParentNode.getTextContent.trim
     
-    println("text of " + elem.getTagName + ": " + text)
+    println("FS_ReplacedElementFactory.getParentText text of " + elem.getTagName + ": " + text)
     
     if (text.length > 0)
       Some(text)
@@ -165,17 +165,17 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
   }
 
   def reset(): Unit = {
-    //println("RESEEEEEEEEEEEET")
+    //println("FS_ReplacedElementFactory.reset")
     loadingImages.clear()
     loadedImages.clear()
   }
   
   def remove(e: DOM_Element): Unit = {
-    println("remove " + e.toString)
+    println("FS_ReplacedElementFactory.remove " + e.toString)
   }
   
   def setFormSubmissionListener(l: FormSubmissionListener): Unit = {
-    println("setFormSubmissionListener " + l)
+    println("FS_ReplacedElementFactory.setFormSubmissionListener " + l)
   }
 }
 

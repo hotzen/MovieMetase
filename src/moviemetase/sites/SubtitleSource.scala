@@ -99,7 +99,7 @@ object SubtitleSource {
     import XOM._
     val logID = "SubtitleSource_ReleasePageExtractor(" +  url.toString + ")"
 
-    def process(doc: nu.xom.Document): List[ReleasePageInfo] = {
+    def processDocument(doc: nu.xom.Document): List[ReleasePageInfo] = {
       val infos = new ListBuffer[ReleasePageInfo]
       val ctx = Namespaces.XHTML
       
@@ -139,7 +139,7 @@ object SubtitleSource {
     import XOM._
     val logID = "SubtitleSource_SubtitlePageExtractor(" +  url.toString + ")"
     
-    def process(doc: nu.xom.Document): Option[SubtitlePageInfo] = {
+    def processDocument(doc: nu.xom.Document): Option[SubtitlePageInfo] = {
       
       val ctx = Namespaces.XHTML
       

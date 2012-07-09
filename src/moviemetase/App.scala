@@ -1,5 +1,7 @@
 package moviemetase
 
+import java.io.IOException
+
 object App {
   val name    = "MovieMetase"
   val version = "0.1"
@@ -27,15 +29,12 @@ object App {
   def resource(path: String): java.net.URL = {
     val url = this.getClass.getResource(path)
     if (url == null)
-      throw new Exception("resource '" + path + "' does not exist")
+      throw new IOException("resource '" + path + "' does not exist")
     url
   }
 
   val userDir: java.io.File = new java.io.File( util.Properties.userHome )
-    
-//  def resourceFromUserDirectory(path: String): java.io.File =
-//    new java.io.File(userDir, path)
-  
+
   def dataDir(subDirName: String = ""): java.io.File = {
     val baseDir = new java.io.File(userDir, "MovieMetase")
       

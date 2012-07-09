@@ -7,26 +7,33 @@ import scala.collection.mutable.Stack
 import java.util.concurrent.BlockingQueue
 
 object FileScanner {
-  def createQueue[A](capacity: Int): BlockingQueue[A] =
+  def createQueue[A](capacity: Int = Int.MaxValue): BlockingQueue[A] =
     new java.util.concurrent.LinkedBlockingQueue[A]( capacity )
   
-  def createUnboundedQueue[A](): BlockingQueue[A] = 
-    new java.util.concurrent.LinkedBlockingQueue[A]( )
+//  def createUnboundedQueue[A](): BlockingQueue[A] = 
+//    new java.util.concurrent.LinkedBlockingQueue[A]( )
     
   def findFilesTask(baseDir: Path, filter: Path => Boolean, queue: BlockingQueue[Path]): FileScannerTask[Path] =
     new FileScannerTask(baseDir, new FileCollector(queue, filter))
+  
+  def createTerminatorTask[A](queue: BlockingQueue[A], terminator: A): Task[Unit] = new Task[Unit] {
+    def execute(): Unit = {
+      queue offer terminator
+      ()
+    }
+  }
 }
 
 trait QueueingFileVisitor[A] extends FileVisitor[Path] {
   val queue: BlockingQueue[A]
 }
 
-case class QueueTerminatorTask[A](queue: BlockingQueue[A], terminator: A) extends Task[Unit] {
-  def execute(): Unit = {
-    queue offer terminator
-    ()
-  }
-}
+//case class QueueTerminatorTask[A](queue: BlockingQueue[A], terminator: A) extends Task[Unit] {
+//  def execute(): Unit = {
+//    queue offer terminator
+//    ()
+//  }
+//}
 
 case class FileScannerTask[A](baseDir: Path, visitor: QueueingFileVisitor[A]) extends Task[Unit] {
   def queue: BlockingQueue[A] = visitor.queue

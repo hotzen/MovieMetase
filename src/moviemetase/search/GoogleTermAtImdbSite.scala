@@ -4,55 +4,59 @@ package search
 import Util._
 import sites._
 import scala.collection.mutable.ListBuffer
+import moviemetase.sites.GoogleResult
 
-case class GoogleTermAtImdbSite(term: String, requiresMatch: Option[GoogleResult => Boolean] = None) extends Task[List[Movie]] with Logging {
+case class GoogleTermAtImdbSite(term: String, filter: Option[GoogleResult => Boolean] = None) extends Task[List[Movie]] with Logging {
   val logID = "GoogleTermAtImdbSite"
   
   def query = term + " site:imdb.com/title/"
   
   val Max = 3
-  
-  final def execute(): List[Movie] = {
-    val googleRes = Google.Query(query).execute()
     
-    val imdbTitleUrls = googleRes.filter(res => requiresMatch match {
-      case Some(f) => f(res)
-      case None    => true
-    }).flatMap(r => {
-      IMDB.extractTitleUrls( r.url.toString )
-    })
+  def execute(): List[Movie] = {
+    val results  = Google.Query(query).execute()
+    
+    val filtered = results.filter( filterResult(_) )
+    if (filtered.isEmpty)
+      Nil
+    else
+      processResults( filtered )
+  }
+ 
+  def filterResult(res: GoogleResult): Boolean = filter match {
+    case Some(f) => f(res)
+    case None    => true
+  }
+    
+  def processResults(results: List[GoogleResult]): List[Movie] = {
+    
+    val imdbUrls = results.flatMap( res => IMDB.extractTitleUrls( res.url.toString ) )
 
-    if (imdbTitleUrls.isEmpty) {
-      trace("Nothing found")
+    if (imdbUrls.isEmpty) {
+      trace("No IMDB-URLs found")
       return Nil 
     }
-        
-    val distinctTitleUrls = imdbTitleUrls.distinctWithCount()
+
+    val candidates = imdbUrls.distinctWithCount()
 
     if (isLogging(LogLevel.Trace))
-      for (url <- distinctTitleUrls)
-        trace("IMDB URL: '" + url._1 + "' (" + url._2 + ")")
+      for (url <- candidates)
+        trace("IMDB: '" + url._1 + "' (" + url._2 + ")")
     
-    if (distinctTitleUrls.length > Max)
-      warn("More than " + Max + " IMDB-URLs found, restricting to the top " + Max)
+    if (candidates.length > Max)
+      warn("More than " + Max + " IMDB-URLs found, restricting to top " + Max)
 
-    val tryUrls = distinctTitleUrls.take( Max ).map(_._1)
+    val outcome = candidates.take( Max ).map(_._1)
     
-    for (url <- tryUrls) {
-      trace("using: " + url)
-    }
-
-    // IMDB-Title-URL => IMDB-ID
-    val tryIds =
-      for (url <- tryUrls)
-        yield IMDB.extractId(url).head
-        
-    // fetch
-    val futs =
-      for (id <- tryIds)
+    val imdbIDs = {
+      for (url <- outcome)
+        yield IMDB.extractID(url)
+    }.flatten
+    
+    val fetching =
+      for (id <- imdbIDs)
         yield IMDB.FetchByID(id).submit()
-
-    // join
-    futs.flatMap( _.get() )
+            
+    fetching.flatMap( fut => fut.get() )
   }
 }

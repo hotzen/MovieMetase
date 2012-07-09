@@ -41,33 +41,7 @@ class MoviesPanel(val top: UI) extends FS_ScrollPane {
       <h1>
         { movie.title }{ if (movie.year > 0) " (" + movie.year + ")" }
       </h1>
-      <div class="genres-directors-actors">
-        <span class="genres">
-          <span class="label">Genres:</span>
-          { for (info <- movie.infos.collect({ case i:MovieInfos.Genre => i })) yield {
-            <span class="genre">{ info.name }</span>
-          }}
-        </span>
-        <span class="directors">
-          <span class="label">Director:</span>
-          { for (info <- movie.infos.collect({ case i:MovieInfos.Director => i })) yield {
-            <span class="director">{ info.name }</span>
-          }}
-        </span>
-        <span class="actors">
-          <span class="label">Actors:</span>
-          { for (info <- movie.infos.collect({ case i:MovieInfos.Actor => i })) yield {
-            <span class="actor">{ info.name }</span>
-          }}
-        </span>
-      </div>
-      {for (info <- movie.infos.collect({ case i:MovieInfos.Tagline => i})) yield {
-        <blockquote class="description">\u00AB { info.text } \u00BB</blockquote>
-      }}
-      {for (info <- movie.infos.collect({ case i:MovieInfos.Summary => i })) yield {
-        <blockquote class="summary">\u00AB { info.text } \u00BB</blockquote>
-      }}
-      <div class="webpages">
+      <span class="websites">
         { for (info <- movie.infos.collect({ case i:MovieInfos.Website => i })) yield {
           val url = info.page
           val host = url.getHost
@@ -76,11 +50,53 @@ class MoviesPanel(val top: UI) extends FS_ScrollPane {
 
           <a href={ url.toExternalForm }>{ label }</a>
         }}
+      </span>
+      <div class="genres-directors-actors">
+
+        { val genres = movie.infos.collect({ case i:MovieInfos.Genre => i })
+          if (!genres.isEmpty) {
+            <span class="genres">
+              <span class="label">Genres:</span>
+              { for (info <- genres) yield {
+                <span class="genre">{ info.name }</span>
+              }}
+            </span>
+          }
+        }
+                
+        { val directors = movie.infos.collect({ case i:MovieInfos.Director => i })
+          if (!directors.isEmpty) {
+            <span class="directors">
+              <span class="label">Director:</span>
+              { for (info <- directors ) yield {
+                <span class="director">{ info.name }</span>
+              }}
+            </span>
+          }
+        }
+        
+        { val actors = movie.infos.collect({ case i:MovieInfos.Actor => i })
+          if (!actors.isEmpty) {
+            <span class="actors">
+              <span class="label">Actors:</span>
+              { for (info <- actors) yield {
+                <span class="actor">{ info.name }</span>
+              }}
+            </span>
+          }
+        }
+        
       </div>
+      {for (info <- movie.infos.collect({ case i:MovieInfos.Tagline => i})) yield {
+        <blockquote class="description">\u00AB { info.text } \u00BB</blockquote>
+      }}
+      /*{for (info <- movie.infos.collect({ case i:MovieInfos.Summary => i })) yield {
+        <blockquote class="summary">\u00AB { info.text } \u00BB</blockquote>
+      }}*/
       <div style="clear: both;" />
     </div>
   
-  def selector(m: Movie, i: MovieInfo): String = m.id + "/" + i.id
+  //def selector(m: Movie, i: MovieInfo): String = m.id + "/" + i.id
 
   val movies = scala.collection.mutable.Map[String, Movie]()
         
