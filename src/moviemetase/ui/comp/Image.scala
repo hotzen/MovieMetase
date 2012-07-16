@@ -1,5 +1,6 @@
 package moviemetase
 package ui
+package comp
 
 import java.net.URL
 import java.awt.Dimension
@@ -9,9 +10,6 @@ import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
 import javax.swing.JComponent
-import java.awt.event.MouseAdapter
-import scala.swing.Publisher
-import java.awt.event.MouseEvent
 
 object JImage {
   val OriginalWidth = None
@@ -78,7 +76,7 @@ class ImageLoader(url: java.net.URL, callback: BufferedImage => Unit, resizeTo: 
   
   def execute(): Unit =
     try {
-      trace("ImageIO reading ...")
+      //trace("ImageIO reading ...")
       val img = ImageIO.read(url)
       
       if (img == null)
@@ -148,11 +146,11 @@ class CachingImageLoader(url: java.net.URL, callback: BufferedImage => Unit, res
     try {
       cache get key match {
         case Some(img) => {
-          trace("HIT")
+          //trace("HIT")
           callback(img)
         }
         case None => {
-          trace("MISS")
+          //trace("MISS")
           loader.execute()
         }
       }
@@ -161,9 +159,9 @@ class CachingImageLoader(url: java.net.URL, callback: BufferedImage => Unit, res
     }
 
   def onImageLoaded(img: BufferedImage): Unit = {
-    trace("PUT")
+    //trace("PUT")
     cache put (key, img)
     
     callback(img)
   }
-}
+} 

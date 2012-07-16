@@ -1,5 +1,6 @@
 package moviemetase
 package ui
+package comp
 
 import scala.swing.Publisher
 import scala.swing.event.Event
@@ -7,6 +8,9 @@ import javax.swing.{JComponent, TransferHandler}
 import java.awt.datatransfer.{Transferable, DataFlavor}
 import java.net.URI
 import java.io.{File => JFile}
+import FileDropHandler.FilesDropped
+import java.io.{File => JFile}
+import scala.Option.option2Iterable
   
 object FileDropHandler {
   

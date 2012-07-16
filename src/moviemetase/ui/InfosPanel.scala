@@ -6,6 +6,9 @@ import scala.swing.event._
 import java.net.URL
 import javax.swing.BoxLayout
 
+import moviemetase.ui.comp.WrapLayout;
+import comp._
+
 class InfosPanel(val top: UI) extends MigPanel("fill") {
   
   val postersPanel   = new InfoPostersPanel(top)
@@ -74,9 +77,9 @@ class InfoPostersPanel(val top: UI) extends ScrollPane {
   listenTo( top.moviesPanel )
   
   reactions += {
-    case SearchSelected(row) => {
-      println("InfoPostersPanel: SearchSelected " + row)
-      row.movies.headOption match {
+    case SearchSelected(search) => {
+      println("InfoPostersPanel: SearchSelected " + search)
+      search.result.headOption match {
         case Some(movie) => render( movie.infos )
         case None =>
       }
@@ -135,9 +138,9 @@ class InfoBackdropsPanel(val top: UI) extends ScrollPane {
   listenTo( top.moviesPanel )
   
   reactions += {
-    case SearchSelected(row) => {
-      println("InfoBackdropsPanel: SearchSelected " + row)
-      row.movies.headOption match {
+    case SearchSelected(search) => {
+      println("InfoBackdropsPanel: SearchSelected " + search)
+      search.result.headOption match {
         case Some(movie) => render( movie.infos )
         case None =>
       }

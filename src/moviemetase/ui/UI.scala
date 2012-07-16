@@ -9,6 +9,7 @@ import java.net.URL
 import java.awt.Color
 import javax.swing.BorderFactory
 import javax.swing.border.EtchedBorder
+import comp._
 
 object UI {
   def start(): Unit = {
@@ -76,28 +77,45 @@ class UI extends Frame {
   
   contents = new MigPanel("fill") {
     border = Swing.EmptyBorder(5, 5, 5, 5)
-    
-    val top = new MigPanel("fill", "[][grow,fill]") {
-      add(dropPanel, "width 120!, height 120!")
-      add(searchesPanel, "height 120!")
+        
+    val leftPanel = new MigPanel("fill", "center") {
+      add(dropPanel, "width 130, center, dock north")
+      add(searchesPanel, "grow")
     }
-    add(top, "dock north, height 130!")
-
-    add(new SplitPane {
+    
+    val rightPanel = new SplitPane {
+      resizeWeight = 0.97
+      oneTouchExpandable = true
+      
       topComponent  = new SplitPane {
+        resizeWeight = 0.5 // auto-resize even
+        oneTouchExpandable = false
+        
         topComponent    = moviesPanel
         bottomComponent = infosPanel
-    
-        resizeWeight = 0.5 // auto-resize even
-        oneTouchExpandable = false 
       }
-      
       bottomComponent = logPanel
-      
-      resizeWeight = 0.97
-      oneTouchExpandable = false
-    }, "grow")
-
+    } 
+    
+    add(new SplitPane(Orientation.Vertical, leftPanel, rightPanel), "grow")
+    
+    //add(left, "dock west, width 200")
+//    
+//    add(new SplitPane {
+//      topComponent  = new SplitPane {
+//        topComponent    = moviesPanel
+//        bottomComponent = infosPanel
+//    
+//        resizeWeight = 0.5 // auto-resize even
+//        oneTouchExpandable = false 
+//      }
+//      
+//      bottomComponent = logPanel
+//      
+//      resizeWeight = 0.97
+//      oneTouchExpandable = false
+//    }, "grow")
+  
     add(statusBar, "dock south, grow, height 25!")
   }
   
@@ -175,7 +193,7 @@ class UI extends Frame {
       
     val movie = Movie(infos).get
     
-    val row = SearchRow(false, "term", "dir", "file", "path", movie :: Nil)
+    //val row = SearchRow(false, "term", "dir", "file", "path", movie :: Nil)
     //UI.publish(searchesPanel)( SearchSelected(row) )
   }
 }

@@ -43,24 +43,26 @@ h1 {
 
 img.main {
 	float: left;
-	width: 150px;
+	width: 120px;
 	border-width: 0;
 	padding-right: 5px;
 }
 
-.genres-directors-actors {
+.directors-actors {
 	margin: 2px;
 	margin-left: 0;
 }
 
-.genres, .actors, .directors {
+/* .genres, .actors, .directors { */
+.actors, .directors {
 	font-family: sans-serif;
 	font-size: 10pt;
 	display: inline-block;
 	margin-right: 30px;
 }
 
-.genre, .actor, .director {
+/* .genre, .actor, .director { */
+.actor, .director {
 	display: inline-block;
 	margin: 2px;
 }

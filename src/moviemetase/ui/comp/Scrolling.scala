@@ -1,14 +1,13 @@
-package moviemetase.ui
+package moviemetase.ui.comp
 
 import javax.swing.JPanel
 import javax.swing.{Scrollable => JScrollable}
-import javax.swing.BoxLayout
 import java.awt.Dimension
 import java.awt.Rectangle
 import scala.swing.SequentialContainer
-import scala.swing.Orientation
 import scala.swing.Scrollable
 import scala.swing.Panel
+import javax.swing.{Scrollable => JScrollable}
 
 class ScrollablePanel extends Panel with SequentialContainer.Wrapper with Scrollable.Wrapper {
   

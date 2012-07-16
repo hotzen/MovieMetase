@@ -164,7 +164,9 @@ case class FileInfo(path: String, dirName: String, fileName: String) {
       fileName.substring(0, pos)
   }
   
-  override def toString: String = path
+  //override def toString: String = path
+  
+  override def toString: String = dirName + "/" + fileName
   
 //  override def toString: String = {
 //    val sb = new StringBuffer("FileInfo(")

@@ -4,7 +4,9 @@ package ui
 import scala.swing._
 import scala.swing.Swing._
 import scala.swing.event._
+import java.nio.file._
 import moviemetase.search.MovieSearch
+import comp._
 
 case class SearchingMoviesByFile(file: FileInfo) extends Event
 case class FoundMoviesByFile(file: FileInfo, movies: List[Movie]) extends Event
@@ -40,6 +42,7 @@ class DropPanel(val top: UI) extends Component {
     
     val droppedDirsCount = ds.length
     val droppedDirs      = ( droppedDirsCount > 0)
+    val droppedOneDir    = ( droppedDirsCount == 1)
     val droppedMultiDirs = ( droppedDirsCount > 1)
         
     val ScanDirAll  = "Scan all"
@@ -48,7 +51,9 @@ class DropPanel(val top: UI) extends Component {
     val ScanOpts = Array[Object](ScanDirAll, ScanDirAsk, ScanDirDont)
     
     val dirsOption =
-      if (droppedMultiDirs) {
+      if (droppedOneDir) ScanDirAll
+      
+      else if (droppedMultiDirs) {
         val sb = new StringBuilder
         sb append "Scan the following directories for movies?\n"
         for (dir <- files if dir.isDirectory)
@@ -68,10 +73,8 @@ class DropPanel(val top: UI) extends Component {
           case 1  => ScanDirAsk
           case _  => ScanDirDont
         }
-      } else ScanDirAsk
+      } else ScanDirDont
     
-    import java.nio.file._
-
     def checkPath(p: Path): Boolean =
       Analyzer.isExt( FileInfo(p).fileExt ) // only if registered extension
           
@@ -116,17 +119,24 @@ class DropPanel(val top: UI) extends Component {
 
     val publish = UI.publish(this) _
     
-    val searchTask = new Task[Unit] {
+    val searchTask = new Task[Unit] with Logging {
+      val logID = "SearchTask"
       val search = new MovieSearch()
+  
       def execute(): Unit = {
         while (true) {
           val file = q.take() // blocking
           if (file == T)
             return ()
-        
+          
           val fileInfo = FileInfo(file)
+          
+          info("searching by file " + fileInfo)
           publish( SearchingMoviesByFile(fileInfo) )
+          
           val movies = search searchByFile fileInfo // blocking
+          
+          info("search finished for file " + fileInfo)
           publish( FoundMoviesByFile(fileInfo, movies) )
         }
       }

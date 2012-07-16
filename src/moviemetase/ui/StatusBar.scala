@@ -5,6 +5,7 @@ import scala.swing._
 import java.awt.Dimension
 import javax.swing.BorderFactory
 import java.awt.{Color, Font}
+import comp._
 
 class StatusBar(val top: UI) extends MigPanel("fillx, aligny center") {
   

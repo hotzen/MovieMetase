@@ -1,5 +1,6 @@
 package moviemetase
 package ui
+package comp
 
 import scala.swing.{Panel, Component, LayoutContainer}
 import net.miginfocom.swing.MigLayout

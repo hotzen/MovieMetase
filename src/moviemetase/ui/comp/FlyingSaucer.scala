@@ -1,10 +1,10 @@
 package moviemetase
 package ui
+package comp
 
-import org.xhtmlrenderer.simple.{XHTMLPanel, FSScrollPane}
+import org.xhtmlrenderer.simple.FSScrollPane
 import java.net.{URI, URL}
-import java.io.File
-import org.w3c.dom.{Element => DOM_Element, Text => DOM_Text}
+import org.w3c.dom.{Element => DOM_Element}
 import org.xhtmlrenderer.layout.LayoutContext
 import org.xhtmlrenderer.simple.extend.FormSubmissionListener
 import org.xhtmlrenderer.swing._
@@ -14,11 +14,10 @@ import org.xhtmlrenderer.render._
 import javax.imageio.ImageIO
 import scala.swing.ScrollPane
 import java.awt.Image
-import java.awt.Dimension
 import java.awt.image.BufferedImage
 import org.w3c.dom._
-import scala.swing.Publisher
 import javax.swing.JCheckBox
+import FS_ReplacedElementFactory.LoadingImg
 
 object FlyingSaucer {
 
@@ -83,22 +82,21 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
     
   def replaceImage(ctx: LayoutContext, box: BlockBox, uac: UserAgentCallback, elem: DOM_Element, w: Int, h: Int): ReplacedElement = {
     val ns = ctx.getNamespaceHandler 
-    
+        
     val src = ns.getImageSourceURI(elem);
     if (src == null)
       throw new NullPointerException("NULL img.src")
-    
-    val url = new URL(src)
-    
-    def imageLoadedCallback(img: BufferedImage): Unit = UI run {
-      loadedImages  += (src -> img)
-      loadingImages -= src
-
-      if (loadingImages.size == 0 || loadedImages.size % 3 == 0)
-        panel.relayout()
-    }
-    
+        
+    // external image
     if (src startsWith "http://") {
+      def onImageLoaded(img: BufferedImage): Unit = UI run {
+        loadedImages  += (src -> img)
+        loadingImages -= src
+
+        if (loadingImages.size == 0 || loadedImages.size % 3 == 0)
+          panel.relayout()
+      }
+      
       loadedImages get src match {
         case Some(img) => // already loaded
           new ImageReplacedElement(img, w, h)
@@ -110,8 +108,10 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
           else { // not loading yet
             loadingImages += src
             
+            val url = new URL(src)
+            
             val resizeTo = (w, h)
-            val loader = new CachingImageLoader(url, imageLoadedCallback, Some(resizeTo))
+            val loader = new CachingImageLoader(url, onImageLoaded, Some(resizeTo))
             loader.submit()
             
             //new ImageReplacedElement(LoadingImg, w, h)
@@ -119,10 +119,8 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
           }
         }
       }
-    }
-    
-    // delegate to UAC
-    else {
+    // load image normally
+    } else {
       val fsImg = uac.getImageResource(src).getImage()
       if (fsImg == null)
         throw new NullPointerException("could not load resource '"+src+"'")
@@ -130,7 +128,6 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
       val img = fsImg.asInstanceOf[AWTFSImage].getImage
       if (img == null)
         throw new NullPointerException("loaded resource '"+src+"' is an invalid AWT-Image")
-      
       new ImageReplacedElement(img, w, h)
     }
   }

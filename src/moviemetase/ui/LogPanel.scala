@@ -6,6 +6,7 @@ import scala.swing.Swing._
 import java.io.Writer
 import java.awt.Font
 import scala.swing.event.ButtonClicked
+import comp._
 
 class JTextWriter(area: javax.swing.JTextArea, autoscroll: Boolean) extends java.io.Writer {
   import javax.swing.text.DefaultCaret
@@ -62,5 +63,6 @@ class LogPanel(val top: UI) extends MigPanel("fill") {
   }
   
   // enable Tracing
-  Trace.doClick()
+  //Trace.doClick()
+  Info.doClick
 }

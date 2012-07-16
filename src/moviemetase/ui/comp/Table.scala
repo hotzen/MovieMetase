@@ -1,8 +1,9 @@
-package moviemetase.ui
+package moviemetase
+package ui
+package comp
 
 import scala.swing._
 import scala.collection.mutable.ArrayBuffer
-import java.awt.Dimension
 import javax.swing.table._
 
 case class TableCol(label: String, width: Int) {

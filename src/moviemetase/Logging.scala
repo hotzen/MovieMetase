@@ -18,7 +18,7 @@ case class LogLevel(id: Int, label: String) {
 }
 
 object Logging {
-  @volatile var out: PrintWriter = new PrintWriter( System.out )
+  var out: PrintWriter = new PrintWriter( System.out )
   
   @volatile var level: LogLevel = LogLevel.Info
 
@@ -55,8 +55,10 @@ trait Logging {
         logBuf append k append "=" append v append ";"
       logBuf append "}"
     }
-    
-    Logging.out println logBuf.toString
-    Logging.out.flush()
+        
+    Logging.out synchronized {
+      Logging.out.println( logBuf.toString )
+      Logging.out.flush()
+    }
   }
 }
