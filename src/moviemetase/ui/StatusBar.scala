@@ -30,6 +30,16 @@ class StatusBar(val top: UI) extends MigPanel("fillx, aligny center") {
   }
   add(progressBar, "dock east, width 50%, height 20!")
   
+  TaskManager registerOnChange { count => UI.run {
+    progressBar.visible =
+      if (count > 0) true
+      else false
+     
+    taskCountLbl.text =
+      if (count > 0) count.toString
+      else ""
+  }}  
+  
 //  listenTo( TaskManager.progress )
 //  reactions += {
 //    case TaskManager.ActiveTasks(count) => {

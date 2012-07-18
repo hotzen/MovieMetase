@@ -32,6 +32,6 @@ object SearchTest {
     }
     
     println("DONE, shutting down...")
-    Scheduler.shutdown()
+    TaskManager.shutdown()
   }
 }

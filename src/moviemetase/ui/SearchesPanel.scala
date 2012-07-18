@@ -1,28 +1,151 @@
 package moviemetase
 package ui
 
-import scala.swing._
-import scala.swing.Swing._
-import scala.swing.event._
-import javax.swing.ImageIcon
-import javax.swing.Icon
-import org.xhtmlrenderer.swing.BasicPanel
-import org.xhtmlrenderer.swing.NaiveUserAgent
-import org.xhtmlrenderer.swing.Java2DTextRenderer
-import org.xhtmlrenderer.swing.HoverListener
-import org.xhtmlrenderer.swing.CursorListener
-import org.xhtmlrenderer.simple.XHTMLPanel
-import org.xhtmlrenderer.simple.extend.XhtmlNamespaceHandler
-import org.xhtmlrenderer.extend.UserAgentCallback
+//import scala.swing._
+//import scala.swing.Swing._
+import javax.swing._
+import java.awt.{Component => JComponent}
 import scala.xml.Elem
 import org.w3c.dom.Element
+import scala.collection.mutable._
+import javax.swing._
+import javax.swing.event._
+import scala.swing.event.Event
 import comp._
-import scala.collection.mutable.ListBuffer
+import scala.swing.ScrollPane
+import scala.swing.Component
+import java.awt.Color
+import javax.swing.border.EtchedBorder
 
 case class SearchSelected(search: Search) extends Event
 
-case class Search(fileInfo: FileInfo, completed: Boolean, result: List[Movie])
+case class Search(fileInfo: FileInfo, completed: Boolean, result: List[Movie]) {
+  override def toString() = {
+    val sb = new StringBuilder
+    sb append "["
+    sb append { if (completed) "X" else " " }
+    sb append "] "
+    sb append fileInfo.dirName
+    sb append " /\n"
+    sb append fileInfo.fileName
+    sb.toString
+  }
+}
 
+class SearchesPanel(val top: UI) extends ScrollPane {
+  import language.reflectiveCalls
+  
+  var searches = List[Search]()
+  
+  val listModel = new javax.swing.AbstractListModel[Search] {
+    def getElementAt(n: Int) = searches(n)
+    def getSize = searches.length
+    
+    def addPending(fileInfo: FileInfo) {
+      val newSearch = Search(fileInfo, false, Nil)
+      searches = newSearch :: searches
+      fireIntervalAdded(newSearch, 0, 0)
+    }
+    
+    def addCompleted(fileInfo: FileInfo, movies: List[Movie]) {
+      val newSearch = Search(fileInfo, true, movies)
+      
+      val parted: (List[(Search,Int)], List[(Search,Int)]) =
+        searches.zipWithIndex.partition({ case (search, idx) => search.fileInfo != newSearch.fileInfo })
+
+      val (keepTpl, removeTpl) = parted
+      
+      searches = keepTpl.map( _._1 )
+      
+      for ((search, idx) <- removeTpl)
+        fireIntervalRemoved(search, idx, idx)
+      
+      searches = newSearch :: searches
+      fireIntervalAdded(newSearch, 0, 0)
+    }
+  }
+  
+  val list = new JList(listModel)
+  list setSelectionMode ListSelectionModel.SINGLE_SELECTION
+  
+  list.addListSelectionListener(OnListSelectedEvent(evt => {
+    val idx = evt.getFirstIndex
+    if (idx < searches.length) {
+      val selSearch = searches( idx )
+      SearchesPanel.this.publish( SearchSelected(selSearch) )
+    }
+  }))
+  
+  list.setCellRenderer(ListLabelRenderer( (lbl, idx, selected) => {
+    if (idx < searches.length) {
+      val search = searches(idx)
+          
+      lbl setOpaque true
+      
+      (search.completed, search.result.length) match {
+        case (true, 0) => {
+          lbl.setIcon( new ImageIcon(App.resource("/res/fail.png")) )
+        }
+        case (true, 1) => {
+          lbl.setIcon( new ImageIcon(App.resource("/res/ok.png")) )
+        }
+        case (true, _) => {
+          lbl.setIcon( new ImageIcon(App.resource("/res/plus.png")) )
+        }
+        case (false, _) => {
+          lbl.setIcon( new ImageIcon(App.resource("/res/clouds.png")) )
+        }
+      }
+      
+      if (selected) {
+        lbl.setBackground( Color.LIGHT_GRAY )
+        lbl.setBorder( BorderFactory.createLineBorder(Color.BLUE) )
+      } else {
+        lbl.setBackground( Color.WHITE )
+        lbl.setBorder( BorderFactory.createLineBorder(Color.BLACK) )
+      }
+      
+      val sb = new StringBuilder
+      sb append "<html>"
+      sb append search.fileInfo.dirName
+      sb append "<br>"
+      sb append "<strong>/ </strong>"
+      sb append search.fileInfo.fileName
+      sb append "</html>"
+      
+      lbl.setText(sb.toString)
+    }
+  }))
+  
+  contents = Component wrap list  
+
+  listenTo( top.dropPanel )
+  reactions += {
+    case SearchingMoviesByFile(fileInfo) =>
+      listModel.addPending(fileInfo)
+    
+    case FoundMoviesByFile(fileInfo, movies) =>
+      listModel.addCompleted(fileInfo, movies)
+  }
+}
+
+case class ListLabelRenderer[A](f: (JLabel, Int, Boolean) => Unit) extends ListCellRenderer[A] {
+  val lbl = new JLabel 
+  def getListCellRendererComponent(list: JList[_ <: A], value: A, idx: Int, selected: Boolean, focused: Boolean): JComponent = {
+    f(lbl, idx, selected)
+    lbl
+  }
+}
+
+case class OnListSelectedEvent(f: ListSelectionEvent => Unit) extends ListSelectionListener {
+  def valueChanged(evt: ListSelectionEvent) {
+    if (!evt.getValueIsAdjusting)
+      f( evt )
+  }
+}
+
+
+/*
 class SearchesPanel(val top: UI) extends FS_ScrollPane {
   
   verticalScrollBarPolicy   = ScrollPane.BarPolicy.AsNeeded
@@ -46,10 +169,10 @@ class SearchesPanel(val top: UI) extends FS_ScrollPane {
       case (true, _)   => ("search matches", "/res/plus.png")
     }
         
-    <div class={ clz }>
+    <div class={ clz } select={ "SEL_" + search.fileInfo.path  }>
       <img src={ img } />
-      <div class="dir" select={ search.fileInfo.dirName }>{ search.fileInfo.dirName }</div>
-      <div class="file" select={ search.fileInfo.dirName }>{ search.fileInfo.fileName }</div>
+      <div class="dir" select={ "OPEN_" + search.fileInfo.dirPath }>{ search.fileInfo.dirName }</div>
+      <div class="file">/ { search.fileInfo.fileName }</div>
     </div>
   }
     
@@ -61,14 +184,30 @@ class SearchesPanel(val top: UI) extends FS_ScrollPane {
   panel.addMouseTrackingListener( new CursorListener )
   panel.addMouseTrackingListener( new FS_MouseListener {
     
-    override def select(panel: FS_Panel, id: String, elem: Element): Unit = {
-      val nsh = panel.getSharedContext.getNamespaceHandler
-
-      toggleCssClass(elem, "selected", nsh)
-      println("SearchesPanel.select(" + id + ")")
+  override def select(panel: FS_Panel, id: String, elem: Element): Unit = {
+    val nsh = panel.getSharedContext.getNamespaceHandler
       
+    println("SearchesPanel.select(" + id + ")")
+    
+    if (id.startsWith("SEL_")) {
+      toggleCssClass(elem, "selected", nsh)
       panel.reload()
       panel.relayout()
+      
+      val selPath = id.substring(4)
+      println("selected: " + selPath)
+      
+    } else if (id.startsWith("OPEN_")) {
+      try {
+        val f = new java.io.File( id.substring(5) )
+        UI.desktop match {
+          case Some(dsk) => dsk.open(f)
+          case None =>
+        }
+      } catch {
+        case e:Exception =>
+      }
+    }
       
 //      movies.get(id) match {
 //        case Some(movie) => MoviesPanel.this.publish( MovieSelected(movie) ) 
@@ -114,3 +253,4 @@ class SearchesPanel(val top: UI) extends FS_ScrollPane {
     }
   }
 }
+*/

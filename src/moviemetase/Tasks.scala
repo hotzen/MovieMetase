@@ -1,26 +1,16 @@
 package moviemetase
 
-import java.util.concurrent.ThreadFactory
-import java.util.concurrent.Executors
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.ForkJoinPool
-import java.util.concurrent.ThreadPoolExecutor
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.Future
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.Callable
+import java.util.concurrent._
+import java.util.concurrent.atomic.AtomicInteger
 import java.net.URL
+import java.net.HttpURLConnection
+import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 import java.io.PrintStream
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.ThreadPoolExecutor.AbortPolicy
-import java.net.HttpURLConnection
-import scala.swing.Publisher
-import java.io.File
 import java.io.IOException
 
-case class TaskThreadFactory(prefix: String = "", daemon: Boolean = false, priority: Int = Thread.NORM_PRIORITY) extends ThreadFactory {
+case class TaskThreadFactory(prefix: String = "T", daemon: Boolean = false, priority: Int = Thread.NORM_PRIORITY) extends ThreadFactory {
   val counter = new AtomicInteger(0)
 
   def newThread(r: Runnable): Thread = {
@@ -36,7 +26,8 @@ case class TaskThreadFactory(prefix: String = "", daemon: Boolean = false, prior
   }
 }
 
-object Scheduler {
+object TaskManager {
+  import scala.collection.mutable.Map
   
   val MinPoolSize = 4
   val MaxPoolSize = Integer.MAX_VALUE
@@ -44,16 +35,16 @@ object Scheduler {
   val MinIOPoolSize = 2
   val MaxIOPoolSize = 4
   
-  val ThreadKeepAlive = 60L
+  val ThreadKeepAliveSecs = 10L
     
   def createPool(size: Int, limit: Int): ExecutorService = {
-    val q  = new LinkedBlockingQueue[Runnable]()
-    val tf = new TaskThreadFactory()
-    new ThreadPoolExecutor(size, limit, ThreadKeepAlive, TimeUnit.SECONDS, q, tf)
+    val q = new LinkedBlockingQueue[Runnable]()
+    val f = new TaskThreadFactory()
+    new ThreadPoolExecutor(size, limit, ThreadKeepAliveSecs, TimeUnit.SECONDS, q, f)
   }
   
-  val pool = createPool(MinPoolSize, MaxPoolSize)
-  val ioPools = scala.collection.mutable.Map[String, ExecutorService]()
+  private val mainPool = createPool(MinPoolSize, MaxPoolSize)
+  private val ioPools  = Map[String, ExecutorService]()
   
   def ioPool(target: String): ExecutorService = ioPools.synchronized {
     ioPools get target match {
@@ -66,70 +57,39 @@ object Scheduler {
     }
   }
   
-  def schedule(c: =>Unit): Unit =
-    pool execute new  Runnable {
-      def run(): Unit = { c }
-    }
-  
-  def schedule(r: Runnable): Unit =
-    pool execute r
-    
-//  def schedule[A](t: Task[A]): Future[A] = t match {
-//    case io:IOTask =>
-//      ioPool( io.target ) submit t
-//
-//    case _ => {
-//      //publishMoreTasks()
-//      //taskPool submit new CompletionCallbackTask(task)
-//      Scheduler.pool submit task
-//    }
-//  }
-      
+  def pool(task: Task[_]): ExecutorService = task match {
+    case io:IOTask[_] => ioPool( io.target )
+    case _ => mainPool
+  }
+
   def shutdown(): Unit = {
-    pool.shutdownNow()
-
-    val shutdownIOPools = for ( (target, ioPool) <- ioPools) yield {
-      ioPool.shutdownNow()
-      ioPool
-    }
-    
-    pool.awaitTermination(3, TimeUnit.SECONDS)
-    shutdownIOPools.foreach( _.awaitTermination(3, TimeUnit.SECONDS) )
-  }
-}
-
-object TaskManager {
-  
-  private val counter = new AtomicInteger(0)
-  
-  def submit[A](task: Task[A]): Future[A] = task match {
-    case io:IOTask[_] =>
-      Scheduler.ioPool( io.target ) submit task
-
-    case _ =>
-      Scheduler.pool submit task
+    val allPools = mainPool :: ioPools.values.toList
+    allPools.foreach( _.shutdownNow() )
+    allPools.foreach( _.awaitTermination(3, TimeUnit.SECONDS) )
   }
   
-  def shutdown(): Unit = Scheduler.shutdown
+  def submit[A](task: Task[A]): Future[A] = {
+    notifyListeners( counter.incrementAndGet )
+    pool(task) submit new ScheduledTask(task)
+  }
   
-//  val progress = new Publisher { }
-//  case class ActiveTasks(tasks: Int) extends scala.swing.event.Event
-//    
-//  private def publishMoreTasks(): Unit = {
-//    val cnt = counter.incrementAndGet()
-//    ui.UI.publish(progress)( ActiveTasks(cnt) )
-//  }
-//
-//  private def publishLessTasks(): Unit = {
-//    val cnt = counter.decrementAndGet()
-//    ui.UI.publish(progress)( ActiveTasks(cnt) )
-//  }
-//
-//  private class CompletionCallbackTask[A](task: Task[A]) extends Callable[A] {
-//    def call(): A =
-//      try     task.execute()
-//      finally publishLessTasks()
-//  }
+  private val counter = new AtomicInteger()
+  private var listeners = List[Int => Unit]()
+  
+  def registerOnChange(f: Int => Unit): Unit = listeners synchronized {
+    listeners = f :: listeners
+  }
+  
+  private def notifyListeners(count: Int): Unit = listeners synchronized {
+    for (listener <- listeners)
+      listener( count )
+  }
+  
+  private class ScheduledTask[A](task: Task[A]) extends Callable[A] {
+    def call(): A =
+      try task.execute()
+      finally notifyListeners( counter.decrementAndGet() )
+  }
 }
 
 object Task {
@@ -142,13 +102,10 @@ object Task {
 //  }
 }
 
-trait Task[A] extends Callable[A] {
+trait Task[A] {
     
   // executes the task synchronously
   def execute(): A
-  
-  // Callable[A]
-  final def call(): A = execute()
   
   // submits the task for concurrent execution
   def submit(): Future[A] =
@@ -298,7 +255,7 @@ trait HttpTask[A] extends IOTask[A] {
 }
 
 
-// A specialisation that processes XML-data located by the URL
+// A specialization that processes XML-data located by the URL
 trait XmlTask[A] extends HttpTask[A] {
   import nu.xom.Builder
   
@@ -334,7 +291,7 @@ trait XhtmlTask[A] extends HttpTask[A] {
   def processDocument(doc: Document): A
 }
 
-// lazy parsing with JSoup
+// HTML parsing with JSoup
 trait HtmlTask[A] extends HttpTask[A] {
   import org.jsoup.Jsoup
   import org.jsoup.nodes.Document
@@ -347,12 +304,14 @@ trait HtmlTask[A] extends HttpTask[A] {
   def processDocument(doc: Document): A
 }
 
-case class DownloadTask(from: URL, to: File) extends Task[(URL,File)] with Logging {
+case class DownloadTask(from: URL, to: File) extends IOTask[(URL,File)] with Logging {
   import java.io.FileOutputStream
   import java.nio.channels.{Channels, ReadableByteChannel, FileChannel}
   import scala.util.control.Exception
   
   val logID = "DownloadTask(" + from.toExternalForm + " => " + to.getAbsolutePath + ")"
+  
+  def target = from.getHost
   
   def execute(): (URL, File) = {
     var is: InputStream = null
@@ -363,20 +322,18 @@ case class DownloadTask(from: URL, to: File) extends Task[(URL,File)] with Loggi
       is = from.openStream()
       val ich = Channels.newChannel( is )
       
-      trace("opening & locking target-file ...")
+      trace("transferring ...")
       os = new FileOutputStream( to )
       val och = os.getChannel()
       och.lock()
-      
-      trace("transferring ...")
       och.transferFrom(ich, 0, 1 << 24)
       
-      info("successfully downloaded")
+      info("done")
       (from, to)
     
     } finally {
-      try is.close() catch { case _ => }
-      try os.close() catch { case _ => }
+      try is.close() catch { case _: Throwable => }
+      try os.close() catch { case _: Throwable => }
     }
   }
 }

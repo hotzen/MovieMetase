@@ -101,12 +101,11 @@ trait MovieInfo {
   def order: Int
   def id: String = hashCode.toString
   
-//  var source: String = ""
-//  
-//  def withSourceInfo(info: String): this.type = {
-//    source = info
-//    this
-//  }
+  var source: String = ""
+  def withSourceInfo(info: String): this.type = {
+    source = info
+    this
+  }
 }
 
 

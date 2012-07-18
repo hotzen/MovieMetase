@@ -148,7 +148,7 @@ object FileInfo {
 
 case class FileInfo(path: String, dirName: String, fileName: String) {
   
-  lazy val fileExt: String = {
+  def fileExt: String = {
     val pos = fileName.lastIndexOf(".")
     if (pos < 0)
       ""
@@ -156,7 +156,7 @@ case class FileInfo(path: String, dirName: String, fileName: String) {
       fileName.substring(pos+1).toLowerCase
   }
   
-  lazy val fileNameWithoutExt: String = {
+  def fileNameWithoutExt: String = {
     val pos = fileName.lastIndexOf(".")
     if (pos < 0)
       fileName
@@ -164,6 +164,9 @@ case class FileInfo(path: String, dirName: String, fileName: String) {
       fileName.substring(0, pos)
   }
   
+  def dirPath: String =
+    new File(path).getParent.toString
+    
   //override def toString: String = path
   
   override def toString: String = dirName + "/" + fileName

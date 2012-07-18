@@ -5,6 +5,8 @@ import java.net.URLEncoder
 import scala.annotation.tailrec
 
 object Util {
+    import language.implicitConversions
+    
     implicit def stringUtils[A](s: String) = new StringUtils(s)
     implicit def regexUtils[A](r: scala.util.matching.Regex) = new RegexUtils(r)
     implicit def listUtils[A](ls: List[A]) = new ListUtils[A](ls)

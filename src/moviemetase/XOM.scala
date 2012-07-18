@@ -4,7 +4,8 @@ import nu.xom._
 import org.xml.sax.helpers.XMLReaderFactory
 
 object XOM {
-  
+  import language.implicitConversions
+    
   object Namespaces {
     val None  = null
     val XHTML = new XPathContext("xhtml", "http://www.w3.org/1999/xhtml")

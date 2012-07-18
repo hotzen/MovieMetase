@@ -33,7 +33,8 @@ class InfosPanel(val top: UI) extends MigPanel("fill") {
 }
 
 class InfoPostersPanel(val top: UI) extends ScrollPane {
-  
+  import language.reflectiveCalls
+    
   val ImageSize = (250, -1)
       
   val panel = new Panel with SequentialContainer.Wrapper {
@@ -103,7 +104,8 @@ class InfoPostersPanel(val top: UI) extends ScrollPane {
 }
 
 class InfoBackdropsPanel(val top: UI) extends ScrollPane {
-
+  import language.reflectiveCalls
+  
   val ImageSize = (600, -1)
       
   val panel = new Panel with SequentialContainer.Wrapper {

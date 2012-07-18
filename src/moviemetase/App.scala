@@ -22,7 +22,7 @@ object App {
   
   def shutdown() = {
     println("shutting down ...")
-    Scheduler.shutdown()
+    TaskManager.shutdown()
     System.exit(0)
   }
 

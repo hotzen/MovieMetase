@@ -14,9 +14,9 @@ class ScrollablePanel extends Panel with SequentialContainer.Wrapper with Scroll
   var scrollIncrement: Int = 10
   var blockScrollIncrement: Int = 50
   
-  val allowVerticalScrolling: Boolean   = true
-  val allowHorizontalScrolling: Boolean = false
-  
+  var allowVerticalScrolling: Boolean   = true
+  var allowHorizontalScrolling: Boolean = false
+    
   override lazy val peer = new JPanel with SuperMixin with JScrollable {
     def getPreferredScrollableViewportSize: Dimension =
       getPreferredSize

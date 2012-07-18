@@ -8,11 +8,10 @@ object JSoup {
   import language.implicitConversions
   
   implicit def _IterableElements(elems: Elements): Iterable[Element] =
-    scala.collection.JavaConversions.JIteratorWrapper( elems.iterator() ).toIterable
-    //scala.collection.convert.Wrappers.IteratorWrapper( elems.iterator() ).toIterable
+    scala.collection.convert.Wrappers.JIteratorWrapper[Element]( elems.iterator() ).toIterable
 
   implicit def _IterableAttributes(attrs: Attributes): Iterable[Attribute] =
-    scala.collection.JavaConversions.JIteratorWrapper( attrs.iterator() ).toIterable
+    scala.collection.convert.Wrappers.JIteratorWrapper[Attribute]( attrs.iterator() ).toIterable
     
   implicit def _RichElement(elem: Element): RichElement = new RichElement(elem)
   

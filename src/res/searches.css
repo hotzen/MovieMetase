@@ -43,3 +43,11 @@ img.main {
   font-family: serif;
   font-size: 9pt;
 }
+
+.dir {
+  text-decoration: underline;
+}
+
+.file {
+
+}
