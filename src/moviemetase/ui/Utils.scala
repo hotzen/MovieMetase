@@ -8,6 +8,16 @@ import java.awt.event.MouseEvent
 import scala.swing.Component
 import scala.swing.event.Event
 import scala.swing.event.MouseClicked
+import javax.swing.AbstractAction
+import java.awt.event.ActionEvent
+
+case class Action(f: ActionEvent => Unit) extends AbstractAction {
+  def actionPerformed(evt: ActionEvent): Unit =  f(evt)
+}
+
+
+
+
 
 class MovieSelection {
   import scala.collection.mutable.Map

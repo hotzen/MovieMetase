@@ -77,7 +77,7 @@ class DropPanel(val top: UI) extends Component {
     
     def checkPath(p: Path): Boolean =
       Analyzer.isExt( FileInfo(p).fileExt ) // only if registered extension
-          
+
     val q = FileScanner.createQueue[Path]()
     
     // create a task that pushes all files into the Q
@@ -131,7 +131,7 @@ class DropPanel(val top: UI) extends Component {
           
           val fileInfo = FileInfo(file)
           
-          info("searching by file " + fileInfo)
+          info("searching by file '" + fileInfo + "'")
           publish( SearchingMoviesByFile(fileInfo) )
           
           val movies = search searchByFile fileInfo // blocking

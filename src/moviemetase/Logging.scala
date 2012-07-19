@@ -52,7 +52,7 @@ trait Logging {
     if (!infos.isEmpty) {
       logBuf append " {"
       for ((k,v) <- infos)
-        logBuf append k append "=" append v append ";"
+        logBuf append k append "='" append v append "'"
       logBuf append "}"
     }
         

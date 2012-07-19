@@ -1,12 +1,10 @@
 package moviemetase
 package search
 
-import sites._
 import java.net.URL
 import scala.collection.mutable.ListBuffer
+import sites._
 import Util._
-import java.io.PrintStream
-import scala.util.matching.Regex
 
 
 class MovieSearch() extends SearchManager[Movie] with Logging {
@@ -20,7 +18,7 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
     
     // contains tags, EXACT search
     if (movies.isEmpty && !dis.tags.isEmpty) {
-      trace("Exact-Term linking to IMDB")
+      trace("SearchStrategy: Exact-Term linking to IMDB")
       
       val t = "\"" + term + "\""
       val f1 = containsAllTokensFilter(dis.tokens) _
@@ -31,7 +29,7 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
     
     // contains tags, search for the EXACT name, year and use tag-hints
     if (movies.isEmpty && !dis.names.isEmpty) {
-      trace("Exact-Name & Any Year & Any Tags search linking to IMDB")
+      trace("SearchStrategy: Exact-Name & Any Year & Any Tags search linking to IMDB")
       
       val t1 = "\"" + dis.name + "\""
       val t2 = dis.year match {
@@ -47,7 +45,7 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
     
     // contains name, search for the name and year
     if (movies.isEmpty && !dis.names.isEmpty) {
-      trace("Name & Any Year search at IMDB")
+      trace("SearchStrategy: Name & Any Year search at IMDB")
       
       val t1 = dis.name
       val t2 = dis.year match {
@@ -83,7 +81,7 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
     
     def searchExactFileName() = {
       if (movies.isEmpty) {
-        trace("Exact-FileName linking to IMDB")
+        trace("SearchStrategy: Exact-FileName linking to IMDB")
         
         val fileName = fileInfo.fileNameWithoutExt
         val t = "\"" + fileName + "\""
@@ -97,7 +95,7 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
     
     def searchExactDirName() = {
       if (movies.isEmpty) {
-        trace("Exact-DirName linking to IMDB")
+        trace("SearchStrategy: Exact-DirName linking to IMDB")
         
         val dirName = fileInfo.dirName
         val t = "\"" + dirName + "\""
@@ -118,7 +116,7 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
     }
     
     if (movies.isEmpty && !dis.all.names.isEmpty && !dis.all.tags.isEmpty) {
-      trace("All Names & Any Year & All Tags linking to IMDB")
+      trace("SearchStrategy: All Names & Any Year & All Tags linking to IMDB")
       
       val t1 = dis.all.name
       val t2 = dis.all.year match {
@@ -133,7 +131,7 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
     }
     
     if (movies.isEmpty && !dis.same.names.isEmpty && !dis.same.tags.isEmpty) {
-      trace("Same Names & Any Year & Same Tags linking to IMDB")
+      trace("SearchStrategy: Same Names & Any Year & Same Tags linking to IMDB")
       
       val t1 = dis.same.name
       val t2 = dis.all.year match {
@@ -148,7 +146,7 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
     }
     
     if (movies.isEmpty && !dis.file.names.isEmpty && !dis.file.tags.isEmpty) {
-      trace("File Names & Any Year & File Tags linking to IMDB")
+      trace("SearchStrategy: File Names & Any Year & File Tags linking to IMDB")
       
       val t1 = dis.file.name
       val t2 = dis.all.year match {
@@ -163,7 +161,7 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
     }
     
     if (movies.isEmpty && !dis.dir.names.isEmpty && !dis.dir.tags.isEmpty) {
-      trace("Dir Names & Any Year & Dir Tags linking to IMDB")
+      trace("SearchStrategy: Dir Names & Any Year & Dir Tags linking to IMDB")
       
       val t1 = dis.dir.name
       val t2 = dis.all.year match {
@@ -179,13 +177,12 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
     
     // NOTHING FOUND
     if (movies.isEmpty) {
-      warn("no results for " + fileInfo)
+      warn("All SearchStrategies failed, no results for " + fileInfo)
       return Nil
     }
 
     // auto-complete with TMDB
     movies.map( TMDB.AutoExpandMovie(_).submit() ).map(_.get()).toList
-    //movies.toList
   }
   
   def containsAllTokensFilter(reqTokens: List[String])(res: GoogleResult): Boolean = {

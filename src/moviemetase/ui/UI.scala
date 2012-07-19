@@ -79,8 +79,8 @@ class UI extends Frame {
     border = Swing.EmptyBorder(5, 5, 5, 5)
         
     val leftPanel = new MigPanel("fill", "center") {
-      add(dropPanel, "width 200, center, dock north")
-      add(searchesPanel, "grow")
+      add(dropPanel, "width 300, center, dock north")
+      add(searchesPanel, "width 300, grow")
     }
     
     val rightPanel = new SplitPane {

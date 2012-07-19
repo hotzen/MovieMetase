@@ -98,7 +98,7 @@ class ImageLoader(url: java.net.URL, callback: BufferedImage => Unit, resizeTo: 
     case Some(targetSize) => {
       val actualSize = (img.getWidth, img.getHeight)
       val (w, h) = calcSize(actualSize, targetSize)
-      trace("resizing from "+actualSize+" to "+targetSize+" => "+(w,h))
+      //trace("resizing from "+actualSize+" to "+targetSize+" => "+(w,h))
       
       val dest = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB)
       val g = dest.createGraphics()
