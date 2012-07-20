@@ -21,9 +21,9 @@ import javax.swing.table.*;
  *  the model row number of the button that was clicked.
  *
  */
-public class ButtonColumn extends AbstractCellEditor
-  implements TableCellRenderer, TableCellEditor, ActionListener, MouseListener
+public class ButtonColumn extends AbstractCellEditor implements TableCellRenderer, TableCellEditor, ActionListener, MouseListener
 {
+  private static final long serialVersionUID = -150999471378375979L;
   private JTable table;
   private Action action;
   private int mnemonic;
@@ -207,18 +207,16 @@ public class ButtonColumn extends AbstractCellEditor
    */
     public void mousePressed(MouseEvent e)
     {
-      if (table.isEditing()
-    &&  table.getCellEditor() == this)
-      isButtonColumnEditor = true;
+      if (table.isEditing() && table.getCellEditor() == this)
+        isButtonColumnEditor = true;
     }
 
     public void mouseReleased(MouseEvent e)
     {
-      if (isButtonColumnEditor
-      &&  table.isEditing())
+      if (isButtonColumnEditor && table.isEditing())
         table.getCellEditor().stopCellEditing();
 
-    isButtonColumnEditor = false;
+      isButtonColumnEditor = false;
     }
 
     public void mouseClicked(MouseEvent e) {}
