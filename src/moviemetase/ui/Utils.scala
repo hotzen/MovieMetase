@@ -127,7 +127,7 @@ trait JSelectable extends Publisher { self: JComponent =>
 
   def select(): Unit = {
     _selected = true
-    this setBorder UI.SelectionBorder
+    //this setBorder UI.SelectionBorder
     this publish JSelected( this )
   }
 

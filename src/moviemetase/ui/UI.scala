@@ -15,18 +15,20 @@ object UI {
   def start(): Unit = {
     import javax.swing.UIManager
     
+    // Look & Feel
     try   { UIManager setLookAndFeel "javax.swing.plaf.nimbus.NimbusLookAndFeel" } 
     catch { case e:Exception => UIManager setLookAndFeel UIManager.getSystemLookAndFeelClassName }
-
-    // apple integration
+        
+    // Apple
     val props = System.getProperties
     props.setProperty("apple.laf.useScreenMenuBar", "true")
     props.setProperty("com.apple.mrj.application.apple.menu.about.name", App.name + " " + App.version)
     
     Swing.onEDT {
       val top = new UI
+      top.iconImage = UI.toolkit.getImage( App.resource("/res/icon.png") )
       top.pack()
-      
+                  
       val screenSize = toolkit.getScreenSize
       top.size = new Dimension(
         (screenSize.width  * 0.8).toInt,
@@ -52,22 +54,17 @@ object UI {
   val toolkit = Toolkit.getDefaultToolkit
   
   val desktop: Option[Desktop] =
-    try {
-      if (Desktop.isDesktopSupported)
-        Some( Desktop.getDesktop )
-      else
-        None
-    } catch {
-      case e:Exception => None
-    }
+    if (Desktop.isDesktopSupported)
+      Some( Desktop.getDesktop )
+    else
+      None
   
   val SelectionColor = new Color(139, 209, 46) // #8BD12E
-  
-  val SelectionBorder = BorderFactory.createMatteBorder(3, 3, 3, 3, SelectionColor)
+  //val SelectionBorder = BorderFactory.createMatteBorder(3, 3, 3, 3, SelectionColor)
 }
 
 class UI extends Frame {
-
+    
   val dropPanel     = new DropPanel(this)
   val searchesPanel = new SearchesPanel(this)
   val moviesPanel   = new MoviesPanel(this)

@@ -29,46 +29,73 @@ case class TaskThreadFactory(prefix: String = "T", daemon: Boolean = false, prio
 object TaskManager {
   import scala.collection.mutable.Map
   
-  val MinPoolSize = 4
-  val MaxPoolSize = Integer.MAX_VALUE
+  private val pools = Map[String, ExecutorService]()
   
-  val MinIOPoolSize = 2
-  val MaxIOPoolSize = 4
+  val MainPoolID = "T"
   
+  val MainPoolSize  = 4
+  val MainPoolLimit = Integer.MAX_VALUE
+      
   val ThreadKeepAliveSecs = 10L
-    
-  def createPool(size: Int, limit: Int): ExecutorService = {
+
+  private def createPool(name: String, size: Int, limit: Int): ExecutorService = {
     val q = new LinkedBlockingQueue[Runnable]()
-    val f = new TaskThreadFactory()
+    val f = new TaskThreadFactory(name)
     new ThreadPoolExecutor(size, limit, ThreadKeepAliveSecs, TimeUnit.SECONDS, q, f)
   }
   
-  private val mainPool = createPool(MinPoolSize, MaxPoolSize)
-  private val ioPools  = Map[String, ExecutorService]()
-  
-  def ioPool(target: String): ExecutorService = ioPools.synchronized {
-    ioPools get target match {
+  private def pool(poolID: String, size: Int, limit: Int): ExecutorService = pools.synchronized {
+    pools get poolID match {
       case Some(pool) => pool
-      case None => {
-        val pool = createPool(MinIOPoolSize, MaxIOPoolSize)
-        ioPools put (target, pool)
+      case None  => {
+        val pool = createPool(poolID, size, limit)
+        pools put (poolID, pool)
         pool
       }
     }
   }
   
-  def pool(task: Task[_]): ExecutorService = task match {
-    case io:IOTask[_] => ioPool( io.target )
-    case _ => mainPool
+  private def pool(task: Task[_]): ExecutorService = task match {
+    case t:TaskOnSpecialPool[_] => {
+      val (poolID, poolSize, poolLimit) = t.pool
+      pool(poolID, poolSize, poolLimit)
+    }
+    case _ => pool(MainPoolID, MainPoolSize, MainPoolLimit)
   }
 
+  
+//  private val mainPool = createPool(MinPoolSize, MaxPoolSize)
+//  
+//  private val ioPools  = Map[String, ExecutorService]()
+//  
+//  def ioPool(target: String): ExecutorService = ioPools.synchronized {
+//    ioPools get target match {
+//      case Some(pool) => pool
+//      case None => {
+//        val pool = createPool(MinIOPoolSize, MaxIOPoolSize)
+//        ioPools put (target, pool)
+//        pool
+//      }
+//    }
+//  }
+  
+//  def pool(task: Task[_], poolHint: String): ExecutorService = task match {
+//    case io:IOTask[_] => pool(io.target, MinIOPoolSize, MaxIOPoolSize)
+//    case _ => {
+//      val poolID =
+//        if (poolHint.isEmpty) MainPoolID
+//        else poolHint
+//      pool(poolID, MinPoolSize, MaxIOPoolSize)
+//    }
+//  }
+
   def shutdown(): Unit = {
-    val allPools = mainPool :: ioPools.values.toList
+    val allPools = pools.values.toList
     allPools.foreach( _.shutdownNow() )
     allPools.foreach( _.awaitTermination(3, TimeUnit.SECONDS) )
   }
   
-  def submit[A](task: Task[A]): Future[A] = {
+  def submit[A](task: Task[A], poolHint: String): Future[A] = {
     notifyListeners( counter.incrementAndGet )
     pool(task) submit new ScheduledTask(task)
   }
@@ -108,8 +135,8 @@ trait Task[A] {
   def execute(): A
   
   // submits the task for concurrent execution
-  def submit(): Future[A] =
-    TaskManager submit this
+  def submit(poolHint: String = ""): Future[A] =
+    TaskManager.submit(this, poolHint)
   
   // forks all tasks for asynchronous execution,
   // then submits a special task that is joining the results and then executes the callback
@@ -130,7 +157,16 @@ trait Task[A] {
 //  }
 }
 
-trait IOTask[A] extends Task[A] {
+trait TaskOnSpecialPool[A] extends Task[A] {
+  def pool: (String, Int, Int)
+}
+
+trait IOTask[A] extends TaskOnSpecialPool[A] {
+  val MinPoolSize = 2
+  val MaxPoolSize = 4
+  
+  final def pool = (target, MinPoolSize, MaxPoolSize)
+  
   def target: String
 }
 

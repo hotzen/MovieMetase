@@ -28,6 +28,7 @@ object App {
 
   def resource(path: String): java.net.URL = {
     val url = this.getClass.getResource(path)
+    //val url = ClassLoader.getSystemResource( path )
     if (url == null)
       throw new IOException("resource '" + path + "' does not exist")
     url

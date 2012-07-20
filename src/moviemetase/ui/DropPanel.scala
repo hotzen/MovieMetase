@@ -5,8 +5,11 @@ import scala.swing._
 import scala.swing.Swing._
 import scala.swing.event._
 import java.nio.file._
+import java.awt.{Component => JComponent}
+import javax.swing.Icon
 import moviemetase.search.MovieSearch
 import comp._
+import java.util.concurrent.BlockingQueue
 
 case class SearchingMoviesByFile(file: FileInfo) extends Event
 case class FoundMoviesByFile(file: FileInfo, movies: List[Movie]) extends Event
@@ -20,18 +23,18 @@ class DropPanel(val top: UI) extends Component {
   val dropHandler = new FileDropHandler
   peer.setTransferHandler(dropHandler)
   listenTo(dropHandler)
-      
+
   reactions += {
     case FileDropHandler.FilesDropped(files) => processDroppedFiles(files)
   }
-  
+
   def processDroppedFiles(files: List[java.io.File]): Unit = {
     import Dialog._
     
     val Comp: Component = null
-    val JComp: java.awt.Component = null
+    val JComp: JComponent = null
     val Title = "Dropped Files"
-    val Icon: javax.swing.Icon = null
+    val Icon: Icon = null
     
     if (files.isEmpty) {
       Dialog.showMessage(Comp, "No files or directories dropped", Title, Message.Error)
@@ -50,12 +53,13 @@ class DropPanel(val top: UI) extends Component {
     val ScanDirDont = "Scan None"
     val ScanOpts = Array[Object](ScanDirAll, ScanDirAsk, ScanDirDont)
     
-    val dirsOption =
+    val scanDirsAnswer =
       if (droppedOneDir) ScanDirAll
       
       else if (droppedMultiDirs) {
         val sb = new StringBuilder
         sb append "Scan the following directories for movies?\n"
+        
         for (dir <- files if dir.isDirectory)
           sb append "  " append dir.getAbsolutePath append "\n"
                     
@@ -75,20 +79,10 @@ class DropPanel(val top: UI) extends Component {
         }
       } else ScanDirDont
     
-    def checkPath(p: Path): Boolean =
-      Analyzer.isExt( FileInfo(p).fileExt ) // only if registered extension
-
-    val q = FileScanner.createQueue[Path]()
+      
+    val scanFiles = fs // scan all files
     
-    // create a task that pushes all files into the Q
-    val filesTask = new Task[Unit] {
-      def execute(): Unit = {
-        fs.filter(f => checkPath(f.toPath) ).foreach(f => q offer f.toPath)
-      }
-    }
-
-    // create a ScanTask for each dir
-    val dirScanTasks = ds.flatMap(dir => dirsOption match {
+    val scanDirs = ds.flatMap(dir => scanDirsAnswer match {
       case ScanDirAll  => Some(dir)
       case ScanDirDont => None
       case ScanDirAsk  => {
@@ -105,45 +99,41 @@ class DropPanel(val top: UI) extends Component {
           case Dialog.Result.No => None
         }
       }
-    }).map(dir => FileScanner.findFilesTask(dir.toPath, checkPath, q))
+    })
+    val scanDirPaths = scanDirs.map( _.toPath )
     
-    // Queue-Terminator
-    val T = Paths.get("/TERMINATED/")
+    def checkPath(p: Path): Boolean = Analyzer.isExt( FileInfo(p).fileExt ) // only if registered extension
+    
+    def publishSearching(fileInfo: FileInfo) = UI.publish(this)( SearchingMoviesByFile(fileInfo) )
+    def publishCompleted(fileInfo: FileInfo, movies: List[Movie]) = UI.publish(this)( FoundMoviesByFile(fileInfo, movies) )
         
-    val scannerTask = new Task[List[Unit]] {
-      val terminatorTask = FileScanner.createTerminatorTask(q, T)
-      val tasks: List[Task[Unit]] = filesTask :: dirScanTasks ::: terminatorTask :: Nil
-      
-      def execute(): List[Unit] = tasks.map( _.execute() ) // process in sequence
-    }
-
-    val publish = UI.publish(this) _
-    
-    val searchTask = new Task[Unit] with Logging {
-      val logID = "SearchTask"
-      val search = new MovieSearch()
-  
-      def execute(): Unit = {
-        while (true) {
-          val file = q.take() // blocking
-          if (file == T)
-            return ()
-          
-          val fileInfo = FileInfo(file)
-          
-          info("searching by file '" + fileInfo + "'")
-          publish( SearchingMoviesByFile(fileInfo) )
-          
-          val movies = search searchByFile fileInfo // blocking
-          
-          info("search finished for file " + fileInfo)
-          publish( FoundMoviesByFile(fileInfo, movies) )
-        }
-      }
-    }
-    
-    searchTask.submit()
-    scannerTask.submit()
+    val q = FileScanner.findFiles(scanDirPaths, checkPath _)
+    new SearchTask(q, publishSearching, publishCompleted).submit()
     ()
+  }
+}
+
+class SearchTask(q: BlockingQueue[Path], searching: FileInfo => Unit, completed: (FileInfo, List[Movie]) => Unit) extends TaskOnSpecialPool[Unit] with Logging {
+  val logID = "SearchTask"
+  val pool = ("S", 2, 4)
+  val searcher = new MovieSearch()
+  
+  def execute() {
+    while (true) {
+      val file = q.take() // blocking
+      
+      if (file == FileScanner.T) // terminal
+        return ()
+      
+      val fileInfo = FileInfo(file)
+      
+      info("searching by file '" + fileInfo + "'")
+      searching( fileInfo )
+      
+      val movies = searcher searchByFile fileInfo // blocking
+      
+      info("found movies for " + fileInfo + ": " + movies.mkString(", "))
+      completed(fileInfo, movies)
+    }
   }
 }
