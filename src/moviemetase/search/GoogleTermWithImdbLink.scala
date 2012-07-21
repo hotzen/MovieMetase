@@ -102,12 +102,11 @@ case class GoogleTermWithImdbLink(term: String, filter: Option[GoogleResult => B
     val tryIds =
       for (url <- tryUrls)
         yield IMDB.extractID(url).head
-    
-    // fetch
+            
     val futs =
       for (id <- tryIds)
         yield IMDB.FetchByID(id).submit()
-
+        
 //    val futs =
 //      for (id <- tryIds) yield {
 //        IMDB.FetchByID(id).thenFork(_ match {

@@ -20,7 +20,7 @@ object JImage {
   val Caching   = true
   val NoCaching = false
   
-  lazy val LoadingImage: BufferedImage = ImageIO.read( App.resource("/res/image-loading.png") ) 
+  lazy val LoadingImage: BufferedImage = ImageIO.read( App.resource("/res/img/image-loading.png") ) 
 }
 
 class JImage(val url: URL, resizeTo: Option[(Int, Int)], parLoad: Boolean = true, caching: Boolean = true) extends JComponent {
@@ -72,7 +72,7 @@ class JImage(val url: URL, resizeTo: Option[(Int, Int)], parLoad: Boolean = true
 class ImageLoader(url: java.net.URL, callback: BufferedImage => Unit, resizeTo: Option[(Int,Int)] = None) extends IOTask[Unit] with Logging {
   val logID = "ImageLoader(" + url.toExternalForm + ")"
   
-  val target = url.getHost
+  def target = IOTask.getTargetByURL(url)
   
   def execute(): Unit =
     try {

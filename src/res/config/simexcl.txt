@@ -6,3 +6,5 @@ of
 as
 at
 to
+and
+in

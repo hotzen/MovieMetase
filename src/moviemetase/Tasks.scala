@@ -26,12 +26,14 @@ case class TaskThreadFactory(prefix: String = "T", daemon: Boolean = false, prio
   }
 }
 
-object TaskManager {
+object TaskManager extends Logging {
   import scala.collection.mutable.Map
+  
+  val logID = "TaskManager"
   
   private val pools = Map[String, ExecutorService]()
   
-  val MainPoolID = "T"
+  val MainPoolID = "M"
   
   val MainPoolSize  = 4
   val MainPoolLimit = Integer.MAX_VALUE
@@ -45,6 +47,7 @@ object TaskManager {
   }
   
   private def pool(poolID: String, size: Int, limit: Int): ExecutorService = pools.synchronized {
+    println("TaskManager.pool" + (poolID, size, limit))
     pools get poolID match {
       case Some(pool) => pool
       case None  => {
@@ -97,7 +100,15 @@ object TaskManager {
   
   def submit[A](task: Task[A], poolHint: String): Future[A] = {
     notifyListeners( counter.incrementAndGet )
-    pool(task) submit new ScheduledTask(task)
+    try {
+      pool(task) submit new ScheduledTask(task)
+
+    } catch { case t:Throwable => {
+      error("could not submit task: " + t.getMessage)
+      
+      notifyListeners( counter.decrementAndGet() )
+      new ErrorFuture(t)
+    }}
   }
   
   private val counter = new AtomicInteger()
@@ -116,6 +127,15 @@ object TaskManager {
     def call(): A =
       try task.execute()
       finally notifyListeners( counter.decrementAndGet() )
+  }
+  
+  private class ErrorFuture[A](t: Throwable) extends Future[A] {
+    def get(): A = throw t
+    def get(timeout: Long, unit: TimeUnit) = get()
+    
+    def cancel(interrupt: Boolean): Boolean = false
+    def isCancelled(): Boolean = false
+    def isDone(): Boolean = true
   }
 }
 
@@ -170,6 +190,19 @@ trait IOTask[A] extends TaskOnSpecialPool[A] {
   def target: String
 }
 
+object IOTask {
+  def getTargetByURL(url: URL): String = {
+    val host = url.getHost
+    val hostParts = host.split("\\.") // regex
+    
+    if (hostParts.length < 2)
+      return host
+    
+    val hostPartsRev = hostParts.reverse
+    hostParts.tail.head + "." + hostParts.head
+  }
+}
+
 //trait JoiningTask[A] {
 //  
 //  def forkJoin[B](ts: Seq[Task[B]]): Seq[B] = {
@@ -200,8 +233,8 @@ trait HttpTask[A] extends IOTask[A] {
   def url: URL
   
   // IOTask
-  def target: String = url.getHost
-  
+  final def target: String = IOTask.getTargetByURL(url)
+    
   // processor of the response
   def processResponse(is: InputStream): A
     

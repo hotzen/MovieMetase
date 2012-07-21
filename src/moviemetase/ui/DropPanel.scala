@@ -11,12 +11,14 @@ import moviemetase.search.MovieSearch
 import comp._
 import java.util.concurrent.BlockingQueue
 
+case class FoundMovieFile(file: FileInfo) extends Event
 case class SearchingMoviesByFile(file: FileInfo) extends Event
 case class FoundMoviesByFile(file: FileInfo, movies: List[Movie]) extends Event
+case class SearchingMoviesByFileFailed(file: FileInfo, t: Throwable) extends Event
 
 class DropPanel(val top: UI) extends Component {
 
-  override lazy val peer = new JImage( App.resource("/res/drop.png"), JImage.OriginalWidth, JImage.Blocking, JImage.NoCaching )
+  override lazy val peer = new JImage( App.resource("/res/img/drop.png"), JImage.OriginalWidth, JImage.Blocking, JImage.NoCaching )
   
   tooltip = "Drop directories or files or a mix of both here"
     
@@ -102,23 +104,54 @@ class DropPanel(val top: UI) extends Component {
     })
     val scanDirPaths = scanDirs.map( _.toPath )
     
-    def checkPath(p: Path): Boolean = Analyzer.isExt( FileInfo(p).fileExt ) // only if registered extension
-    
-    def publishSearching(fileInfo: FileInfo) = UI.publish(this)( SearchingMoviesByFile(fileInfo) )
-    def publishCompleted(fileInfo: FileInfo, movies: List[Movie]) = UI.publish(this)( FoundMoviesByFile(fileInfo, movies) )
+    def checkPath(p: Path): Boolean = {
+      val fileInfo = FileInfo(p)
+      val disFileInfo = Analyzer.dissectFileInfo( fileInfo )
+      
+      val tokens = disFileInfo.all.tokens
+      if (tokens.find( Config.scanExcludes.contains(_) ).isDefined)
+        return false
+            
+      if (!Analyzer.isExt(  fileInfo.fileExt ))
+        return false
+      
+      UI.publish(DropPanel.this)( FoundMovieFile(FileInfo(p)) )
         
+      true
+    }
+    
     val q = FileScanner.findFiles(scanDirPaths, checkPath _)
-    new SearchTask(q, publishSearching, publishCompleted).submit()
+    
+    new SearchTask(q) {
+      def publish = UI.publish(DropPanel.this) _
+      
+      def onSearching(fileInfo: FileInfo) {
+        publish( SearchingMoviesByFile(fileInfo) )
+      }
+      
+      def onCompleted(fileInfo: FileInfo, movies: List[Movie]) {
+        publish( FoundMoviesByFile(fileInfo, movies) )
+      }
+      
+      def onFailed(fileInfo: FileInfo, t: Throwable) {
+        publish( SearchingMoviesByFileFailed(fileInfo, t) )
+      }
+      
+    }.submit()
     ()
   }
 }
 
-class SearchTask(q: BlockingQueue[Path], searching: FileInfo => Unit, completed: (FileInfo, List[Movie]) => Unit) extends TaskOnSpecialPool[Unit] with Logging {
+abstract class SearchTask(q: BlockingQueue[Path]) extends TaskOnSpecialPool[Unit] with Logging {
   val logID = "SearchTask"
   val pool = ("S", 2, 4)
   val searcher = new MovieSearch()
-  
-  def execute() {
+
+  def onSearching(fileInfo: FileInfo): Unit
+  def onCompleted(fileInfo: FileInfo, movies: List[Movie]): Unit
+  def onFailed(fileInfo: FileInfo, t: Throwable): Unit
+    
+  final def execute() {
     while (true) {
       val file = q.take() // blocking
       
@@ -126,14 +159,20 @@ class SearchTask(q: BlockingQueue[Path], searching: FileInfo => Unit, completed:
         return ()
       
       val fileInfo = FileInfo(file)
-      
-      info("searching by file '" + fileInfo + "'")
-      searching( fileInfo )
-      
-      val movies = searcher searchByFile fileInfo // blocking
-      
-      info("found movies for " + fileInfo + ": " + movies.mkString(", "))
-      completed(fileInfo, movies)
+
+      try {
+        trace("searching by file '" + fileInfo + "'")
+        onSearching( fileInfo )
+
+        val movies = searcher searchByFile fileInfo // blocking
+        
+        info("found movies for " + fileInfo + ": " + movies.mkString(", "))
+        onCompleted(fileInfo, movies)
+        
+      } catch { case t:Throwable =>
+        error("search for " + fileInfo + " failed: " + t.getMessage)
+        onFailed(fileInfo, t)
+      }
     }
   }
 }

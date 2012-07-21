@@ -41,7 +41,7 @@ object MetaCrawler {
       import org.jsoup.nodes._
       import JSoup._
       
-      doc.select("#webResults").headOption match {
+      doc.select("#resultsPane").headOption match {
         case Some(res) => res.select(".webResult").map(li => {
           val a     = li.select("a.resultTitle").head // fails
           val link  = InfoSpace.extractLinkFromRedirect( a.attr("href") ).get // fails
@@ -81,7 +81,7 @@ object DogPile {
       import org.jsoup.nodes._
       import JSoup._
       
-      doc.select("#webResults").headOption match {
+      doc.select("#resultsPane").headOption match {
         case Some(res) => res.select(".webResult").map(li => {
           val a     = li.select("a.resultTitle").head // fails
           val link  = InfoSpace.extractLinkFromRedirect( a.attr("href") ).get // fails

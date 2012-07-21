@@ -44,10 +44,10 @@ class FileCollector(val q: BlockingQueue[Path], p: Path => Boolean) extends Queu
   import java.nio.file.FileVisitResult._
   val logID = "FileCollector"
     
-  var dirs = List[Path]() 
-    
+  var stack = List[Path]()
+
   def preVisitDirectory(path: Path, attrs: BasicFileAttributes): FileVisitResult = {
-    dirs = path :: dirs
+    stack = path :: stack
     CONTINUE
   }
   
@@ -64,7 +64,7 @@ class FileCollector(val q: BlockingQueue[Path], p: Path => Boolean) extends Queu
   }
   
   def postVisitDirectory(path: Path, ex: IOException): FileVisitResult = {
-    dirs = dirs.tail
+    stack = stack.tail
     CONTINUE
   }
 }

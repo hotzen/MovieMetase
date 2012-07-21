@@ -10,6 +10,8 @@ import java.awt.Color
 import javax.swing.BorderFactory
 import javax.swing.border.EtchedBorder
 import comp._
+import java.net.URI
+import java.net.URLEncoder
 
 object UI {
   def start(): Unit = {
@@ -26,7 +28,7 @@ object UI {
     
     Swing.onEDT {
       val top = new UI
-      top.iconImage = UI.toolkit.getImage( App.resource("/res/icon.png") )
+      top.iconImage = UI.toolkit.getImage( App.resource("/res/img/icon.png") )
       top.pack()
                   
       val screenSize = toolkit.getScreenSize
@@ -59,6 +61,27 @@ object UI {
     else
       None
   
+  val UNCRepl =  // Regex-Masked, replaceAll works on Regexes!
+    ("#" -> "%23") ::
+    (" " -> "%20") ::
+    ("\\[" -> "%5B") ::
+    ("\\]" -> "%5D") ::
+    Nil
+
+  def openFile(f: java.io.File) {
+    val path = f.getPath
+    desktop.foreach(dsk => {
+      if (path.startsWith("\\")) {
+        val newPath = "file:" + UNCRepl.foldLeft(path)({ case (path, (from, to)) =>
+          path.replaceAll(from, to)
+        })
+        dsk browse new URL(newPath).toURI
+      } else {
+        dsk open f
+      }
+    })
+  }
+      
   val SelectionColor = new Color(139, 209, 46) // #8BD12E
   //val SelectionBorder = BorderFactory.createMatteBorder(3, 3, 3, 3, SelectionColor)
 }

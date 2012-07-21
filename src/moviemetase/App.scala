@@ -8,8 +8,7 @@ object App {
   
   def main(args: Array[String]): Unit = {
     
-    // please fail fast
-    Analyzer.init()
+    Config.load()
     
     if (args.isEmpty) {
       ui.UI.start()

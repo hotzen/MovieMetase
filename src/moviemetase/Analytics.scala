@@ -9,38 +9,8 @@ import java.nio.file.Paths
 object Analyzer {
     
 // ----------------------------------------------  
-  lazy val Tags =
-    scala.io.Source.fromFile(App.resource("/res/tags.txt").toURI, "utf-8").
-      getLines.map(_.trim.toLowerCase).filter(x => !x.isEmpty && !x.startsWith("#")).toSet
-
-  lazy val Exts =
-    scala.io.Source.fromFile(App.resource("/res/exts.txt").toURI, "utf-8").
-      getLines.map(_.trim.toLowerCase).filter(x => !x.isEmpty && !x.startsWith("#")).toSet
-  
-  lazy val SimExcludes =
-    scala.io.Source.fromFile(App.resource("/res/simexcl.txt").toURI, "utf-8"). 
-      getLines.map(_.trim.toLowerCase).filter(x => !x.isEmpty && !x.startsWith("#")).toSet
-  
-  lazy val ReplMap =
-    scala.io.Source.fromFile(App.resource("/res/repl.txt").toURI, "utf-8").
-      getLines.map(_.trim.toLowerCase).filter(x => !x.isEmpty && !x.startsWith("#")).
-      map( _.split("->").map(_.trim) ).
-      filter(xs => !xs.isEmpty && !xs.head.isEmpty).
-      map(xs => (xs.head, if (xs.tail.isEmpty) "" else xs.tail.head)).toList
-
-  def isTag(s: String):  Boolean = Tags contains s.toLowerCase
-  def isExt(s: String):  Boolean = Exts contains s.toLowerCase
-
-
-// ----------------------------------------------
-  
-  def init(): Unit = {
-    Tags.head
-    Exts.head
-    SimExcludes.head
-    ReplMap.head
-    ()
-  }
+  def isTag(s: String):  Boolean = Config.tags contains s.toLowerCase
+  def isExt(s: String):  Boolean = Config.exts contains s.toLowerCase
 
 // ----------------------------------------------
   type Tokens = List[String]
@@ -50,7 +20,7 @@ object Analyzer {
   def tokenize(in: String): Tokens = {
     var s = in.toLowerCase
     
-    for ( (a,b) <- ReplMap )
+    for ( (a,b) <- Config.replMap )
       s = s.replace(a, b)
     
     TokenSplitRegex.split(s).map(_.trim).filter(!_.isEmpty).toList
@@ -215,8 +185,8 @@ object Dissected {
   
   def sim(d1: Dissected, d2: Dissected, exact: Boolean = true): (Float, Float) = {
     val simNames = Analyzer.sim(
-      d1.names.filter(!Analyzer.SimExcludes.contains(_)),
-      d2.names.filter(!Analyzer.SimExcludes.contains(_))
+      d1.names.filter(!Config.simExcludes.contains(_)),
+      d2.names.filter(!Config.simExcludes.contains(_))
     )
     val simTags  = Analyzer.sim(d1.tags, d2.tags)
     (simNames, simTags)
@@ -237,9 +207,9 @@ case class Dissected(orig: String, names: List[String], tags: List[String], year
     sb append names.mkString("[", ", ", "]")
     sb append " / " append year append " / "
     sb append tags.mkString("[", ", ", "]")
-    sb append " {"
-    sb append orig
-    sb append "})"
+    //sb append " {"
+    //sb append orig
+    //sb append "})"
     sb.toString
   }
 }

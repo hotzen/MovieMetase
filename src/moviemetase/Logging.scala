@@ -5,8 +5,8 @@ import java.util.Date
 
 object LogLevel {
   val Trace = LogLevel(2,  "trace")
-  val Info  = LogLevel(4,  "info ")
-  val Warn  = LogLevel(8,  "warn ")
+  val Info  = LogLevel(4,  "info")
+  val Warn  = LogLevel(8,  "warn")
   val Error = LogLevel(16, "ERROR")
 }
 
@@ -33,9 +33,9 @@ trait Logging {
   private val logBuf = new StringBuffer()
   
   final def trace(msg: =>String, infos: List[(String,Any)] = Nil): Unit = log(LogLevel.Trace, msg, infos)
-  final def info(msg: String,  infos: List[(String,Any)] = Nil): Unit   = log(LogLevel.Info,  msg, infos)
-  final def warn(msg: String,  infos: List[(String,Any)] = Nil): Unit   = log(LogLevel.Warn,  msg, infos)
-  final def error(msg: String, infos: List[(String,Any)] = Nil): Unit   = log(LogLevel.Error, msg, infos)
+  final def info(msg: String,    infos: List[(String,Any)] = Nil): Unit = log(LogLevel.Info,  msg, infos)
+  final def warn(msg: String,    infos: List[(String,Any)] = Nil): Unit = log(LogLevel.Warn,  msg, infos)
+  final def error(msg: String,   infos: List[(String,Any)] = Nil): Unit = log(LogLevel.Error, msg, infos)
   
   final def log(lvl: LogLevel, msg: String, infos: List[(String,Any)]): Unit = {
     if (!isLogging(lvl))
