@@ -9,6 +9,9 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.io.PrintStream
 import java.io.IOException
+import scala.collection.mutable.ListBuffer
+import java.util.concurrent.atomic.AtomicLong
+import scala.util.Random
 
 case class TaskThreadFactory(prefix: String = "T", daemon: Boolean = false, priority: Int = Thread.NORM_PRIORITY) extends ThreadFactory {
   val counter = new AtomicInteger(0)
@@ -185,7 +188,7 @@ trait IOTask[A] extends TaskOnSpecialPool[A] {
   val MinPoolSize = 2
   val MaxPoolSize = 4
   
-  final def pool = (target, MinPoolSize, MaxPoolSize)
+  def pool = (target, MinPoolSize, MaxPoolSize)
   
   def target: String
 }
@@ -226,41 +229,48 @@ object IOTask {
 //    callback( ts.map( _.get() ).toList )
 //}
 
+case class HttpResponseCodeException(code: Int, message: String, url: URL) extends Exception {
+  override def getMessage(): String =
+    "HTTP " + code + ": " + message + " {" + url + "}"
+}
+
 // Task processing an HTTP-URL
 trait HttpTask[A] extends IOTask[A] {
   
   // url to process
   def url: URL
-  
+
   // IOTask
-  final def target: String = IOTask.getTargetByURL(url)
+  def target: String = IOTask.getTargetByURL(url)
     
   // processor of the response
   def processResponse(is: InputStream): A
+
+  var ConnectionClose = false
+  
+  var UserAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:14.0) Gecko/20100101 Firefox/14.0.1"
+  var Referer   = "http://stackoverflow.com/questions/tagged/referer" 
+  var Throttle: Option[(Int, Int)] = None
     
-  // dont keep-alive
-  val ConnectionClose = false
-  
-  val UserAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:9.0.1) Gecko/20100101 Firefox/9.0.1"
-  val Referer   = "http://stackoverflow.com/questions/tagged/referer" 
-     
   // if sending data, define its content-type and the function to fill the OutputStream with the data
-  val RequestMethod: String = "GET"
-  val RequestProperties: List[(String, String)] = Nil
-  val RequestContentType: Option[String]      = None
-  val RequestSendData: Option[OutputStream => Unit] = None
-  val FollowRedirects = false
+  var RequestMethod: String = "GET"
+  var RequestProperties = ListBuffer[(String, String)]()
+  var RequestContentType: Option[String] = None
+  var RequestData: Option[OutputStream => Unit] = None
   
-  final def execute(): A = {
+  var FollowRedirects = false
+  var StoreCookies = false
+  var cookies = List[(String, String)]()
+  
+  def prepare(url: URL): HttpURLConnection = {
     val conn: HttpURLConnection = url.openConnection() match {
       case http:HttpURLConnection => http
       case _                      => throw new Exception("HttpTask only supports HTTP connections")
     }
-    
     conn setUseCaches true
     conn setAllowUserInteraction false
     conn setDoInput  true
-    conn setDoOutput RequestSendData.isDefined
+    conn setDoOutput RequestData.isDefined
     
     conn setRequestMethod RequestMethod
     conn setInstanceFollowRedirects FollowRedirects
@@ -276,49 +286,120 @@ trait HttpTask[A] extends IOTask[A] {
     
     for ((propName, propValue) <- RequestProperties)
       conn setRequestProperty (propName, propValue)
+    
+    conn
+  }
   
-    var in: InputStream = null
-    try {
-      conn.connect()
-      
-      RequestSendData match {
-        case Some(f) => f( conn.getOutputStream )
-        case None    => // request-parameters only encoded in URL
+  private var sleepRandomizer = new Random
+  private var sleepLast: Long = 0
+    
+  def sleep(min: Int, max: Int): Unit = {
+    val t = min + sleepRandomizer.nextInt( max - min )
+    //this.asInstanceOf[Logging].trace("Throttle active: sleeping for %.3f secs".format(t/1000))
+    println("Throttle active: sleeping for %.3f secs".format(t.toFloat/1000))
+    Thread sleep t.toLong
+    
+    sleepLast = System.currentTimeMillis
+  }
+  
+  def connect(conn: HttpURLConnection): InputStream = {
+    Throttle match {
+      case Some((min, max)) => sleep(min, max)
+      case None =>
+    }
+    conn.connect()
+    
+    RequestData match {
+      case Some(f) => f( conn.getOutputStream )
+      case None    => 
+    }
+    
+    if (StoreCookies) {
+//      val headers = scala.collection.convert.Wrappers.JMapWrapper( conn.getHeaderFields )
+//      val newCookies =
+//        headers.get("Set-Cookie").flatMap( jlist => scala.collection.convert.Wrappers.JListWrapper(jlist).toList ).
+//          map( foo => foo)
+//        
+//        
+//        for (cookieDefs <- ;
+//             cookieDef  <- 
+//          yield cookieDef
+//        
+//        .map()
+//        
+//        headers.keys.filter( _.startsWith("Set-Cookie") ).
+//          flatMap( headers.get(_) ).map( foo => foo )
+//        
+//        for (header     <- headers.keys if header.startsWith("Set-Cookie");
+//             cookieDefs <- headers.get(header);
+//             cookieDef  <-  )
+//          yield cookieDef //cookieDef.split(";")(0)
+//     
+//      
+//        val cookieDef = headers.get( header ).get
+//        val cookie    = cookieDef.split(";")(0)
+//        
+//        
+//          GDSESS=ID=67231603decc62df:TM=1342985505:C=c:IP=92.231.163.3-:S=ADSvE-eEvfNHYVsS43d3v5aMRnXdjZz9_w; path=/; domain=google.com; expires=Sun, 22-Jul-2012 22:31:45 GMT
+    }
+
+    val respCode = conn.getResponseCode
+    
+    // redirect
+    if (respCode >= 300 && respCode < 400) {
+      if (!conn.getInstanceFollowRedirects) {
+        val newLoc  = conn getHeaderField "Location"
+        val newConn = onRedirect(respCode, newLoc, conn)
+
+        UserAgent = "Lynx/2.8.7dev.9 libwww-FM/2.14"
+        Referer   = conn.getURL.toString
+        return connect( newConn )
       }
-      
-      val respCode = conn.getResponseCode
-      
-      if (respCode != HttpURLConnection.HTTP_OK)
-        throw new IOException("HTTP " + respCode + ": " + conn.getResponseMessage + " {" + url + "}")
-      
-      in = conn.getInputStream
-      val res = processResponse( in )
-      
-      if (ConnectionClose) {
-        conn.disconnect()
-      }
-      
-      res
-    } catch {
-      // http://docs.oracle.com/javase/1.5.0/docs/guide/net/http-keepalive.html
-      case io:IOException => {
-        cleanCloseInputStream( conn.getErrorStream )
-        throw io
-      }
-    } finally {
-      cleanCloseInputStream( in )
+    }
+    // non-200er
+    else if (respCode != HttpURLConnection.HTTP_OK) {
+      throw new HttpResponseCodeException(respCode, conn.getResponseMessage, conn.getURL)
+    }
+
+    conn.getInputStream
+  }
+  
+  def onRedirect(code: Int, loc: String, conn: HttpURLConnection): HttpURLConnection = {
+    throw new Exception("Unhandled Redirect to " + loc)
+  }
+  
+  def disconnect(conn: HttpURLConnection) {
+    if (conn != null && ConnectionClose) {
+      conn.disconnect()
     }
   }
   
-  def cleanCloseInputStream(is: InputStream): Unit = {
-    if (is == null)
-      return ()
-    
+  final def execute(): A = {
+    val conn = prepare( url )
     try {
-      while (is.read() > 0) {}
-      is.close()
-    } catch {
-      case e:Exception =>
+      val is = connect( conn )
+      try {
+        val res = processResponse( is )
+        disconnect( conn )
+        res
+      } finally
+          cleanCloseInputStream( is )
+    
+    } catch { case t:Throwable => {
+        cleanCloseInputStream( conn.getErrorStream )
+        throw t
+
+    }} finally
+         disconnect( conn )
+  }
+  
+  // http://docs.oracle.com/javase/1.5.0/docs/guide/net/http-keepalive.html
+  def cleanCloseInputStream(is: InputStream) {
+    if (is != null) {
+      try {
+        while (is.read() > 0) {}
+        is.close()
+      } catch { case e:Exception => }
     }
   }
 }

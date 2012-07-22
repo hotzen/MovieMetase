@@ -21,7 +21,7 @@ object Subscene {
   case class SearchByRelease(release: String) extends XhtmlTask[List[MovieInfos.Subtitle]] with Logging {
     val logID = "Subscene.SearchByRelease(" + release + ")"
     
-    override val Referer = "http://subscene.com"
+    Referer = "http://subscene.com"
 
     lazy val url: URL = {
       val sb = new StringBuilder(BASE_URL)
@@ -54,7 +54,7 @@ object Subscene {
   case class SearchByTitle(title: String) extends XhtmlTask[List[MovieInfos.Subtitle]] with Logging {
     val logID = "Subscene.SearchByTitle(" + title + ")"
     
-    override val Referer = "http://subscene.com"
+    Referer = "http://subscene.com"
     
     lazy val url: URL = {
       val sb = new StringBuilder(BASE_URL)

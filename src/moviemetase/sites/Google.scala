@@ -9,20 +9,22 @@ import scala.io.Source
 import scala.util.parsing.json.JSON
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.{Future, future}
+import java.net.HttpURLConnection
 
 object Google {
-  val UseAjax        = 1
-  val UseWeb         = 2
-  val UseMetaCrawler = 3
-  val UseDogPile     = 4
-  val UseNothing     = 5
+//  val UseAjax        = 1
+//  val UseWeb         = 2
+//  val UseMetaCrawler = 3
+//  val UseDogPile     = 4
+//  val UseNothing     = 5
   
-  val use = new AtomicInteger( UseMetaCrawler ) //XXX Skip AJAX since it finds considerably fewer results than the web-search :/
+//  val use = new AtomicInteger( UseMetaCrawler ) //XXX Skip AJAX since it finds considerably fewer results than the web-search :/
   
   // generic query that tries different query-methods
   case class Query(query: String) extends Task[List[GoogleResult]] {
     
-    def execute(): List[GoogleResult] = MetaCrawler.Query(query).execute()
+    //def execute(): List[GoogleResult] = MetaCrawler.Query(query).execute()
+    def execute(): List[GoogleResult] = GoogleWeb.Query(query).execute()
     
 //    def executeQuery(): List[GoogleResult] = use.get match {
 //      case id@UseAjax          => tryOrNext(id, GoogleAjax.Query(query)   )
@@ -72,83 +74,152 @@ case class GoogleResult(query: String, url: URL, title: String, snippet: String)
 }
 
 ////XXX very poor result-quality :( 
-object GoogleAjax {
-  val BASE_URL = "http://ajax.googleapis.com/ajax/services/search/web"
-  
-  case class Query(query: String, page: Int = 1) extends HttpTask[List[GoogleResult]] with Logging {
-    val logID = "GoogleAjax.Query"
-    
-    def params: String = "v=1.0&rsz=large&hl=en"
-    def limit: Int = 8
-      
-    lazy val url: URL = {
-      val sb = new StringBuilder( BASE_URL )
-      sb append "?"       append params
-      sb append "&start=" append ((page-1)*limit)
-      sb append "&q="     append query.urlEncode
-
-      val url = sb.toString 
-      trace("querying '" + query + "' ...", ("url" -> url) :: Nil)
-      new URL(url)
-    }
-    
-    def processResponse(in: InputStream): List[GoogleResult] = {
-      import Util._
-      import JsonType._
-
-      val str = Source.fromInputStream(in).mkString
-      
-      println(str.replaceAll("}", "}\n"))
-      
-      for {
-        M(map)      <- List( JSON.parseFull(str).get ) // shall fail
-        M(respData) =  map("responseData")
-        L(results)  =  respData("results")
-        M(resMap)   <- results
-        S(url)      =  resMap("unescapedUrl")
-        S(title)    =  resMap("titleNoFormatting")
-        S(snippet)  =  resMap("content")
-      } yield {
-        GoogleResult(query, url.toURL, title, snippet.noTags.noEntities)
-      }
-    }
-  }
-}
+//object GoogleAjax {
+//  val BASE_URL = "http://ajax.googleapis.com/ajax/services/search/web"
+//  
+//  case class Query(query: String, page: Int = 1) extends HttpTask[List[GoogleResult]] with Logging {
+//    val logID = "GoogleAjax.Query"
+//    
+//    def params: String = "v=1.0&rsz=large&hl=en"
+//    def limit: Int = 8
+//      
+//    lazy val url: URL = {
+//      val sb = new StringBuilder( BASE_URL )
+//      sb append "?"       append params
+//      sb append "&start=" append ((page-1)*limit)
+//      sb append "&q="     append query.urlEncode
+//
+//      val url = sb.toString 
+//      trace("querying '" + query + "' ...", ("url" -> url) :: Nil)
+//      new URL(url)
+//    }
+//    
+//    def processResponse(in: InputStream): List[GoogleResult] = {
+//      import Util._
+//      import JsonType._
+//
+//      val str = Source.fromInputStream(in).mkString
+//      
+//      println(str.replaceAll("}", "}\n"))
+//      
+//      for {
+//        M(map)      <- List( JSON.parseFull(str).get ) // shall fail
+//        M(respData) =  map("responseData")
+//        L(results)  =  respData("results")
+//        M(resMap)   <- results
+//        S(url)      =  resMap("unescapedUrl")
+//        S(title)    =  resMap("titleNoFormatting")
+//        S(snippet)  =  resMap("content")
+//      } yield {
+//        GoogleResult(query, url.toURL, title, snippet.noTags.noEntities)
+//      }
+//    }
+//  }
+//}
 
 object GoogleWeb {
-  val BASE_URL = "http://nosslsearch.google.com/search"
+  //val BASE_URL = "http://nosslsearch.google.com/search"
   
+  val Domains =
+    "nosslsearch.google.com" ::
+    "google.com.au" ::
+    "google.co.uk" ::
+    "google.de" ::
+    Nil
+    
+  def baseURL(domain: String): String = 
+    "http://" + domain + "/search" 
+    
+  def baseURL: String =
+    baseURL( Domains(0) )
+
   case class Query(query: String) extends HtmlTask[List[GoogleResult]] with Logging {
     val logID = "GoogleWeb.Query"
-     
+
+    override def target = "G"
+    override val MinPoolSize = 1
+    override val MaxPoolSize = 1
+    
+    Throttle = Some( (1000, 3000) ) // pause between 1-3 secs between requests
+    StoreCookies = true
+    
+    RequestProperties += ("Accept" -> "text/html,application/xhtml+xml,application/xml")
+    RequestProperties += ("Accept-Language" -> "en-us,en")
+
     // http://code.google.com/intl/de/apis/searchappliance/documentation/46/xml_reference.html#request_parameters
     // http://googlesystem.blogspot.com/2007/04/how-to-disable-google-personalized.html
     // http://www.blueglass.com/blog/google-search-url-parameters-query-string-anatomy/
-    def params: String = "ie=UTF-8&oe=UTF-8&hl=en&filter=0&safe=0&pws=0&complete=0&instant=off"
-    
-    lazy val url: URL = {
+    //def params: String = "ie=UTF-8&oe=UTF-8&hl=en&filter=0&safe=0&pws=0&complete=0&instant=off&num=10&adtest=on"
+    def params: String = "sourceid=navclient&ie=UTF-8&oe=UTF-8&hl=en&filter=0&safe=0&pws=0&complete=0&instant=off&num=10&btnG=Search"
+            
+    var DomainIndex = 0
+      
+    def url: URL = {
       val q = java.net.URLEncoder.encode(query, "UTF-8")
 
-      val sb = new StringBuilder( BASE_URL )
+      val base = baseURL( Domains(DomainIndex) )
+      
+      val sb = new StringBuilder( base )
       sb append "?q=" append q
       sb append "&"   append params
-
-      trace(query, ("url" -> sb.toString) :: Nil)
-      new URL( sb.toString )
+      val url = new URL( sb.toString )
+      
+      trace(query, ("url" -> url.toString) :: Nil)
+      url
     }
     
-     def processDocument(doc:  org.jsoup.nodes.Document): List[GoogleResult] = {
+   override def onRedirect(code: Int, loc: String, conn: HttpURLConnection): HttpURLConnection = {
+      println(code + " => " + loc)
+      
+      if (conn.getInputStream != null) {
+          val src = Source.fromInputStream(conn.getInputStream, "UTF-8")
+          println("=============INPUT:")
+          println( src.getLines.mkString("\n") )
+          println("=============")
+        }
+        
+        if (conn.getErrorStream != null) {
+          val src = Source.fromInputStream(conn.getErrorStream, "UTF-8")
+          println("=============ERROR:")
+          println( src.getLines.mkString("\n") )
+          println("=============")
+        }
+        
+        println("BLOCKED BY GOOGLE")
+        //throw new Exception("BLOCKED BY GOOGLE")
+        
+        prepare( loc.toURL )
+    }
+        
+    def processDocument(doc: org.jsoup.nodes.Document): List[GoogleResult] = {
       import org.jsoup.nodes._
       import JSoup._
       
-      doc.select("#ires li.g").map(li => {
-        val a     = li.select("a.l").head // fails
-        val link  = a.attrOpt("href").get // fails
-        val title = a.text
+      println("queried " + url.toString)
+      
+      val lis = doc.select("#ires li.g").toList
 
-        val snippet = li.select(".st").map(_.text).head // fails
+      if (lis.isEmpty) {
+        warn("Google-Result does not contain '#ires li.g'")
+        return Nil
+      }
+      
+      lis.flatMap(li => {
         
-        GoogleResult(query: String, link.toURL, title, snippet)
+        
+        li.select("a.l").headOption match {
+          case Some(a) => {
+            val link  = a.attrOpt("href").get
+            val title = a.text
+            val snippet = li.select(".st").map(_.text).mkString("")
+            
+            Some( GoogleResult(query: String, link.toURL, title, snippet) )
+          }
+          case None => {
+            warn("Google-Result does not contain '#ires li.g a.l'")
+            None
+          }
+        }
       }).toList
     }
   }
