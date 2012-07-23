@@ -110,7 +110,7 @@ object TaskManager extends Logging {
     allPools.foreach( _.awaitTermination(3, TimeUnit.SECONDS) )
   }
   
-  def submit[A](task: Task[A], poolHint: String): JFuture[A] = {
+  def submit[A](task: Task[A]): JFuture[A] = {
     notifyListeners( counter.incrementAndGet )
     try {
       pool(task) submit new ScheduledTask(task)
@@ -167,32 +167,13 @@ trait Task[A] {
   def execute(): A
   
   // submits the task for concurrent execution
-  def submit(poolHint: String = ""): JFuture[A] =
-    TaskManager.submit(this, poolHint)
-
-  private implicit def execCtx: ExecutionContext =
-    ExecutionContext.fromExecutorService( TaskManager.pool(this) )   
+  def submit(): JFuture[A] = TaskManager.submit(this)
+    
+  // http://docs.scala-lang.org/sips/pending/futures-promises.html
+  private implicit def execContext = ExecutionContext.fromExecutorService( TaskManager.pool(this) )   
 
   // submit asynchronously using the new Scala Futures
   def async(): Future[A] = future { execute() } 
-
-  // forks all tasks for asynchronous execution,
-  // then submits a special task that is joining the results and then executes the callback
-//  def fork[B](ts: Seq[Task[B]], callback: List[B] => Unit): Unit = {
-//    if (ts.isEmpty)
-//      return ()
-//      
-//    // execute one task directly
-//    if (ts.tail.isEmpty) {
-//      callback( ts.head.execute() :: Nil )
-//    
-//    // execute multiple tasks asynchronously
-//    // submit a special JoiningTask that joins the results, then calls back
-//    } else {
-//      val futs = ts.map( _.submit() )
-//      new TaskJoiner(futs, callback).submit()
-//    }
-//  }
 }
 
 trait TaskOnSpecialPool[A] extends Task[A] {
@@ -205,6 +186,7 @@ trait IOTask[A] extends TaskOnSpecialPool[A] {
   
   def pool = (target, MinPoolSize, MaxPoolSize)
   
+  // I/O-target, e.g. domain-name "s3.amazonaws.com"
   def target: String
 }
 
@@ -221,39 +203,16 @@ object IOTask {
   }
 }
 
-//trait JoiningTask[A] {
-//  
-//  def forkJoin[B](ts: Seq[Task[B]]): Seq[B] = {
-//    if (ts.isEmpty)
-//      return Nil
-//    
-//    // execute one task directly
-//    if (ts.tail.isEmpty) {
-//      ts.head.execute() :: Nil
-//    
-//    // execute multiple tasks asynchronously
-//    // join the results
-//    } else {
-//      ts.map( _.submit() ).map( _.get() )
-//    }
-//  }
-//}
-
-//final class TaskJoiner[A](ts: Traversable[JFuture[A]], callback: List[A] => Unit) extends Task[Unit] with JoiningTask[Unit] {
-//  def execute(): Unit =
-//    callback( ts.map( _.get() ).toList )
-//}
-
 case class HttpResponseCodeException(code: Int, message: String, url: URL) extends Exception {
   override def getMessage(): String =
     "HTTP " + code + ": " + message + " {" + url + "}"
 }
 
-object HttpTask {
-  import scala.collection.concurrent.Map
-  
-  val cookies = Map[String, List[String]]()
-}
+//object HttpTask {
+//  import scala.collection.concurrent.Map
+//  
+//  val cookies = Map[String, List[String]]()
+//}
 
 // Task processing an HTTP-URL
 trait HttpTask[A] extends IOTask[A] {
@@ -339,14 +298,13 @@ trait HttpTask[A] extends IOTask[A] {
       if (!conn.getInstanceFollowRedirects) {
         val newLoc  = conn getHeaderField "Location"
         val newConn = onRedirect(respCode, newLoc, conn)
-        
         return connect( newConn )
       }
     // errors
     } else if (respCode != HttpURLConnection.HTTP_OK) {
       return onError(respCode, conn)
     }
-        
+
     conn.getInputStream
   }
     
@@ -369,7 +327,7 @@ trait HttpTask[A] extends IOTask[A] {
     } catch { case t:Throwable => {
         cleanCloseInputStream( conn.getErrorStream )
         throw t
-
+    
     }} finally disconnect( conn )
   }
   
