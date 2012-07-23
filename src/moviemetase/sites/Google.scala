@@ -126,16 +126,28 @@ object GoogleWeb {
     "google.co.uk" ::
     "google.de" ::
     Nil
-    
+
   def baseURL(domain: String): String = 
     "http://" + domain + "/search" 
-    
+
   def baseURL: String =
     baseURL( Domains(0) )
 
+  sealed trait QueryState
+  object QueryState {
+    case object Normal extends QueryState
+    case class Blocked(captcha: URL) extends QueryState
+    case object Unblocking extends QueryState
+    //case object 
+  }
+    
   case class Query(query: String) extends HtmlTask[List[GoogleResult]] with Logging {
+    import QueryState._
+    
     val logID = "GoogleWeb.Query"
 
+    var state: QueryState = Normal
+      
     override def target = "G"
     override val MinPoolSize = 1
     override val MaxPoolSize = 1
@@ -167,46 +179,50 @@ object GoogleWeb {
       trace(query, ("url" -> url.toString) :: Nil)
       url
     }
-    
-   override def onRedirect(code: Int, loc: String, conn: HttpURLConnection): HttpURLConnection = {
-      println(code + " => " + loc)
-      
-      if (conn.getInputStream != null) {
-          val src = Source.fromInputStream(conn.getInputStream, "UTF-8")
-          println("=============INPUT:")
-          println( src.getLines.mkString("\n") )
-          println("=============")
-        }
+
+    override def onRedirect(code: Int, loc: String, conn: HttpURLConnection): HttpURLConnection = state match {
+      case Normal if loc contains "/sorry/" => {
+        warn("BLOCKED BY GOOGLE")
         
-        if (conn.getErrorStream != null) {
-          val src = Source.fromInputStream(conn.getErrorStream, "UTF-8")
-          println("=============ERROR:")
-          println( src.getLines.mkString("\n") )
-          println("=============")
-        }
-        
-        println("BLOCKED BY GOOGLE")
-        //throw new Exception("BLOCKED BY GOOGLE")
-        
-        prepare( loc.toURL )
+        val url = loc.toURL  
+        state = Blocked(url)
+        prepare(url)
+      }
+      case Unblocking => {
+        prepare(loc.toURL)
+      }
+      case _ =>
+        super.onRedirect(code, loc, conn)
     }
-        
+    
+    override def onError(code: Int, conn: HttpURLConnection): InputStream = state match {
+      case Blocked(captcha) if conn.getURL.toString contains captcha.toString =>
+        conn.getErrorStream
+      case _ =>
+        super.onError(code, conn)
+    }
+            
     def processDocument(doc: org.jsoup.nodes.Document): List[GoogleResult] = {
       import org.jsoup.nodes._
       import JSoup._
       
-      println("queried " + url.toString)
-      
-      val lis = doc.select("#ires li.g").toList
+      state match {
+        case Normal =>
+          processResultsDocument( doc )
+        
+        case Blocked(captcha) =>
+          processCaptchaDocument( doc )
 
-      if (lis.isEmpty) {
-        warn("Google-Result does not contain '#ires li.g'")
-        return Nil
+        case _ =>
+          throw new IllegalStateException("processDocument in state " + state)
       }
+    }
+    
+    def processResultsDocument(doc: org.jsoup.nodes.Document): List[GoogleResult] = {
+      import org.jsoup.nodes._
+      import JSoup._
       
-      lis.flatMap(li => {
-        
-        
+      doc.select("#ires li.g").flatMap(li => {
         li.select("a.l").headOption match {
           case Some(a) => {
             val link  = a.attrOpt("href").get
@@ -221,6 +237,31 @@ object GoogleWeb {
           }
         }
       }).toList
+    }
+    
+    def processCaptchaDocument(doc: org.jsoup.nodes.Document): List[GoogleResult] = {
+      import org.jsoup.nodes._
+      import JSoup._
+      
+      val img = doc.select("img").flatMap(_.attrOpt("src") match {
+        case Some(src) if src contains "/sorry/image" => Some(src)
+        case _ => None
+      }).headOption
+                
+      val params = doc.select("form").flatMap(f => {
+        f.select("input").map(in => {
+          val name  = in.attrOpt("name").getOrElse("")
+          val value = in.attrOpt("value").getOrElse("")
+          (name, value)
+        })
+      }).toList
+      
+      println("captcha-img: " + img)
+      println("params: " + params.mkString("\n"))
+      
+      state = Unblocking
+            
+      Nil
     }
   }
 }
