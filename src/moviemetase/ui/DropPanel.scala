@@ -122,7 +122,7 @@ class DropPanel(val top: UI) extends Component {
     
     val q = FileScanner.findFiles(scanDirPaths, checkPath _)
     
-    new SearchTask(q) {
+    val search = new SearchTask(q) {
       def publish = UI.publish(DropPanel.this) _
       
       def onSearching(fileInfo: FileInfo) {
@@ -137,14 +137,18 @@ class DropPanel(val top: UI) extends Component {
         publish( SearchingMoviesByFileFailed(fileInfo, t) )
       }
       
-    }.submit()
+    }
+    search.submit()
+    
     ()
   }
 }
 
-abstract class SearchTask(q: BlockingQueue[Path]) extends TaskOnSpecialPool[Unit] with Logging {
+abstract class SearchTask(q: BlockingQueue[Path]) extends Task[Unit] with DedicatedPool with Logging {
   val logID = "SearchTask"
+  
   val pool = ("S", 2, 4)
+  
   val searcher = new MovieSearch()
 
   def onSearching(fileInfo: FileInfo): Unit

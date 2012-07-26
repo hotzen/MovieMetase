@@ -73,7 +73,7 @@ class ImageLoader(url: java.net.URL, callback: BufferedImage => Unit, resizeTo: 
   val logID = "ImageLoader(" + url.toExternalForm + ")"
   
   def target = IOTask.getTargetByURL(url)
-  
+    
   def execute(): Unit =
     try {
       //trace("ImageIO reading ...")

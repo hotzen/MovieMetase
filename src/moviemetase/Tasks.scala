@@ -70,39 +70,14 @@ object TaskManager extends Logging {
     }
   }
   
-  def pool(task: Task[_]): ExecutorService = task match {
-    case t:TaskOnSpecialPool[_] => {
-      val (poolID, poolSize, poolLimit) = t.pool
+  def getPoolFor(task: Task[_]): ExecutorService = task match {
+    case p:DedicatedPool => {
+      val (poolID, poolSize, poolLimit) = p.pool
       pool(poolID, poolSize, poolLimit)
     }
-    case _ => pool(MainPoolID, MainPoolSize, MainPoolLimit)
+    case _ =>
+      pool(MainPoolID, MainPoolSize, MainPoolLimit)
   }
-
-  
-//  private val mainPool = createPool(MinPoolSize, MaxPoolSize)
-//  
-//  private val ioPools  = Map[String, ExecutorService]()
-//  
-//  def ioPool(target: String): ExecutorService = ioPools.synchronized {
-//    ioPools get target match {
-//      case Some(pool) => pool
-//      case None => {
-//        val pool = createPool(MinIOPoolSize, MaxIOPoolSize)
-//        ioPools put (target, pool)
-//        pool
-//      }
-//    }
-//  }
-  
-//  def pool(task: Task[_], poolHint: String): ExecutorService = task match {
-//    case io:IOTask[_] => pool(io.target, MinIOPoolSize, MaxIOPoolSize)
-//    case _ => {
-//      val poolID =
-//        if (poolHint.isEmpty) MainPoolID
-//        else poolHint
-//      pool(poolID, MinPoolSize, MaxIOPoolSize)
-//    }
-//  }
 
   def shutdown(): Unit = {
     val allPools = pools.values.toList
@@ -113,7 +88,7 @@ object TaskManager extends Logging {
   def submit[A](task: Task[A]): JFuture[A] = {
     notifyListeners( counter.incrementAndGet )
     try {
-      pool(task) submit new ScheduledTask(task)
+      getPoolFor(task) submit new ScheduledTask(task)
 
     } catch { case t:Throwable => {
       error("could not submit task: " + t.getMessage)
@@ -122,7 +97,7 @@ object TaskManager extends Logging {
       new ErrorJFuture(t)
     }}
   }
-  
+    
   private val counter = new AtomicInteger()
   private var listeners = List[Int => Unit]()
   
@@ -155,32 +130,26 @@ object Task {
   def create[A](code: =>A): Task[A] = new Task[A] {
     def execute(): A = { code }
   }
-  
-//  def wrap[A](ts: List[Task[A]]): Task[List[A]] = new Task[List[A]] {
-//    def execute(): List[A] = ts.map( _.execute() )
-//  }
 }
 
 trait Task[A] {
   
-  // executes the task synchronously
   def execute(): A
   
   // submits the task for concurrent execution
-  def submit(): JFuture[A] = TaskManager.submit(this)
+  def submit(): JFuture[A] = TaskManager submit this
     
-  // http://docs.scala-lang.org/sips/pending/futures-promises.html
-  private implicit def execContext = ExecutionContext.fromExecutorService( TaskManager.pool(this) )   
-
   // submit asynchronously using the new Scala Futures
-  def async(): Future[A] = future { execute() } 
+  // http://docs.scala-lang.org/sips/pending/futures-promises.html
+  private def asyncExecContext = ExecutionContext.fromExecutorService( TaskManager getPoolFor this )   
+  def async(): Future[A] = Future({ execute() })(asyncExecContext)
 }
 
-trait TaskOnSpecialPool[A] extends Task[A] {
-  def pool: (String, Int, Int)
+trait DedicatedPool {
+  def pool: (String, Int, Int) // poolID, min threads, max threads
 }
 
-trait IOTask[A] extends TaskOnSpecialPool[A] {
+trait IOTask[A] extends Task[A] with DedicatedPool {
   val MinPoolSize = 2
   val MaxPoolSize = 4
   
@@ -203,16 +172,24 @@ object IOTask {
   }
 }
 
-case class HttpResponseCodeException(code: Int, message: String, url: URL) extends Exception {
+case class HttpRedirectException(code: Int, message: String, location: String, url: URL) extends Exception {
+  override def getMessage(): String =
+    "HTTP " + code + ": " + message + " REDIRECT to " + location + " {" + url + "}"
+}
+
+case class HttpResponseException(code: Int, message: String, url: URL) extends Exception {
   override def getMessage(): String =
     "HTTP " + code + ": " + message + " {" + url + "}"
 }
 
-//object HttpTask {
-//  import scala.collection.concurrent.Map
-//  
-//  val cookies = Map[String, List[String]]()
-//}
+object HttpTask {
+  //import scala.collection.concurrent.Map
+  import java.util.concurrent.ConcurrentHashMap
+  
+  case class HttpCookie(name: String, value: String, extra: String = "")
+  
+  val CookieStore = new ConcurrentHashMap[String, List[HttpCookie]]()
+}
 
 // Task processing an HTTP-URL
 trait HttpTask[A] extends IOTask[A] {
@@ -230,8 +207,7 @@ trait HttpTask[A] extends IOTask[A] {
   
   var UserAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:14.0) Gecko/20100101 Firefox/14.0.1"
   var Referer   = "http://stackoverflow.com/questions/tagged/referer" 
-  var Throttle: Option[(Int, Int)] = None
-    
+      
   // if sending data, define its content-type and the function to fill the OutputStream with the data
   var RequestMethod: String = "GET"
   var RequestProperties = ListBuffer[(String, String)]()
@@ -242,7 +218,7 @@ trait HttpTask[A] extends IOTask[A] {
   var StoreCookies = false
   var cookies = List[(String, String)]()
   
-  def prepare(url: URL): HttpURLConnection = {
+  def setup(url: URL): HttpURLConnection = {
     val conn: HttpURLConnection = url.openConnection() match {
       case http:HttpURLConnection => http
       case _                      => throw new Exception("HttpTask only supports HTTP connections")
@@ -269,17 +245,8 @@ trait HttpTask[A] extends IOTask[A] {
     
     conn
   }
-  
-  lazy val sleepRandomizer = new Random
     
   def connect(conn: HttpURLConnection): InputStream = {
-    Throttle match {
-      case Some((min, max)) => {
-        val t = min + sleepRandomizer.nextInt( max - min )
-        Thread sleep t.toLong
-      }
-      case None =>
-    }
     conn.connect()
     
     RequestData match {
@@ -289,6 +256,7 @@ trait HttpTask[A] extends IOTask[A] {
     
     if (StoreCookies) {
       val headers = scala.collection.convert.Wrappers.JMapWrapper( conn.getHeaderFields )
+      // TODO ...
     }
 
     val respCode = conn.getResponseCode
@@ -315,7 +283,7 @@ trait HttpTask[A] extends IOTask[A] {
   }
   
   final def execute(): A = {
-    val conn = prepare( url )
+    val conn = setup( url )
     try {
       val is = connect( conn )
       try {
@@ -332,11 +300,11 @@ trait HttpTask[A] extends IOTask[A] {
   }
   
   def onRedirect(code: Int, loc: String, conn: HttpURLConnection): HttpURLConnection = {
-    throw new Exception("Unhandled HTTP " + code + " Redirect to " + loc)
+    throw new HttpRedirectException(code, conn.getResponseMessage, loc, conn.getURL)
   }
   
   def onError(code: Int, conn: HttpURLConnection): InputStream = {
-    throw new HttpResponseCodeException(code, conn.getResponseMessage, conn.getURL)
+    throw new HttpResponseException(code, conn.getResponseMessage, conn.getURL)
   }
   
   // http://docs.oracle.com/javase/1.5.0/docs/guide/net/http-keepalive.html
