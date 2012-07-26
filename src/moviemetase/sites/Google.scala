@@ -313,15 +313,18 @@ object GoogleWeb {
       val url = new URL("http://" + page.getHost + answer.question.formAction + "?" + params)
       
       trace("responding", ("url" -> url) :: Nil)
-            
+      
       val conn = url.openConnection().asInstanceOf[HttpURLConnection]
+      conn.setUseCaches(false)
+      conn.setDoInput(true)
+      conn.setDoOutput(false)
       conn.setRequestProperty("Referer", "http://www.google.com/sorry/Captcha")
       conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:5.0) Gecko/20100101 Firefox/5.0")
       conn.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml") 
       conn.setRequestProperty("Accept-Language", "en-us,en")
       conn.setRequestProperty("Accept-Charset", "utf-8")
       conn.connect()
-      
+            
       val respCode = conn.getResponseCode
       
       val respOK    = (respCode == 200)

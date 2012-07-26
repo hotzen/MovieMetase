@@ -209,9 +209,11 @@ trait HttpTask[A] extends IOTask[A] {
   var StoreCookies = false
   
   var RequestMethod: String = "GET"
-  var RequestContentType: Option[String] = None
   var RequestHeaders = ListBuffer[(String, String)]()
-  var RequestData: Option[OutputStream => Unit] = None // POSTing data
+  
+  // POSTing data ...
+  var RequestContentType: Option[String] = None
+  var RequestData: Option[OutputStream => Unit] = None
   
   var UserAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:14.0) Gecko/20100101 Firefox/14.0.1"
   var Referer   = "http://stackoverflow.com/questions/tagged/referer" 
@@ -220,7 +222,7 @@ trait HttpTask[A] extends IOTask[A] {
    
     conn setUseCaches Caching
     conn setAllowUserInteraction false
-    conn setDoInput  true
+    conn setDoInput true
     conn setDoOutput RequestData.isDefined
     
     conn setRequestMethod RequestMethod
@@ -231,7 +233,7 @@ trait HttpTask[A] extends IOTask[A] {
     
     for (ct <- RequestContentType)
       conn setRequestProperty ("Content-Type", ct)
-    
+
     conn setRequestProperty ("User-Agent", UserAgent)
     conn setRequestProperty ("Referer",    Referer)
     
@@ -249,7 +251,7 @@ trait HttpTask[A] extends IOTask[A] {
         
     if (StoreCookies) {
       val headers = scala.collection.convert.Wrappers.JMapWrapper( conn.getHeaderFields )
-      // TODO ...
+      // TODO HttpTask.CookieStore put headers ...
     }
     
     // redirect
@@ -282,6 +284,7 @@ trait HttpTask[A] extends IOTask[A] {
       setup(conn)
       val is = connect( conn )
       try {
+        // pass headers?
         val res = processResponse( is )
         disconnect( conn )
         res
