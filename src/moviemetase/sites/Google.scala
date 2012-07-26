@@ -141,8 +141,8 @@ object GoogleWeb {
     
     val pool = ("G", 1, 1) // NO concurrent google-queries
 
-    val ThrottleMin = 100 // 1000
-    val ThrottleMax = 500 // 3000
+    val ThrottleMin = 50 // 1000
+    val ThrottleMax = 100 // 3000
     
     def execute(): List[GoogleResult] = {
       try {
@@ -343,8 +343,8 @@ object GoogleWeb {
   case class WebQuery(query: String) extends HtmlTask[List[GoogleResult]] with Logging {
     val logID = "Google.WebQuery"
     
-    RequestProperties += ("Accept" -> "text/html,application/xhtml+xml,application/xml")
-    RequestProperties += ("Accept-Language" -> "en-us,en")
+    RequestHeaders += ("Accept" -> "text/html,application/xhtml+xml,application/xml")
+    RequestHeaders += ("Accept-Language" -> "en-us,en")
 
     // http://code.google.com/intl/de/apis/searchappliance/documentation/46/xml_reference.html#request_parameters
     // http://googlesystem.blogspot.com/2007/04/how-to-disable-google-personalized.html

@@ -198,32 +198,27 @@ trait HttpTask[A] extends IOTask[A] {
   def url: URL
 
   // IOTask
-  def target: String = IOTask.getTargetByURL(url)
+  def target: String = IOTask getTargetByURL url
     
   // processor of the response
   def processResponse(is: InputStream): A
 
   var ConnectionClose = false
+  var Caching = true
+  var FollowRedirects = false
+  var StoreCookies = false
+  
+  var RequestMethod: String = "GET"
+  var RequestContentType: Option[String] = None
+  var RequestHeaders = ListBuffer[(String, String)]()
+  var RequestData: Option[OutputStream => Unit] = None // POSTing data
   
   var UserAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:14.0) Gecko/20100101 Firefox/14.0.1"
   var Referer   = "http://stackoverflow.com/questions/tagged/referer" 
-      
-  // if sending data, define its content-type and the function to fill the OutputStream with the data
-  var RequestMethod: String = "GET"
-  var RequestProperties = ListBuffer[(String, String)]()
-  var RequestContentType: Option[String] = None
-  var RequestData: Option[OutputStream => Unit] = None
-  
-  var FollowRedirects = false
-  var StoreCookies = false
-  var cookies = List[(String, String)]()
-  
-  def setup(url: URL): HttpURLConnection = {
-    val conn: HttpURLConnection = url.openConnection() match {
-      case http:HttpURLConnection => http
-      case _                      => throw new Exception("HttpTask only supports HTTP connections")
-    }
-    conn setUseCaches true
+    
+  def setup(conn: HttpURLConnection): Unit = {
+   
+    conn setUseCaches Caching
     conn setAllowUserInteraction false
     conn setDoInput  true
     conn setDoOutput RequestData.isDefined
@@ -234,32 +229,28 @@ trait HttpTask[A] extends IOTask[A] {
     if (ConnectionClose)
        conn setRequestProperty ("Connection", "Close")
     
-    if (RequestContentType.isDefined)
-      conn setRequestProperty ("Content-Type", RequestContentType.get);
+    for (ct <- RequestContentType)
+      conn setRequestProperty ("Content-Type", ct)
     
     conn setRequestProperty ("User-Agent", UserAgent)
     conn setRequestProperty ("Referer",    Referer)
     
-    for ((propName, propValue) <- RequestProperties)
-      conn setRequestProperty (propName, propValue)
-    
-    conn
+    for ((name, value) <- RequestHeaders)
+      conn setRequestProperty (name, value)
   }
     
   def connect(conn: HttpURLConnection): InputStream = {
     conn.connect()
-    
-    RequestData match {
-      case Some(f) => f( conn.getOutputStream )
-      case None    => 
-    }
-    
+      
+    for (f <- RequestData)
+      f( conn.getOutputStream )
+
+    val respCode = conn.getResponseCode
+        
     if (StoreCookies) {
       val headers = scala.collection.convert.Wrappers.JMapWrapper( conn.getHeaderFields )
       // TODO ...
     }
-
-    val respCode = conn.getResponseCode
     
     // redirect
     if (respCode >= 300 && respCode < 400) {
@@ -272,7 +263,7 @@ trait HttpTask[A] extends IOTask[A] {
     } else if (respCode != HttpURLConnection.HTTP_OK) {
       return onError(respCode, conn)
     }
-
+    
     conn.getInputStream
   }
     
@@ -283,8 +274,12 @@ trait HttpTask[A] extends IOTask[A] {
   }
   
   final def execute(): A = {
-    val conn = setup( url )
+    val conn: HttpURLConnection = url.openConnection() match {
+      case http:HttpURLConnection => http
+      case _                      => throw new IllegalArgumentException("HttpTask only supports HTTP connections")
+    }
     try {
+      setup(conn)
       val is = connect( conn )
       try {
         val res = processResponse( is )

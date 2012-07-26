@@ -68,17 +68,27 @@ class JImage(val url: URL, resizeTo: Option[(Int, Int)], parLoad: Boolean = true
     new Dimension(img.getWidth, img.getHeight)
 }
 
-
-class ImageLoader(url: java.net.URL, callback: BufferedImage => Unit, resizeTo: Option[(Int,Int)] = None) extends IOTask[Unit] with Logging {
+class ImageLoader(url: URL, callback: BufferedImage => Unit, resizeTo: Option[(Int,Int)] = None) extends IOTask[Unit] with Logging {
+  import java.io.InputStream
+  
   val logID = "ImageLoader(" + url.toExternalForm + ")"
   
   def target = IOTask.getTargetByURL(url)
+  
+  // don't let ImageIO do the HTTP-handling, just use it to decode the InputStream
+  private class HttpImageIO(val url: URL) extends HttpTask[BufferedImage] {
+    def processResponse(is: InputStream): BufferedImage =
+      ImageIO.read(is)
+  }
     
   def execute(): Unit =
     try {
-      //trace("ImageIO reading ...")
-      val img = ImageIO.read(url)
-      
+      val img =
+        if (url.getProtocol == "http")
+          new HttpImageIO(url).execute()
+        else
+          ImageIO.read(url)
+                
       if (img == null)
         error("ImageIO returned NULL")
       else

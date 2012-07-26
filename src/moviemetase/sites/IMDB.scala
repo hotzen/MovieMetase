@@ -19,7 +19,7 @@ object IMDB {
   case class FetchByID(val id: String) extends XhtmlTask[Option[Movie]] with Logging {
     val logID = "IMDB.FetchByID(" + id + ")"
     
-    RequestProperties += ("Accept-Language" -> "en-US,en")
+    RequestHeaders += ("Accept-Language" -> "en-US,en")
     
     val imdbInfo = MovieInfos.IMDB(id)
     def url = imdbInfo.page
