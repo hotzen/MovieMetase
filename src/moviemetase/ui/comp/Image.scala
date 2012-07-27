@@ -77,6 +77,7 @@ class ImageLoader(url: URL, callback: BufferedImage => Unit, resizeTo: Option[(I
   
   // don't let ImageIO do the HTTP-handling, just use it to decode the InputStream
   private class HttpImageIO(val url: URL) extends HttpTask[BufferedImage] {
+    StoreCookies = true
     def processResponse(is: InputStream): BufferedImage =
       ImageIO.read(is)
   }

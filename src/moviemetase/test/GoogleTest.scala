@@ -26,7 +26,7 @@ object GoogleTest {
     for (i <- 1 to 1000) {
       val cs = for (i <- 1 to 10) yield rnd.nextPrintableChar
       val res = Google.Query("foobar " + cs.mkString("")).execute()
-      println(i + " = " + res.length)
+      println(i + " = " + res.length + "\n-----")
     }
             
 //    for (res <- Google.Query("Inception.1080p.BluRay.x264-REFiNED link:imdb.com/title/").execute()) {

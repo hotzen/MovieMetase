@@ -2,31 +2,18 @@ package moviemetase
 package sites
 
 import Util._
-import nu.xom._
+//import nu.xom._
 import java.net.URL
 import java.io.InputStream
-import scala.io.Source
-import scala.util.parsing.json.JSON
-import java.util.concurrent.atomic.AtomicInteger
-import scala.concurrent.{Future, future}
 import java.net.HttpURLConnection
 import java.util.Random
 import scala.concurrent.SyncVar
 import moviemetase.ui.comp.JImage
 
 object Google {
-//  val UseAjax        = 1
-//  val UseWeb         = 2
-//  val UseMetaCrawler = 3
-//  val UseDogPile     = 4
-//  val UseNothing     = 5
   
-//  val use = new AtomicInteger( UseMetaCrawler ) //XXX Skip AJAX since it finds considerably fewer results than the web-search :/
-  
-  // generic query that tries different query-methods
   case class Query(query: String) extends Task[List[GoogleResult]] {
-    
-    //def execute(): List[GoogleResult] = MetaCrawler.Query(query).execute()
+      
     def execute(): List[GoogleResult] = GoogleWeb.Query(query).execute()
     
 //    def executeQuery(): List[GoogleResult] = use.get match {
@@ -78,6 +65,9 @@ case class GoogleResult(query: String, url: URL, title: String, snippet: String)
 
 ////XXX very poor result-quality :( 
 //object GoogleAjax {
+//  import import scala.util.parsing.json.JSON
+//  import scala.io.Source
+//
 //  val BASE_URL = "http://ajax.googleapis.com/ajax/services/search/web"
 //  
 //  case class Query(query: String, page: Int = 1) extends HttpTask[List[GoogleResult]] with Logging {
@@ -121,8 +111,6 @@ case class GoogleResult(query: String, url: URL, title: String, snippet: String)
 //}
 
 object GoogleWeb {
-  //val BASE_URL = "http://nosslsearch.google.com/search"
-  
   val Domains =
     "nosslsearch.google.com" ::
     "google.com.au" ::
@@ -134,95 +122,101 @@ object GoogleWeb {
     "http://" + domain + "/search" 
 
   def baseURL: String =
-    baseURL( Domains(0) )
+    baseURL( Domains(0) ) // TODO: make me smart
   
   case class Query(query: String) extends Task[List[GoogleResult]] with DedicatedPool with Logging {
     val logID = "Google.Query"
     
     val pool = ("G", 1, 1) // NO concurrent google-queries
 
-    val ThrottleMin = 50 // 1000
-    val ThrottleMax = 100 // 3000
+    var ThrottleMin = 100
+    var ThrottleMax = 1000
+    
+    val BlockPagePattern = "/sorry/"
     
     def execute(): List[GoogleResult] = {
       try {
-        val rnd = new Random
-        val throttle = ThrottleMin + rnd.nextInt( ThrottleMax - ThrottleMin )
-        println("throttling " + (throttle.toFloat/1000) + " secs")
-        Thread sleep throttle.toLong        
-        
+        if (ThrottleMin > 0 && ThrottleMax > 0) {
+          val rnd = new Random
+          val throttle = ThrottleMin + rnd.nextInt( ThrottleMax - ThrottleMin )
+          Thread sleep throttle.toLong
+        }
+
         WebQuery(query).execute()
         
       } catch {
-        // we got blocked
-        case e@HttpRedirectException(code, msg, loc, url) if loc contains "/sorry/" => {
-          tryUnblock( loc.toURL )
-          Nil
+        case e@HttpRedirectException(code, msg, loc, url) => {
+          if (loc contains BlockPagePattern) {
+            warn("BLOCKED")
+            unblockRetry( loc.toURL )
+          } else {
+            warn("unexpected redirection to " + loc)
+            throw e
+          }
         }
-        
-        // access denied due to block?
         case e@HttpResponseException(code, msg, url) if code >= 500 => {
-          println("HTTP50x: " + e)
-          Nil
-        }
-        
-        case e:Exception => {
-          println("UNEXPECTED ERROR")
-          e.printStackTrace
-          
+          warn("HTTP " + code + " " + msg + " - aborting")
           Nil
         }
       }
     }
     
-    private def tryUnblock(captchaPage: URL): List[GoogleResult] = {
+    private def unblockRetry(captchaPage: URL): List[GoogleResult] = {
       unblock( captchaPage ) match {
         case Right(_) => {
-          info("UNBLOCKED, continue ...")
+          info("UNBLOCKED, retrying ...")
           execute() 
         }
         case Left(_)  => {
           warn("STILL BLOCKED, trying to unblock again")
-          tryUnblock( captchaPage )
+          unblockRetry( captchaPage )
         }
       }
     }
     
-    private def unblock(captchaPage: URL): Either[CaptchaFailed, CaptchaConfirmed] = {
+    private def unblock(captchaPage: URL): Either[CaptchaFailed, CaptchaSolved] = {
       val question = CaptchaReader( captchaPage ).execute()
-      println("question: " + question)
-      println("CAPTCHA: " + question.img)
-      
-      val answer = CaptchaSolver( question ).execute()
-      println("answer: " + answer)
-      
-      val result = CaptchaResponder( answer ).execute()
-      println("result: " + result)
-      
-      result
+      val answer   = CaptchaSolver( question ).execute()
+      CaptchaResponder( answer ).execute()
     }
   }
   
-  private case class CaptchaQuestion(page: URL, img: URL, formAction: String, formParams: List[(String, String)])  
-  private case class CaptchaAnswer(solution: String, question: CaptchaQuestion)
-  private case class CaptchaConfirmed(answer: CaptchaAnswer)
+  private case class CaptchaChallenge(page: URL, img: URL, formAction: String, formParams: List[(String, String)])  
+  private case class CaptchaResponse(answer: String, challenge: CaptchaChallenge)
+  
+  private case class CaptchaSolved(answer: CaptchaResponse)
   private case class CaptchaFailed(code: Int)
   
-  private case class CaptchaReader(url: URL) extends HtmlTask[CaptchaQuestion] with Logging {
+  private case class CaptchaReader(url: URL) extends HtmlTask[CaptchaChallenge] with Logging {
     val logID = "Google.CaptchaReader"
 
-    def processDocument(doc: org.jsoup.nodes.Document): CaptchaQuestion = {
+    StoreCookies = true
+    
+    val CaptchaImagePattern = "/sorry/image"
+      
+    def processDocument(doc: org.jsoup.nodes.Document): CaptchaChallenge = {
       import org.jsoup.nodes._
       import JSoup._
       
-      val imgPath = doc.select("img").flatMap(_.attrOpt("src") match {
-        case Some(src) if src contains "/sorry/image" => Some(src)
-        case _ => None
-      }).head
+      val imgSrc = doc.select("img").flatMap(img => {
+        val src = img.attr("src")
+        if (src contains CaptchaImagePattern)
+          Some(src)
+        else
+          None
+      }).head // there must be one
       
-      val img = new URL("http://www.google.com" + imgPath)
+      val imgPath = {
+        if (imgSrc startsWith "/")  imgSrc
+        else url.getPath + "/" + imgSrc
+      }.replaceAll("//", "/")
       
-      val formAction = doc.select("form").map(f => f.attr("action")).head
+      val imgUrl = {
+        new URL("http://www.google.com" + imgPath)
+      }
+      trace("CAPTCHA-image: " + imgUrl.toExternalForm)
+      
+      val formAction = doc.select("form").head.attr("action")
       
       val actionPath = {
         if (formAction startsWith "/") formAction
@@ -237,29 +231,23 @@ object GoogleWeb {
         })
       }).toList
       
-      val q = CaptchaQuestion(url, img, actionPath, params)
-      trace("parsed captcha-page: " + q)
-      q
+      CaptchaChallenge(url, imgUrl, actionPath, params)
     }
     
     // captcha-page is displayed with HTTP 50X, ignore it
-    override def onError(code: Int, conn: HttpURLConnection): InputStream = {
-      println("ignoring HTTP " + code)
-      conn.getErrorStream
-    }
-      
+    override def onError(code: Int, conn: HttpURLConnection): InputStream = conn.getErrorStream
   }
   
   class UnsolvedCaptchaException() extends Exception
   
-  private case class CaptchaSolver(question: CaptchaQuestion) extends Task[CaptchaAnswer] with Logging {
+  private case class CaptchaSolver(question: CaptchaChallenge) extends Task[CaptchaResponse] with Logging {
     val logID = "Google.CaptchaSolver"
-      
-    def execute(): CaptchaAnswer = {
-      val result = prompt( question.img )
+
+    def execute(): CaptchaResponse = {
+      val result = prompt( question.img ) // TODO decouple me properly!
       
       val a = result.get match {
-        case Right(a) => CaptchaAnswer(a, question)
+        case Right(a) => CaptchaResponse(a, question)
         case Left(t)  => throw t
       }
       
@@ -293,59 +281,63 @@ object GoogleWeb {
     }
   }
   
-  private case class CaptchaResponder(answer: CaptchaAnswer) extends Task[Either[CaptchaFailed, CaptchaConfirmed]] with Logging {
+  private case class CaptchaResponder(resp: CaptchaResponse) extends HttpTask[Either[CaptchaFailed, CaptchaSolved]] with Logging {
     val logID = "Google.CaptchaResponder"
     
-    val Charset = "UTF-8"
+    StoreCookies = true
       
-    def execute(): Either[CaptchaFailed, CaptchaConfirmed] = {
+    val Charset = "UTF-8"
+    
+    def url(): URL = {
       val params = { 
-        for ((name,value) <- answer.question.formParams)
+        for ((name,value) <- resp.challenge.formParams)
           yield
             name + "=" + {name match {
-              case "captcha"  => java.net.URLEncoder.encode(answer.solution, Charset)
+              case "captcha"  => java.net.URLEncoder.encode(resp.answer, Charset)
               case "continue" => java.net.URLEncoder.encode("http://www.google.com", Charset)
               case _          => java.net.URLEncoder.encode(value, Charset) 
             }}
       }.mkString("&")
       
-      val page = answer.question.page
-      val url = new URL("http://" + page.getHost + answer.question.formAction + "?" + params)
-      
-      trace("responding", ("url" -> url) :: Nil)
-      
-      val conn = url.openConnection().asInstanceOf[HttpURLConnection]
-      conn.setUseCaches(false)
-      conn.setDoInput(true)
-      conn.setDoOutput(false)
-      conn.setRequestProperty("Referer", "http://www.google.com/sorry/Captcha")
-      conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:5.0) Gecko/20100101 Firefox/5.0")
-      conn.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml") 
-      conn.setRequestProperty("Accept-Language", "en-us,en")
-      conn.setRequestProperty("Accept-Charset", "utf-8")
-      conn.connect()
-            
-      val respCode = conn.getResponseCode
-      
-      val respOK    = (respCode == 200)
-      val respRedir = (respCode >= 300 && respCode < 400)
-      
-      val headers = scala.collection.convert.Wrappers.JMapWrapper( conn.getHeaderFields ).toList
-      val newLoc = headers.exists(_ match {
-        case ("Location", _) => true
-        case _ => false
-      })
-      
-      if ( (respOK || respRedir) && newLoc)
-        Right( CaptchaConfirmed(answer) )
-      else
-        Left( CaptchaFailed(conn.getResponseCode) )
+      val page = resp.challenge.page
+      new URL("http://" + page.getHost + resp.challenge.formAction + "?" + params)
     }
+    
+    var result: Either[CaptchaFailed, CaptchaSolved] = Left( CaptchaFailed(0) )
+
+    // 1
+    override def onError(code: Int, conn: HttpURLConnection): InputStream = {
+      warn("CAPTCHA-response failed: HTTP " + code)
+      result = Left( CaptchaFailed(code) )
+      
+      conn.getErrorStream // return something to continue
+    }
+    
+    // 2
+    override def onRedirect(code: Int, loc: String, conn: HttpURLConnection): HttpURLConnection = {
+      //println("CaptchaResponder.onRedirect: " + loc)
+      conn // just continue with the same connection
+    }
+    
+    // 3
+    override def preProcess(conn: HttpURLConnection, headers: Map[String, List[String]]): Unit = {
+      val respCode = conn.getResponseCode 
+      if (respCode >= 400)
+        result = Left( CaptchaFailed(respCode) )
+      else
+        result = Right( CaptchaSolved(resp) )
+    }
+
+    // 4
+    def processResponse(is: InputStream): Either[CaptchaFailed, CaptchaSolved] =
+      result
   }
     
   case class WebQuery(query: String) extends HtmlTask[List[GoogleResult]] with Logging {
     val logID = "Google.WebQuery"
     
+    StoreCookies = true
+      
     RequestHeaders += ("Accept" -> "text/html,application/xhtml+xml,application/xml")
     RequestHeaders += ("Accept-Language" -> "en-us,en")
 
@@ -354,7 +346,7 @@ object GoogleWeb {
     // http://www.blueglass.com/blog/google-search-url-parameters-query-string-anatomy/
     //def params: String = "ie=UTF-8&oe=UTF-8&hl=en&filter=0&safe=0&pws=0&complete=0&instant=off&num=10&adtest=on"
     def params: String = "sourceid=navclient&ie=UTF-8&oe=UTF-8&hl=en&filter=0&safe=0&pws=0&complete=0&instant=off&num=10&btnG=Search"
-            
+
     var DomainIndex = 0
       
     def url: URL = {
@@ -367,7 +359,7 @@ object GoogleWeb {
       sb append "&"   append params
       val url = new URL( sb.toString )
       
-      trace(query, ("url" -> url.toString) :: Nil)
+      //trace(query, ("url" -> url.toString) :: Nil)
       url
     }
             

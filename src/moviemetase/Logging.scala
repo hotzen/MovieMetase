@@ -45,8 +45,8 @@ trait Logging {
 
     logBuf append "[" append Thread.currentThread.getName append "] "
     logBuf append "[" append lvl.label append "] "
-    logBuf append Logging.TimestampFormat.format( new Date() ) 
-    logBuf append " " append logID append "\t"
+    //logBuf append Logging.TimestampFormat.format( new Date() ) 
+    logBuf append " " append logID append " " //append "\t"
     logBuf append msg
     
     if (!infos.isEmpty) {

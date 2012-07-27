@@ -168,7 +168,7 @@ object IOTask {
       return host
     
     val hostPartsRev = hostParts.reverse
-    hostParts.tail.head + "." + hostParts.head
+    hostPartsRev.tail.head + "." + hostPartsRev.head
   }
 }
 
@@ -184,15 +184,19 @@ case class HttpResponseException(code: Int, message: String, url: URL) extends E
 
 object HttpTask {
   //import scala.collection.concurrent.Map
-  import java.util.concurrent.ConcurrentHashMap
+  //import java.util.concurrent.ConcurrentHashMap
   
-  case class HttpCookie(name: String, value: String, extra: String = "")
+  case class HttpCookie(name: String, value: String, attrs: List[String] = Nil) {
+    def toHeader(): String = name+"="+value
+  }
   
-  val CookieStore = new ConcurrentHashMap[String, List[HttpCookie]]()
+  //val CookieStore = new ConcurrentHashMap[String, List[HttpCookie]]()
+  val CookieStore = new scala.collection.mutable.HashMap[String, List[HttpCookie]]()
 }
 
 // Task processing an HTTP-URL
 trait HttpTask[A] extends IOTask[A] {
+  import HttpTask._
   
   // url to process
   def url: URL
@@ -200,6 +204,9 @@ trait HttpTask[A] extends IOTask[A] {
   // IOTask
   def target: String = IOTask getTargetByURL url
     
+  // optional "raw"-processor
+  def preProcess(conn: HttpURLConnection, headers: Map[String, List[String]]): Unit = {}
+  
   // processor of the response
   def processResponse(is: InputStream): A
 
@@ -219,7 +226,7 @@ trait HttpTask[A] extends IOTask[A] {
   var Referer   = "http://stackoverflow.com/questions/tagged/referer" 
     
   def setup(conn: HttpURLConnection): Unit = {
-   
+      
     conn setUseCaches Caching
     conn setAllowUserInteraction false
     conn setDoInput true
@@ -233,9 +240,20 @@ trait HttpTask[A] extends IOTask[A] {
     
     for (ct <- RequestContentType)
       conn setRequestProperty ("Content-Type", ct)
-
+    
     conn setRequestProperty ("User-Agent", UserAgent)
     conn setRequestProperty ("Referer",    Referer)
+    
+    if (StoreCookies) {
+      CookieStore synchronized {
+        val domain = cookieDomain( conn.getURL )
+        
+        for (cookies <- CookieStore get domain) {
+          val header = cookies.map(_.toHeader).mkString(";")
+          conn setRequestProperty ("Cookie", header)
+        }
+      }
+    }
     
     for ((name, value) <- RequestHeaders)
       conn setRequestProperty (name, value)
@@ -248,12 +266,7 @@ trait HttpTask[A] extends IOTask[A] {
       f( conn.getOutputStream )
 
     val respCode = conn.getResponseCode
-        
-    if (StoreCookies) {
-      val headers = scala.collection.convert.Wrappers.JMapWrapper( conn.getHeaderFields )
-      // TODO HttpTask.CookieStore put headers ...
-    }
-    
+
     // redirect
     if (respCode >= 300 && respCode < 400) {
       if (!conn.getInstanceFollowRedirects) {
@@ -265,7 +278,7 @@ trait HttpTask[A] extends IOTask[A] {
     } else if (respCode != HttpURLConnection.HTTP_OK) {
       return onError(respCode, conn)
     }
-    
+        
     conn.getInputStream
   }
     
@@ -277,14 +290,17 @@ trait HttpTask[A] extends IOTask[A] {
   
   final def execute(): A = {
     val conn: HttpURLConnection = url.openConnection() match {
-      case http:HttpURLConnection => http
-      case _                      => throw new IllegalArgumentException("HttpTask only supports HTTP connections")
+      case c:HttpURLConnection => c
+      case _                   => throw new IllegalArgumentException("HttpTask only supports HTTP connections")
     }
+    
     try {
       setup(conn)
       val is = connect( conn )
       try {
-        // pass headers?
+        val hdrs = headers(conn)
+        storeCookies(conn, hdrs)
+        preProcess(conn, hdrs)
         val res = processResponse( is )
         disconnect( conn )
         res
@@ -303,7 +319,44 @@ trait HttpTask[A] extends IOTask[A] {
   
   def onError(code: Int, conn: HttpURLConnection): InputStream = {
     throw new HttpResponseException(code, conn.getResponseMessage, conn.getURL)
+    //conn.getErrorStream
   }
+  
+  def headers(conn: HttpURLConnection): Map[String, List[String]] = {
+    for ( (name, values) <- scala.collection.convert.Wrappers.JMapWrapper( conn.getHeaderFields ))
+      yield (name -> scala.collection.convert.Wrappers.JListWrapper(values).toList)
+  }.toMap
+  
+    
+  def storeCookies(conn: HttpURLConnection, headers: Map[String, List[String]]): Unit = {
+    if (StoreCookies) {
+      val domain = cookieDomain( conn.getURL )
+      
+      val newCookies: List[HttpCookie] = 
+        headers.get("Set-Cookie").getOrElse( Nil ).
+        map( str => str.split(";") ).
+        flatMap( parts => {
+          val pos = parts.head.indexOf("=")
+          if (pos > 0) {
+            val name  = parts.head.slice(0, pos)
+            val value = parts.head.slice(pos+1, parts.head.length)
+            Some( HttpCookie(name, value, parts.tail.toList) )
+          } else None
+        }).distinct
+        
+      val newCookieNames: Set[String] = newCookies.map(_.name).toSet
+            
+      CookieStore.synchronized {
+        val keep = CookieStore.get(domain) match {
+          case Some(cs) => cs.filter(c => !newCookieNames.contains(c.name) )
+          case None     => Nil
+        }
+        CookieStore.put(domain, newCookies ::: keep)
+      }
+    }
+  }
+  
+  def cookieDomain(url: URL): String = IOTask.getTargetByURL(url) // TODO
   
   // http://docs.oracle.com/javase/1.5.0/docs/guide/net/http-keepalive.html
   def cleanCloseInputStream(is: InputStream) {
