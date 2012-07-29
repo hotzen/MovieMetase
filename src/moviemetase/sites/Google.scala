@@ -2,13 +2,10 @@ package moviemetase
 package sites
 
 import Util._
-//import nu.xom._
 import java.net.URL
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.util.Random
-import scala.concurrent.SyncVar
-import moviemetase.ui.comp.JImage
 
 object Google {
   
@@ -122,7 +119,7 @@ object GoogleWeb {
     "http://" + domain + "/search" 
 
   def baseURL: String =
-    baseURL( Domains(0) ) // TODO: make me smart
+    baseURL( Domains(0) ) // TODO try to change domains before prompting for CAPTCHAs
   
   case class Query(query: String) extends Task[List[GoogleResult]] with DedicatedPool with Logging {
     val logID = "Google.Query"
@@ -175,18 +172,22 @@ object GoogleWeb {
     }
     
     private def unblock(captchaPage: URL): Either[CaptchaFailed, CaptchaSolved] = {
-      val question = CaptchaReader( captchaPage ).execute()
-      val answer   = CaptchaSolver( question ).execute()
+      val challenge = CaptchaReader( captchaPage ).execute()
+      val answer   = CaptchaSolver( challenge ).execute()
       CaptchaResponder( answer ).execute()
     }
   }
   
-  private case class CaptchaChallenge(page: URL, img: URL, formAction: String, formParams: List[(String, String)])  
-  private case class CaptchaResponse(answer: String, challenge: CaptchaChallenge)
+  case class CaptchaChallenge(page: URL, img: URL, formAction: String, formParams: List[(String, String)])  
+  case class CaptchaResponse(answer: String, challenge: CaptchaChallenge)
   
-  private case class CaptchaSolved(answer: CaptchaResponse)
-  private case class CaptchaFailed(code: Int)
-  
+  case class CaptchaSolved(answer: CaptchaResponse)
+  case class CaptchaFailed(code: Int)
+
+  case class CaptchaRequired(challenge: CaptchaChallenge, cb: CaptchaResponse => Unit) extends HumanTaskEvent[CaptchaResponse] {
+    def reply(a: CaptchaResponse) = cb(a)
+  }
+    
   private case class CaptchaReader(url: URL) extends HtmlTask[CaptchaChallenge] with Logging {
     val logID = "Google.CaptchaReader"
 
@@ -238,47 +239,9 @@ object GoogleWeb {
     override def onError(code: Int, conn: HttpURLConnection): InputStream = conn.getErrorStream
   }
   
-  class UnsolvedCaptchaException() extends Exception
-  
-  private case class CaptchaSolver(question: CaptchaChallenge) extends Task[CaptchaResponse] with Logging {
-    val logID = "Google.CaptchaSolver"
-
-    def execute(): CaptchaResponse = {
-      val result = prompt( question.img ) // TODO decouple me properly!
-      
-      val a = result.get match {
-        case Right(a) => CaptchaResponse(a, question)
-        case Left(t)  => throw t
-      }
-      
-      trace("answer: " + a)
-      a
-    }
-    
-    private def prompt(imgUrl: URL): SyncVar[Either[Throwable,String]] = {
-      val res = new SyncVar[Either[Throwable,String]]
-      ui.UI.run {
-        import java.awt._
-        import javax.swing._
-        
-        val panel = new JPanel(new BorderLayout)
-                
-        val lbl = new JLabel()
-        lbl.setText("Please enter the CAPTCHA:")
-        panel.add(lbl, BorderLayout.NORTH)
-        
-        val img = new JImage(imgUrl, None, JImage.Blocking, JImage.NoCaching)
-        panel.add(img, BorderLayout.SOUTH)
-        
-        val prompt = JOptionPane.showInputDialog(panel)
-        
-        if (prompt == null)
-          res put Left(new UnsolvedCaptchaException)
-        else
-          res put Right(prompt)
-      }
-      res
-    }
+  private case class CaptchaSolver(challenge: CaptchaChallenge) extends HumanTask[CaptchaResponse] {
+    def createEvent(cb: CaptchaResponse => Unit): HumanTaskEvent[CaptchaResponse] =
+      CaptchaRequired(challenge, cb)
   }
   
   private case class CaptchaResponder(resp: CaptchaResponse) extends HttpTask[Either[CaptchaFailed, CaptchaSolved]] with Logging {
@@ -346,15 +309,11 @@ object GoogleWeb {
     // http://www.blueglass.com/blog/google-search-url-parameters-query-string-anatomy/
     //def params: String = "ie=UTF-8&oe=UTF-8&hl=en&filter=0&safe=0&pws=0&complete=0&instant=off&num=10&adtest=on"
     def params: String = "sourceid=navclient&ie=UTF-8&oe=UTF-8&hl=en&filter=0&safe=0&pws=0&complete=0&instant=off&num=10&btnG=Search"
-
-    var DomainIndex = 0
       
     def url: URL = {
       val q = java.net.URLEncoder.encode(query, "UTF-8")
 
-      val base = baseURL( Domains(DomainIndex) )
-      
-      val sb = new StringBuilder( base )
+      val sb = new StringBuilder( baseURL )
       sb append "?q=" append q
       sb append "&"   append params
       val url = new URL( sb.toString )

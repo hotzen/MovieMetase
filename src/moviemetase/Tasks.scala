@@ -58,7 +58,7 @@ object TaskManager extends Logging {
   }
   
   def pool(id: String, size: Int, limit: Int): ExecutorService = pools.synchronized {
-    println("TaskManager.pool" + (id, size, limit))
+    //println("TaskManager.pool" + (id, size, limit))
     pools get id match {
       case Some(pool) => pool
       case None  => {
@@ -148,10 +148,7 @@ trait DedicatedPool {
   def pool: (String, Int, Int) // poolID, min threads, max threads
 }
 
-// UI registers here
-object HumanTask extends scala.swing.Publisher {
-  
-}
+object HumanTasks extends scala.swing.Publisher
 
 trait HumanTaskEvent[A] extends scala.swing.event.Event {
   def reply(a: A): Unit //XXX better name?
@@ -168,8 +165,8 @@ trait HumanTask[A] extends Task[A] with DedicatedPool {
   
   final def execute(): A = {
     val v = new SyncVar[A]
-    HumanTask synchronized {
-      HumanTask publish createEvent(a => v put a)
+    HumanTasks synchronized {
+      HumanTasks publish createEvent(a => v put a)
     }
     v.get
   }
@@ -240,13 +237,13 @@ object HttpTask {
 // Task processing an HTTP-URL
 trait HttpTask[A] extends IOTask[A] {
   import HttpTask._
+  import Util.urlUtils
   
   // url to process
   def url: URL
 
   // IOTask
-  import Util.urlUtils
-  def target: String = url.getDomainName()
+  def target: String = url.domainName
     
   // optional "raw"-processor
   def preProcess(conn: HttpURLConnection, headers: Map[String, List[String]]): Unit = {}
@@ -400,7 +397,7 @@ trait HttpTask[A] extends IOTask[A] {
   }
   
   import Util.urlUtils
-  def cookieDomain(url: URL): String = url.getDomainName()
+  def cookieDomain(url: URL): String = url.domainName
 
   // http://docs.oracle.com/javase/1.5.0/docs/guide/net/http-keepalive.html
   def cleanCloseInputStream(is: InputStream) {

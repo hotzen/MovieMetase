@@ -29,13 +29,14 @@ object UI {
     Swing.onEDT {
       val top = new UI
       top.iconImage = UI.toolkit.getImage( App.resource("/res/img/icon.png") )
-      top.pack()
                   
       val screenSize = toolkit.getScreenSize
       top.size = new Dimension(
         (screenSize.width  * 0.8).toInt,
         (screenSize.height * 0.8).toInt
       )
+      
+      top.pack()
       top.visible = true
     }
   }
@@ -118,31 +119,42 @@ class UI extends Frame {
     } 
     
     add(new SplitPane(Orientation.Vertical, leftPanel, rightPanel), "grow")
-    
-    //add(left, "dock west, width 200")
-//    
-//    add(new SplitPane {
-//      topComponent  = new SplitPane {
-//        topComponent    = moviesPanel
-//        bottomComponent = infosPanel
-//    
-//        resizeWeight = 0.5 // auto-resize even
-//        oneTouchExpandable = false 
-//      }
-//      
-//      bottomComponent = logPanel
-//      
-//      resizeWeight = 0.97
-//      oneTouchExpandable = false
-//    }, "grow")
-  
+
     add(statusBar, "dock south, grow, height 25!")
   }
   
   title = App.name + " " + App.version
   iconImage = UI.toolkit.getImage("/res/icon.png")
-  
+    
   override def closeOperation = App.shutdown()
+  
+  
+  listenTo( HumanTasks )
+  reactions += {
+    case e@sites.GoogleWeb.CaptchaRequired(challenge, _) => {
+      import java.awt._
+      import javax.swing._
+      
+      val panel = new JPanel(new BorderLayout)
+              
+      val lbl = new JLabel()
+      lbl.setText("Please enter the CAPTCHA:")
+      panel.add(lbl, BorderLayout.NORTH)
+      
+      val img = new JImage(challenge.img, None, JImage.Blocking, JImage.NoCaching)
+      panel.add(img, BorderLayout.SOUTH)
+      
+      var prompt: String = null
+      while (prompt == null) {
+        prompt = JOptionPane.showInputDialog(this, panel)
+      }
+      
+      val resp = sites.GoogleWeb.CaptchaResponse(prompt, challenge)
+      println("replying: " + resp)
+      e reply resp        
+    }
+  }
+  
   
   
   { // TEST

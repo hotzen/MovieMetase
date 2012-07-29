@@ -5,22 +5,13 @@ import sites._
 import search._
 import scala.util.Random
 import java.io.PrintWriter
+import moviemetase.ui.comp.JImage
 
-object GoogleTest {
+object GoogleTest extends swing.Reactor {
   def main(args: Array[String]) = {
     Logging.out = new PrintWriter(System.out)
     Logging.level = LogLevel.Trace
     
-//    { // CSE IMDB Search
-//      val title = "Terminator"
-//      val IMDB = "011282045967305256347:dyc6spozqnc"
-//      println( GoogleCSE.Query(IMDB, title).execute() )
-//    }
-//    
-//    { // Ajax Search
-//      val title = "Inception.1080p.BluRay.x264-REFiNED"
-//      println( GoogleAjax.Query(title + " link:imdb.com/title/").execute() )
-//    }
     
     val rnd = new Random
     for (i <- 1 to 1000) {
@@ -28,11 +19,34 @@ object GoogleTest {
       val res = Google.Query("foobar " + cs.mkString("")).execute()
       println(i + " = " + res.length + "\n-----")
     }
-            
-//    for (res <- Google.Query("Inception.1080p.BluRay.x264-REFiNED link:imdb.com/title/").execute()) {
-//      println( res )
-//    }
 
     ()
+  }
+  
+  listenTo( HumanTasks )
+  reactions += {
+    case e@sites.GoogleWeb.CaptchaRequired(challenge, _) => {
+      import java.awt._
+      import javax.swing._
+      println("EVENT: " + e)
+      
+      val panel = new JPanel(new BorderLayout)
+              
+      val lbl = new JLabel()
+      lbl.setText("Please enter the CAPTCHA:")
+      panel.add(lbl, BorderLayout.NORTH)
+      
+      val img = new JImage(challenge.img, None, JImage.Blocking, JImage.NoCaching)
+      panel.add(img, BorderLayout.SOUTH)
+      
+      var prompt: String = null
+      while (prompt == null) {
+        prompt = JOptionPane.showInputDialog(panel)
+      }
+      
+      val resp = sites.GoogleWeb.CaptchaResponse(prompt, challenge)
+      println("replying: " + resp)
+      e reply resp        
+    }
   }
 }

@@ -60,6 +60,8 @@ class URLUtils(val url: java.net.URL) {
         yield hostPartsArrRev(i)
     }.reverse.mkString(".")
   }
+  
+  def domainName: String = getDomainName(2)
 }
     
 

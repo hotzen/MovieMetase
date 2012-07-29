@@ -70,19 +70,18 @@ class JImage(val url: URL, resizeTo: Option[(Int, Int)], parLoad: Boolean = true
 
 class ImageLoader(url: URL, callback: BufferedImage => Unit, resizeTo: Option[(Int,Int)] = None) extends IOTask[Unit] with Logging {
   import java.io.InputStream
+  import Util.urlUtils
   
   val logID = "ImageLoader(" + url.toExternalForm + ")"
   
-  import Util.urlUtils
-  def target = url.getDomainName()
-
+  def target = url.domainName 
+  
   // don't let ImageIO do the HTTP-handling, just use it to decode the InputStream
   private class HttpImageIO(val url: URL) extends HttpTask[BufferedImage] {
-    StoreCookies = true
-    def processResponse(is: InputStream): BufferedImage =
-      ImageIO.read(is)
+    StoreCookies = true // activated due to google CAPTCHAs
+    def processResponse(is: InputStream): BufferedImage = ImageIO.read(is)
   }
-    
+  
   def execute(): Unit =
     try {
       val img =
@@ -140,9 +139,11 @@ class ImageLoader(url: URL, callback: BufferedImage => Unit, resizeTo: Option[(I
 }
 
 class CachingImageLoader(url: java.net.URL, callback: BufferedImage => Unit, resize: Option[(Int,Int)] = None) extends IOTask[Unit] with Logging {
+  import Util.urlUtils
+  
   val logID = "CachingImageLoader(" + url.toExternalForm + ")"
   
-  val target = url.getHost
+  val target = url.domainName
   
   val cache = new ImageCache
   lazy val loader = new ImageLoader(url, onImageLoaded _, resize)
