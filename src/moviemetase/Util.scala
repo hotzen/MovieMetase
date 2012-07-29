@@ -5,11 +5,12 @@ import java.net.URLEncoder
 import scala.annotation.tailrec
 
 object Util {
-    import language.implicitConversions
-    
-    implicit def stringUtils[A](s: String) = new StringUtils(s)
-    implicit def regexUtils[A](r: scala.util.matching.Regex) = new RegexUtils(r)
-    implicit def listUtils[A](ls: List[A]) = new ListUtils[A](ls)
+  import language.implicitConversions
+  
+  implicit def stringUtils(s: String) = new StringUtils(s)
+  implicit def regexUtils(r: scala.util.matching.Regex) = new RegexUtils(r)
+  implicit def listUtils[A](ls: List[A]) = new ListUtils[A](ls)
+  implicit def urlUtils(url: java.net.URL) = new URLUtils(url) 
 }
 
 class StringUtils(val s: String) {
@@ -43,6 +44,21 @@ class ListUtils[A](val xs: List[A]) {
       val rest  = tail.filterNot( eq(_,x) )
       _distinctWithCount(rest, (x, count) :: res, eq)
     }
+  }
+}
+
+class URLUtils(val url: java.net.URL) {
+  def getDomainName(levels: Int = 2): String = {
+    val host = url.getHost
+    val hostParts = host.split("\\.")
+    if (hostParts.length < levels)
+      return host
+    
+    val hostPartsArrRev = hostParts.reverse.toArray
+    
+    { for (i <- 0 until levels)
+        yield hostPartsArrRev(i)
+    }.reverse.mkString(".")
   }
 }
     

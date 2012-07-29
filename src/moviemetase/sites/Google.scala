@@ -251,7 +251,7 @@ object GoogleWeb {
         case Left(t)  => throw t
       }
       
-      trace("solved captcha: " + a)
+      trace("answer: " + a)
       a
     }
     

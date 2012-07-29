@@ -45,11 +45,10 @@ object TaskManager extends Logging {
   
   private val pools = Map[String, ExecutorService]()
   
-  val MainPoolID = "M"
-  
+  val MainPoolID    = "M"
   val MainPoolSize  = 4
   val MainPoolLimit = Integer.MAX_VALUE
-      
+
   val ThreadKeepAliveSecs = 10L
 
   private def createPool(name: String, size: Int, limit: Int): ExecutorService = {
@@ -58,13 +57,13 @@ object TaskManager extends Logging {
     new ThreadPoolExecutor(size, limit, ThreadKeepAliveSecs, TimeUnit.SECONDS, q, f)
   }
   
-  def pool(poolID: String, size: Int, limit: Int): ExecutorService = pools.synchronized {
-    println("TaskManager.pool" + (poolID, size, limit))
-    pools get poolID match {
+  def pool(id: String, size: Int, limit: Int): ExecutorService = pools.synchronized {
+    println("TaskManager.pool" + (id, size, limit))
+    pools get id match {
       case Some(pool) => pool
       case None  => {
-        val pool = createPool(poolID, size, limit)
-        pools put (poolID, pool)
+        val pool = createPool(id, size, limit)
+        pools put (id, pool)
         pool
       }
     }
@@ -97,7 +96,7 @@ object TaskManager extends Logging {
       new ErrorJFuture(t)
     }}
   }
-    
+      
   private val counter = new AtomicInteger()
   private var listeners = List[Int => Unit]()
   
@@ -139,7 +138,7 @@ trait Task[A] {
   // submits the task for concurrent execution
   def submit(): JFuture[A] = TaskManager submit this
     
-  // submit asynchronously using the new Scala Futures
+  // submit for asynchronous processing using the new Scala Futures
   // http://docs.scala-lang.org/sips/pending/futures-promises.html
   private def asyncExecContext = ExecutionContext.fromExecutorService( TaskManager getPoolFor this )   
   def async(): Future[A] = Future({ execute() })(asyncExecContext)
@@ -148,6 +147,50 @@ trait Task[A] {
 trait DedicatedPool {
   def pool: (String, Int, Int) // poolID, min threads, max threads
 }
+
+// UI registers here
+object HumanTask extends scala.swing.Publisher {
+  
+}
+
+trait HumanTaskEvent[A] extends scala.swing.event.Event {
+  def reply(a: A): Unit //XXX better name?
+}
+
+trait HumanTask[A] extends Task[A] with DedicatedPool {
+  import scala.concurrent.SyncVar
+  
+  val MinPoolSize = 1
+  val MaxPoolSize = Int.MaxValue
+  def pool = ("H", MinPoolSize, MaxPoolSize)
+  
+  def createEvent(cb: A => Unit): HumanTaskEvent[A]
+  
+  final def execute(): A = {
+    val v = new SyncVar[A]
+    HumanTask synchronized {
+      HumanTask publish createEvent(a => v put a)
+    }
+    v.get
+  }
+}
+
+//case class AskUserEvent(question: String, cb: String => Unit) extends HumanTaskEvent[String] {
+//  def reply(a: String): Unit = cb(a)
+//}
+//
+//case class AskUserTask(question: String) extends HumanTask[String] {
+//  def createEvent(cb: String => Unit): HumanTaskEvent[String] = AskUserEvent(question, cb)
+//}
+//
+//... swing ...
+//listenTo(HumanTask)
+//reactions += {
+//  case AskUserEvent(question, cb) => {
+//    val answer = showDialog(q)
+//    cb(answer)
+//  }
+//}
 
 trait IOTask[A] extends Task[A] with DedicatedPool {
   val MinPoolSize = 2
@@ -160,24 +203,24 @@ trait IOTask[A] extends Task[A] with DedicatedPool {
 }
 
 object IOTask {
-  def getTargetByURL(url: URL): String = {
-    val host = url.getHost
-    val hostParts = host.split("\\.") // regex
-    
-    if (hostParts.length < 2)
-      return host
-    
-    val hostPartsRev = hostParts.reverse
-    hostPartsRev.tail.head + "." + hostPartsRev.head
-  }
+//  def getTargetByURL(url: URL): String = {
+//    val host = url.getHost
+//    val hostParts = host.split("\\.") // regex
+//    
+//    if (hostParts.length < 2)
+//      return host
+//    
+//    val hostPartsRev = hostParts.reverse
+//    hostPartsRev.tail.head + "." + hostPartsRev.head
+//  }
 }
 
-case class HttpRedirectException(code: Int, message: String, location: String, url: URL) extends Exception {
+case class HttpRedirectException(code: Int, message: String, location: String, url: URL) extends IOException {
   override def getMessage(): String =
     "HTTP " + code + ": " + message + " REDIRECT to " + location + " {" + url + "}"
 }
 
-case class HttpResponseException(code: Int, message: String, url: URL) extends Exception {
+case class HttpResponseException(code: Int, message: String, url: URL) extends IOException {
   override def getMessage(): String =
     "HTTP " + code + ": " + message + " {" + url + "}"
 }
@@ -202,7 +245,8 @@ trait HttpTask[A] extends IOTask[A] {
   def url: URL
 
   // IOTask
-  def target: String = IOTask getTargetByURL url
+  import Util.urlUtils
+  def target: String = url.getDomainName()
     
   // optional "raw"-processor
   def preProcess(conn: HttpURLConnection, headers: Map[String, List[String]]): Unit = {}
@@ -210,7 +254,7 @@ trait HttpTask[A] extends IOTask[A] {
   // processor of the response
   def processResponse(is: InputStream): A
 
-  var ConnectionClose = false
+  var CloseConnection = false
   var Caching = true
   var FollowRedirects = false
   var StoreCookies = false
@@ -222,6 +266,7 @@ trait HttpTask[A] extends IOTask[A] {
   var RequestContentType: Option[String] = None
   var RequestData: Option[OutputStream => Unit] = None
   
+  // basic browser-mimicry
   var UserAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:14.0) Gecko/20100101 Firefox/14.0.1"
   var Referer   = "http://stackoverflow.com/questions/tagged/referer" 
     
@@ -235,7 +280,7 @@ trait HttpTask[A] extends IOTask[A] {
     conn setRequestMethod RequestMethod
     conn setInstanceFollowRedirects FollowRedirects
         
-    if (ConnectionClose)
+    if (CloseConnection)
        conn setRequestProperty ("Connection", "Close")
     
     for (ct <- RequestContentType)
@@ -283,7 +328,7 @@ trait HttpTask[A] extends IOTask[A] {
   }
     
   def disconnect(conn: HttpURLConnection) {
-    if (conn != null && ConnectionClose) {
+    if (conn != null && CloseConnection) {
       conn.disconnect()
     }
   }
@@ -305,11 +350,9 @@ trait HttpTask[A] extends IOTask[A] {
         disconnect( conn )
         res
       } finally cleanCloseInputStream( is )
-    
-    } catch { case t:Throwable => {
+    } catch { case e:IOException => {
         cleanCloseInputStream( conn.getErrorStream )
-        throw t
-    
+        throw e
     }} finally disconnect( conn )
   }
   
@@ -334,15 +377,15 @@ trait HttpTask[A] extends IOTask[A] {
       
       val newCookies: List[HttpCookie] = 
         headers.get("Set-Cookie").getOrElse( Nil ).
-        map( str => str.split(";") ).
-        flatMap( parts => {
-          val pos = parts.head.indexOf("=")
-          if (pos > 0) {
-            val name  = parts.head.slice(0, pos)
-            val value = parts.head.slice(pos+1, parts.head.length)
-            Some( HttpCookie(name, value, parts.tail.toList) )
-          } else None
-        }).distinct
+          map( str => str.split(";") ).
+          flatMap( parts => {
+            val pos = parts.head.indexOf("=")
+            if (pos > 0) {
+              val name  = parts.head.slice(0, pos)
+              val value = parts.head.slice(pos+1, parts.head.length)
+              Some( HttpCookie(name, value, parts.tail.toList) )
+            } else None
+          }).distinct
         
       val newCookieNames: Set[String] = newCookies.map(_.name).toSet
             
@@ -356,15 +399,18 @@ trait HttpTask[A] extends IOTask[A] {
     }
   }
   
-  def cookieDomain(url: URL): String = IOTask.getTargetByURL(url) // TODO
-  
+  import Util.urlUtils
+  def cookieDomain(url: URL): String = url.getDomainName()
+
   // http://docs.oracle.com/javase/1.5.0/docs/guide/net/http-keepalive.html
   def cleanCloseInputStream(is: InputStream) {
     if (is != null) {
       try {
         while (is.read() > 0) {}
         is.close()
-      } catch { case e:Exception => }
+      } catch {
+        case e:IOException =>
+      }
     }
   }
 }

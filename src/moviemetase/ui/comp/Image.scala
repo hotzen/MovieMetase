@@ -73,8 +73,9 @@ class ImageLoader(url: URL, callback: BufferedImage => Unit, resizeTo: Option[(I
   
   val logID = "ImageLoader(" + url.toExternalForm + ")"
   
-  def target = IOTask.getTargetByURL(url)
-  
+  import Util.urlUtils
+  def target = url.getDomainName()
+
   // don't let ImageIO do the HTTP-handling, just use it to decode the InputStream
   private class HttpImageIO(val url: URL) extends HttpTask[BufferedImage] {
     StoreCookies = true
