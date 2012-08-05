@@ -151,7 +151,7 @@ object GoogleWeb {
             throw e
           }
         }
-        case e@HttpResponseException(code, msg, url) if code >= 500 => {
+        case e@HttpResponseException(code, msg, url) /* if code >= 500 */ => {
           warn("HTTP " + code + " " + msg + " - aborting")
           Nil
         }
@@ -173,8 +173,8 @@ object GoogleWeb {
     
     private def unblock(captchaPage: URL): Either[CaptchaFailed, CaptchaSolved] = {
       val challenge = CaptchaReader( captchaPage ).execute()
-      val answer   = CaptchaSolver( challenge ).execute()
-      CaptchaResponder( answer ).execute()
+      val response  = CaptchaSolver( challenge ).execute()
+      CaptchaResponder( response ).execute()
     }
   }
   
@@ -332,8 +332,11 @@ object GoogleWeb {
             val title = a.text
             val snippet = li.select(".st").map(_.text).mkString("")
             
-            try { Some( GoogleResult(query: String, link.toURL, title, snippet) ) }
-            catch { case e:java.net.MalformedURLException => None }
+            try   { Some( GoogleResult(query: String, link.toURL, title, snippet) ) }
+            catch { case e:java.net.MalformedURLException => {
+              warn("invalid URL: " + e.toString)
+              None
+            }}
           }
           case None => {
             warn("Google-Result does not contain '#ires li.g a.l'")
