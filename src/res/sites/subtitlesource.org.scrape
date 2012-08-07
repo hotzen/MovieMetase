@@ -1,22 +1,15 @@
-search movies on "SubtitleSource" with URL "http://www.subtitlesource.org/search/%TERM%"
+SEARCH SUBTITLE AT "SubtitleSource.org"
+  OPEN "http://www.subtitlesource.org/search/$$$"
 
-select ".content #searchPage li" as $searchResults
-
-for every $searchResults as $searchResult
-	select from $searchResult "a[href]" as $href
-	open $href as $releasePage
-	
-	select from $releasePage "#release-list" as $releases
-endfor
-
-endsearch
-
-
-fetch movie on "SubtitleSource" with URL "http://www.subtitlesource.org/title/%ID%"
-
-
-endfetch
-
-
-# <a href="http://www.subtitlesource.org/title/tt1375666" title="Inception subtitles">Inception (2010) </a>
-select lis "a[href]" as href
+  SELECT "#searchPage li"
+  SELECT "a[href]"
+  OPEN SELECTED
+  
+  SELECT "table#release-list tr td#subtitle-container"
+   
+  SELECT "ul#subtitle-list li"
+  
+  SELECT "a:eq(1)[href]"  AS SUBTITLE-DOWNLOAD
+  SELECT "a:eq(2)[href]"  AS SUBTITLE-PAGE
+  SELECT "a:eq(2)[title]" AS SUBTITLE-LANGUAGE
+ENDSEARCH
