@@ -19,11 +19,11 @@ trait Step[A] {
   def process(elem: Element, ctx: Context[A]): List[A]
 }
 
-case class Terminal[A]() extends Step[A] {
+case class TerminalStep[A]() extends Step[A] {
   def process(elem: Element, ctx: Context[A]): List[A] = ctx.results
 }
 
-case class Browse[A](expr: Expr, next: Step[A]) extends Step[A] with Logging {
+case class BrowseStep[A](expr: Expr, next: Step[A]) extends Step[A] with Logging {
   val logID = "Browse"
   
   def browse(theUrl: URL): Document = new HtmlTask[Document] {
@@ -40,7 +40,7 @@ case class Browse[A](expr: Expr, next: Step[A]) extends Step[A] with Logging {
   }
 }
 
-case class Select[A](selector: String, next: Step[A]) extends Step[A] with Logging {
+case class SelectStep[A](selector: String, next: Step[A]) extends Step[A] with Logging {
   import language.implicitConversions
   implicit def jiter[A](jiter: java.util.Iterator[A]): Iterator[A] =
     scala.collection.convert.Wrappers.JIteratorWrapper[A]( jiter )
@@ -59,7 +59,7 @@ trait ExtractorFactory[A] {
   def create(what: String, value: String): A
 }
 
-case class Extract[A](what: String, expr: Expr, factory: ExtractorFactory[A], next: Step[A]) extends Step[A] with Logging {
+case class ExtractStep[A](what: String, expr: Expr, factory: ExtractorFactory[A], next: Step[A]) extends Step[A] with Logging {
   val logID = "Extract(" + what + ")"
   
   def process(elem: Element, ctx: Context[A]): List[A] = {
@@ -71,15 +71,15 @@ case class Extract[A](what: String, expr: Expr, factory: ExtractorFactory[A], ne
   }
 }
 
-case class Search[A](siteName: String, start: Step[A]) extends Logging {
-  val logID = "Search(" + siteName + ")"
+case class Scrape[A](site: String, author: String, start: Step[A]) extends Logging {
+  val logID = "Scrape(" + site + ")"
   
-  def search(term: String): List[A] = {
+  def scrape(query: String): List[A] = {
     val html = """<html><head></head><body></body></html>"""
     val doc = org.jsoup.Jsoup.parse(html)
     
     val idents = Map[String, String](
-      "SEARCH-TERM" -> term    
+      "QUERY" -> query
     )
     trace("identifiers: " + idents.mkString)
 
