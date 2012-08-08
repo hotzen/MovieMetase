@@ -71,7 +71,7 @@ case class ExtractStep[A](what: String, expr: Expr, factory: ExtractorFactory[A]
   }
 }
 
-case class Scrape[A](site: String, author: String, start: Step[A]) extends Logging {
+case class Scraper[A](site: String, author: String, start: Step[A]) extends Logging {
   val logID = "Scrape(" + site + ")"
   
   def scrape(query: String): List[A] = {
