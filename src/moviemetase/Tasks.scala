@@ -320,7 +320,7 @@ trait HttpTask[A] extends IOTask[A] {
     } else if (respCode != HttpURLConnection.HTTP_OK) {
       return onError(respCode, conn)
     }
-        
+
     conn.getInputStream
   }
     
@@ -359,7 +359,6 @@ trait HttpTask[A] extends IOTask[A] {
   
   def onError(code: Int, conn: HttpURLConnection): InputStream = {
     throw new HttpResponseException(code, conn.getResponseMessage, conn.getURL)
-    //conn.getErrorStream
   }
   
   def headers(conn: HttpURLConnection): Map[String, List[String]] = {
@@ -455,7 +454,7 @@ trait HtmlTask[A] extends HttpTask[A] {
   import org.jsoup.nodes.Document
     
   final def processResponse(in: InputStream): A = {
-    val doc = Jsoup.parse(in, null /* "UTF-8" */, url.toString) 
+    val doc = Jsoup.parse(in, null /* "UTF-8" */, url.toString)
     processDocument(doc)
   }
   

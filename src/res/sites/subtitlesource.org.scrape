@@ -1,15 +1,10 @@
 SEARCH SUBTITLE AT "SubtitleSource.org"
-  OPEN "http://www.subtitlesource.org/search/$$$"
-
-  SELECT "#searchPage li"
-  SELECT "a[href]"
-  OPEN SELECTED
-  
-  SELECT "table#release-list tr td#subtitle-container"
-   
+  BROWSE "http://www.subtitlesource.org/search/" + SEARCH-TERM
+  SELECT "#searchPage li a[href]"
+  BROWSE "http://www.subtitlesource.org/" + ATTRIBUTE "href"
   SELECT "ul#subtitle-list li"
   
-  SELECT "a:eq(1)[href]"  AS SUBTITLE-DOWNLOAD
-  SELECT "a:eq(2)[href]"  AS SUBTITLE-PAGE
-  SELECT "a:eq(2)[title]" AS SUBTITLE-LANGUAGE
+  EXTRACT SUBTITLE-DOWNLOAD SELECT "a:eq(1)" ATTRIBUTE "href" 
+  EXTRACT SUBTITLE-PAGE SELECT "a:eq(2)" ATTRIBUTE "href" 
+  EXTRACT SUBTITLE-LANGUAGE SELECT "a:eq(2)" ATTRIBUTE "title" 
 ENDSEARCH
