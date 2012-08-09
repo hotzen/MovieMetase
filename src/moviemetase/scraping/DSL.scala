@@ -9,9 +9,9 @@ object DSL extends RegexParsers with PackratParsers {
   
   override protected val whiteSpace = """(\s|#.*)+""".r
   
-  def quoted   = "\"" ~> """[^"]*""".r <~ "\""
-  //def unquoted = not("+") ~> """\S+""".r
-  def value    = quoted // | unquoted
+  def quoted = "\"" ~> """[^"]*""".r <~ "\""
+  def unquoted = not("+") ~> """\S+""".r
+  def value = quoted // | unquoted
   
   def int = """-?[0-9]+""".r ^^ { d => d.toInt }
   
