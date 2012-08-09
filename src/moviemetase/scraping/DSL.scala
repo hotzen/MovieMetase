@@ -10,7 +10,7 @@ object DSL extends RegexParsers with PackratParsers {
   override protected val whiteSpace = """(\s|#.*)+""".r
   
   def quoted   = "\"" ~> """[^"]*""".r <~ "\""
-  def unquoted = """\S+""".r
+  //def unquoted = not("+") ~> """\S+""".r
   def value    = quoted // | unquoted
   
   def int = """-?[0-9]+""".r ^^ { d => d.toInt }
@@ -20,7 +20,9 @@ object DSL extends RegexParsers with PackratParsers {
   
   // ############################################
   // expressions
-  def literalExpr = value ^^ { case s => LiteralExpr(s) }
+  def literalExpr = quoted ^^ { case s => LiteralExpr(s) }
+  
+  def identExpr = "<" ~> """[A-Z]+""".r <~ ">" ^^ { case s => IdentExpr(s) }
   
   def selectExpr = "SELECT" ~> value ^^ { case s => SelectExpr(s) }
   
@@ -28,34 +30,32 @@ object DSL extends RegexParsers with PackratParsers {
   
   def selectAttributeExpr = "SELECT-ATTRIBUTE" ~> value ~ value ^^ { case s ~ a => SelectAttributeExpr(s, a) }
     
-  def identExpr = "<" ~> """[A-Z]""".r <~ ">" ^^ { case s => IdentExpr(s) }
+  lazy val concatExpr: PackratParser[Expr] = expr ~ "+" ~ expr ^^ { case e1 ~ _ ~ e2 => ConcatExpr(e1, e2) }
   
-  //lazy val concatExpr: PackratParser[Expr] = expr ~ "+" ~ expr ^^ { case e1 ~ _ ~ e2 => ConcatExpr(e1, e2) }
-  //lazy val expr: PackratParser[Expr] = concatExpr | selectExpr | attributeExpr | selectAttributeExpr | literalExpr
+  lazy val expr: PackratParser[Expr] = concatExpr | selectExpr | attributeExpr | selectAttributeExpr | identExpr | literalExpr
   
-  def normalExpr = selectExpr | attributeExpr | selectAttributeExpr | literalExpr
-  def concatExpr: Parser[Expr] = normalExpr ~ "+" ~ expr ^^ { case e1 ~ _ ~ e2 => ConcatExpr(e1, e2) }
-    
-  def expr = normalExpr | concatExpr
+  //def normalExpr = selectExpr | attributeExpr | selectAttributeExpr | literalExpr
+  //def concatExpr: Parser[Expr] = normalExpr ~ "+" ~ expr ^^ { case e1 ~ _ ~ e2 => ConcatExpr(e1, e2) }
+  //def expr = normalExpr | concatExpr
   
     
   // ############################################
   // steps 
-  lazy val browseStep: PackratParser[Step[_]] = "BROWSE" ~> expr ~ step ^^ { case e ~ next => BrowseStep(e, next) }
+  def browseStep: Parser[Step[_]] = "BROWSE" ~> expr ~ step ^^ { case e ~ next => BrowseStep(e, next) }
   
-  lazy val selectStep: PackratParser[Step[_]] = "SELECT" ~> value /* ~ ("MAX" ~> int | Int.MaxValue ) */ ~ step ^^ { case e ~ next => SelectStep(e, Int.MaxValue, next) }
+  def selectStep: Parser[Step[_]] = "SELECT" ~> value /* ~ ("MAX" ~> int | Int.MaxValue ) */ ~ step ^^ { case e ~ next => SelectStep(e, Int.MaxValue, next) }
   
-  lazy val extractStep: PackratParser[Step[_]] = "EXTRACT" ~> keyword ~ expr ~ step ^^ { case what ~ e ~ next => ExtractStep(what, e, next) }
+  def extractStep: Parser[Step[_]] = "EXTRACT" ~> keyword ~ expr ~ step ^^ { case what ~ e ~ next => ExtractStep(what, e, next) }
   
-  lazy val terminalStep: PackratParser[Step[_]] = "END" ^^^ TerminalStep()
+  def terminalStep: Parser[Step[_]] = "END" ^^^ TerminalStep()
   
-  lazy val step: PackratParser[Step[_]] = browseStep | selectStep | extractStep | terminalStep
+  def step: Parser[Step[_]] = browseStep | selectStep | extractStep | terminalStep
 
   
   // ############################################
   // scrapers
-  
-  lazy val subtitlesScraper: PackratParser[Scraper[_]] = "SCRAPE" ~> "SUBTITLES" ~> "AT" ~> value ~ "BY" ~ value ~ step ^^ { case site ~ _ ~ author ~ step => SubtitleScraper(site, author, step.asInstanceOf[Step[MovieInfos.Subtitle]]) }  
+  lazy val subtitlesScraper: PackratParser[Scraper[_]] = "SCRAPE" ~> "SUBTITLES" ~> "AT" ~> value ~ "BY" ~ value ~ step ^^
+                                                           { case site ~ _ ~ author ~ step => SubtitleScraper(site, author, step.asInstanceOf[Step[MovieInfos.Subtitle]]) }  
   
   lazy val scraper: PackratParser[Scraper[_]] = subtitlesScraper
 
@@ -91,8 +91,9 @@ SCRAPE SUBTITLES AT "SubtitleSource.org" BY "fizzl@foo"
 END"""
   
   def main(args: Array[String]): Unit = {
-    println( DSL.parseAll(DSL.attributeExpr, """ ATTRIBUTE "ficken" """) )
-    
+    //println( DSL.parseAll(DSL.attributeExpr, """ ATTRIBUTE "foo" """) )
+    //println( DSL.parseAll(DSL.attributeExpr, """ ATTRIBUTE foo """) )
+    println( DSL.parseAll(DSL.attributeExpr, """ ATTRIBUTE "foo" + "bar" """) )
     
     val mdl = DSL(scraper1) 
     
