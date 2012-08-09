@@ -20,7 +20,7 @@ object DSL extends RegexParsers with PackratParsers {
   
   // ############################################
   // expressions
-  def literalExpr = quoted ^^ { case s => LiteralExpr(s) }
+  def literalExpr = value ^^ { case s => LiteralExpr(s) }
   
   def identExpr = "<" ~> """[A-Z]+""".r <~ ">" ^^ { case s => IdentExpr(s) }
   
@@ -29,10 +29,12 @@ object DSL extends RegexParsers with PackratParsers {
   def attributeExpr = "ATTRIBUTE" ~> value ^^ { case s => AttributeExpr(s) }
   
   def selectAttributeExpr = "SELECT-ATTRIBUTE" ~> value ~ value ^^ { case s ~ a => SelectAttributeExpr(s, a) }
-    
-  lazy val concatExpr: PackratParser[Expr] = expr ~ "+" ~ expr ^^ { case e1 ~ _ ~ e2 => ConcatExpr(e1, e2) }
   
-  lazy val expr: PackratParser[Expr] = concatExpr | selectExpr | attributeExpr | selectAttributeExpr | identExpr | literalExpr
+  def normalExpr = selectExpr | attributeExpr | selectAttributeExpr | identExpr | literalExpr
+  
+  lazy val concatExpr: PackratParser[Expr] = expr ~ "+" ~ expr ^^ { case e1 ~ _ ~ e2 => ConcatExpr(e1, e2) }
+
+  lazy val expr: PackratParser[Expr] = concatExpr | normalExpr
   
   //def normalExpr = selectExpr | attributeExpr | selectAttributeExpr | literalExpr
   //def concatExpr: Parser[Expr] = normalExpr ~ "+" ~ expr ^^ { case e1 ~ _ ~ e2 => ConcatExpr(e1, e2) }
