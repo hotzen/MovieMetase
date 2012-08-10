@@ -24,6 +24,9 @@ object DSL_Test extends FunSuite with BeforeAndAfter {
     assert(!res.isEmpty, "\"\"\"" + in + "\"\"\" => " + res.toString)
   }
   
+  // ############################################
+  // Expressions
+  
   test("ValueValueSeqExpr1") {
     in = """ "foo" "bar" """
     res = DSL.parseAll(DSL.value ~ DSL.value, in)
@@ -73,14 +76,6 @@ object DSL_Test extends FunSuite with BeforeAndAfter {
     in = """ ATTRIBUTE href """
     res = DSL.parseAll(DSL.expr, in)
   }
-//  
-//  test("UnquotedAttrExpr") {
-//    in = """ ATTRIBUTE href """
-//    
-//    def p1 = DSL.  
-//      
-//    res = DSL.parseAll(DSL.expr, in)
-//  }
   
   test("SelAttrExpr") {
     in = """ SELECT-ATTRIBUTE "a:eq(1)" "href" """
@@ -96,7 +91,20 @@ object DSL_Test extends FunSuite with BeforeAndAfter {
     in = """ SELECT-ATTRIBUTE a href """
     res = DSL.parseAll(DSL.expr, in)
   }
-    
+  
+  // ############################################
+  // Steps
+   
+  test("SelectStep") {
+    in = """ SELECT "h1" END """
+    res = DSL.parseAll(DSL.step, in)
+  }
+  
+  test("UnquotedSelectStep") {
+    in = """ SELECT h1 END """
+    res = DSL.parseAll(DSL.step, in)
+  }
+  
   test("BrowseStep") {
     in = """ BROWSE SELECT "h1" + "suffix" END """
     res = DSL.parseAll(DSL.step, in)
@@ -118,6 +126,9 @@ object DSL_Test extends FunSuite with BeforeAndAfter {
   }     
   
   
+  // ############################################
+  // Scrapes
+  
   test("Complete Scrape") {
     in = """
 SCRAPE SUBTITLES AT "SubtitleSource.org" BY "fizzl@foo"
@@ -132,7 +143,7 @@ SCRAPE SUBTITLES AT "SubtitleSource.org" BY "fizzl@foo"
       EXTRACT SUBTITLE-PAGE_URL     SELECT-ATTRIBUTE "a:eq(2)" "href"
       EXTRACT SUBTITLE-LANGUAGE_TITLE SELECT-ATTRIBUTE "a:eq(2)" "title"
 END"""
-    res = DSL.parseAll(DSL.scraper, in)
+    res = DSL(in)
   }
   
   test("Complex Scrape") {
@@ -152,7 +163,7 @@ SCRAPE SUBTITLES AT "SubtitleSource.org" BY "fizzl@foo"
       EXTRACT SUBTITLE-LANGUAGE_TITLE SELECT-ATTRIBUTE "a:eq(2)" title
 
 END"""
-    res = DSL.parseAll(DSL.scraper, in)
+    res = DSL(in)
   }
   
     
