@@ -121,7 +121,6 @@ sealed trait Expr
   case class ConcatExpr(a: Expr, b: Expr) extends Expr
   case class SubstrLenExpr(e: Expr, off: Int, len: Int) extends Expr
   case class SubstrPosExpr(e: Expr, off: Int, pos: Int) extends Expr
-  
   // TODO RegexExpr
   // ...
 
@@ -145,8 +144,12 @@ object Expr {
       if (elems.size == 0) ""
       else elems.get(0).attr(a)
     }
-    case ConcatExpr(a, b) =>
-      apply(a, elem, ctx) + apply(b, elem, ctx)
+    case ConcatExpr(a, b) => {
+      val sb = new StringBuilder
+      sb append apply(a, elem, ctx)
+      sb append apply(b, elem, ctx)
+      sb.toString
+    }
     case SubstrLenExpr(e, off, len) => {
       val s = apply(e, elem, ctx)
       s.substring(off, off+len)

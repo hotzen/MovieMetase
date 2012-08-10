@@ -39,11 +39,9 @@ object DSL extends RegexParsers with PackratParsers {
 
   val substrRegex = """\((\d+)(,|-)(\d+)?\)""".r 
   lazy val substrExpr: PackratParser[Expr] = expr ~ regexMatch(substrRegex) ^^ { case e ~ m => {
-
       val off = m.group(1).toInt
       val op = m.group(2)
       val x = m.group(3).toInt
-      
       if (op == ",")
         SubstrLenExpr(e, off, x)
       else
