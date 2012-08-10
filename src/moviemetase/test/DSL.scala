@@ -24,11 +24,99 @@ object DSL_Test extends FunSuite with BeforeAndAfter {
     assert(!res.isEmpty, "\"\"\"" + in + "\"\"\" => " + res.toString)
   }
   
-  test("AttrExpr") {
-    in = """ ATTRIBUTE "foo" + "bar" """
+  test("ValueValueSeqExpr1") {
+    in = """ "foo" "bar" """
+    res = DSL.parseAll(DSL.value ~ DSL.value, in)
+  }
+  
+  test("ValueValueSeqExpr2") {
+    in = """ "foo" bar """
+    res = DSL.parseAll(DSL.value ~ DSL.value, in)
+  }
+  
+  test("ValueValueSeqExpr3") {
+    in = """ foo bar """
+    res = DSL.parseAll(DSL.value ~ DSL.value, in)
+  }
+  
+  test("ValueValueSeqExpr4") {
+    in = """ foo "bar" """
+    res = DSL.parseAll(DSL.value ~ DSL.value, in)
+  }
+  
+  test("ConcatExpr") {
+    in = """ "foo" + "bar" """
     res = DSL.parseAll(DSL.expr, in)
   }
-   
+  
+  test("UnquotedConcatExpr") {
+    in = """ "foo" + bar """
+    res = DSL.parseAll(DSL.expr, in)
+  }
+    
+  test("SelExpr") {
+    in = """ SELECT "a:eq(1)" """
+    res = DSL.parseAll(DSL.expr, in)
+  }
+  
+  test("UnquotedSelExpr") {
+    in = """ SELECT a """
+    res = DSL.parseAll(DSL.expr, in)
+  }
+  
+  test("AttrExpr") {
+    in = """ ATTRIBUTE "href" """
+    res = DSL.parseAll(DSL.expr, in)
+  }
+  
+  test("UnquotedAttrExpr") {
+    in = """ ATTRIBUTE href """
+    res = DSL.parseAll(DSL.expr, in)
+  }
+//  
+//  test("UnquotedAttrExpr") {
+//    in = """ ATTRIBUTE href """
+//    
+//    def p1 = DSL.  
+//      
+//    res = DSL.parseAll(DSL.expr, in)
+//  }
+  
+  test("SelAttrExpr") {
+    in = """ SELECT-ATTRIBUTE "a:eq(1)" "href" """
+    res = DSL.parseAll(DSL.expr, in)
+  }
+  
+  test("UnquotedSelAttrExpr1") {
+    in = """ SELECT-ATTRIBUTE "a:eq(1)" href """
+    res = DSL.parseAll(DSL.expr, in)
+  }
+  
+  test("UnquotedSelAttrExpr2") {
+    in = """ SELECT-ATTRIBUTE a href """
+    res = DSL.parseAll(DSL.expr, in)
+  }
+    
+  test("BrowseStep") {
+    in = """ BROWSE SELECT "h1" + "suffix" END """
+    res = DSL.parseAll(DSL.step, in)
+  }
+  
+  test("UnquotedBrowseStep") {
+    in = """ BROWSE ATTRIBUTE foo + bar END """
+    res = DSL.parseAll(DSL.step, in)
+  }
+
+  test("ExtractStep") {
+    in = """ EXTRACT Something SELECT "div" + "suffix" END """
+    res = DSL.parseAll(DSL.step, in)
+  }
+  
+  test("UnquotedExtractStep") {
+    in = """ EXTRACT Something SELECT h1 + suffix END """
+    res = DSL.parseAll(DSL.step, in)
+  }     
+  
   
   test("Complete Scrape") {
     in = """
