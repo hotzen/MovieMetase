@@ -25,7 +25,7 @@ object DSL_Test extends FunSuite with BeforeAndAfter {
   }
   
   // ############################################
-  // Expressions
+  // Basic
   
   test("ValueValueSeqExpr1") {
     in = """ "foo" "bar" """
@@ -47,6 +47,10 @@ object DSL_Test extends FunSuite with BeforeAndAfter {
     res = DSL.parseAll(DSL.value ~ DSL.value, in)
   }
   
+  
+  // ############################################
+  // Expressions
+  
   test("ConcatExpr") {
     in = """ "foo" + "bar" """
     res = DSL.parseAll(DSL.expr, in)
@@ -55,6 +59,16 @@ object DSL_Test extends FunSuite with BeforeAndAfter {
   test("UnquotedConcatExpr") {
     in = """ "foo" + bar """
     res = DSL.parseAll(DSL.expr, in)
+  }
+  
+  test("SubstrExpr1") {
+    in = """ "foo"(1-2) """
+    res = DSL.parseAll(DSL.substrExpr, in)
+  }
+  
+  test("SubstrExpr2") {
+    in = """ "foo"(1,2) """
+    res = DSL.parseAll(DSL.substrExpr, in)
   }
     
   test("SelExpr") {

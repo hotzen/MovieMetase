@@ -4,20 +4,22 @@ package scraping
 import scala.util.parsing.combinator.RegexParsers
 import scala.util.parsing.input.CharSequenceReader
 import scala.util.parsing.combinator.PackratParsers
+import scala.util.matching.Regex
 
 object DSL extends RegexParsers with PackratParsers {
   
   override protected val whiteSpace = """(\s|#.*)+""".r
   
-  val quoted = """"[^"]*"""".r
-  //def quoted = "\"" ~> """[^"]*""".r <~ "\""
+  
+  // ############################################
+  // basic
+  
+  val quoted   = """"[^"]*"""".r
   val unquoted = """[^\s"]+""".r
-  val value = quoted | unquoted
+  val value    = quoted | unquoted
   
   val int = """-?[0-9]+""".r ^^ { d => d.toInt }
   
-  //def keyword = """[A-Z\-_]+""".r
-    
   
   // ############################################
   // expressions
@@ -31,14 +33,24 @@ object DSL extends RegexParsers with PackratParsers {
   
   val selAttrExpr = "SELECT-ATTRIBUTE" ~> value ~ value ^^ { case s ~ a => SelAttrExpr(s, a) }
     
-  // "foo"(1,4) // offset, length
-  // "foo"(1-5) // offset, pos
-  //def substrExpr = """"[^"]*"\((\d+)(([,-])(\d+))?\)""".r
-  
   val easyExpr = varExpr | selAttrExpr | selExpr | attrExpr
     
   lazy val concatExpr: PackratParser[Expr] = expr ~ "+" ~ expr ^^ { case e1 ~ _ ~ e2 => ConcatExpr(e1, e2) }
 
+  val substrRegex = """\((\d+)(,|-)(\d+)?\)""".r 
+  lazy val substrExpr: PackratParser[Expr] = expr ~ regexMatch(substrRegex) ^^ { case e ~ m => {
+
+      val off = m.group(1).toInt
+      val op = m.group(2)
+      val x = m.group(3).toInt
+      
+      if (op == ",")
+        SubstrLenExpr(e, off, x)
+      else
+        SubstrPosExpr(e, off, x)
+    }}
+  
+  
   lazy val expr: PackratParser[Expr] = concatExpr | easyExpr | literalExpr
   
     
@@ -64,6 +76,25 @@ object DSL extends RegexParsers with PackratParsers {
   val scraper: PackratParser[Scraper[_]] = subtitlesScraper
 
   val scrapers = rep1(scraper)
+  
+  
+  // ############################################
+  // utils
+  def regexMatch(r: Regex): Parser[Regex.Match] = new Parser[Regex.Match] {
+    def apply(in: Input) = {
+      val source = in.source
+      val offset = in.offset
+      val start = handleWhiteSpace(source, offset)
+      (r findPrefixMatchOf (source.subSequence(start, source.length))) match {
+        case Some(matched) =>
+          Success(matched, in.drop(start + matched.end - offset))
+        case None =>
+          val found = if (start == source.length()) "end of source" else "`"+source.charAt(start)+"'"
+          Failure("string matching regex `"+r+"' expected but "+found+" found", in.drop(start - offset))
+          //Failure("string matching regex `"+r+"' expected but `"+in.first+"' found", in.drop(start - offset))
+      }
+    }
+  }
   
   def apply(s: String): ParseResult[List[Scraper[_]]] = parseAll(scrapers, s)
 }
