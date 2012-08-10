@@ -9,36 +9,37 @@ object DSL extends RegexParsers with PackratParsers {
   
   override protected val whiteSpace = """(\s|#.*)+""".r
   
-  def quoted = "\"" ~> """[^"]*""".r <~ "\""
-  def unquoted = not("+") ~> """\S+""".r
-  def value = quoted // | unquoted
+  def quoted = """"[^"]*"""".r
+  //def quoted = "\"" ~> """[^"]*""".r <~ "\""
+  def unquoted = """[^\s"]+""".r
+  def value = quoted | unquoted
   
   def int = """-?[0-9]+""".r ^^ { d => d.toInt }
   
-  def keyword = """[A-Z\-_]+""".r
+  //def keyword = """[A-Z\-_]+""".r
     
   
   // ############################################
   // expressions
-  def literalExpr = value ^^ { case s => LiteralExpr(s) }
+  def literalExpr = value ^^ { case s => LitExpr(s) }
   
-  def identExpr = "<" ~> """[A-Z]+""".r <~ ">" ^^ { case s => IdentExpr(s) }
+  def varExpr = "<" ~> """[A-Z]+""".r <~ ">" ^^ { case s => VarExpr(s) }
   
-  def selectExpr = "SELECT" ~> value ^^ { case s => SelectExpr(s) }
+  def selectExpr = "SELECT" ~> value ^^ { case s => SelExpr(s) }
   
-  def attributeExpr = "ATTRIBUTE" ~> value ^^ { case s => AttributeExpr(s) }
+  def attrExpr = "ATTRIBUTE" ~> value ^^ { case s => AttrExpr(s) }
   
-  def selectAttributeExpr = "SELECT-ATTRIBUTE" ~> value ~ value ^^ { case s ~ a => SelectAttributeExpr(s, a) }
+  def selAttrExpr = "SELECT-ATTRIBUTE" ~> value ~ value ^^ { case s ~ a => SelAttrExpr(s, a) }
   
-  def normalExpr = selectExpr | attributeExpr | selectAttributeExpr | identExpr | literalExpr
+  // "foo"(1,4) // offset, length
+  // "foo"(1-5) // offset, pos
+  //def substrExpr = """"[^"]*"\((\d+)(([,-])(\d+))?\)""".r
   
+  def normalExpr = varExpr | selectExpr | attrExpr | selAttrExpr | literalExpr
+    
   lazy val concatExpr: PackratParser[Expr] = expr ~ "+" ~ expr ^^ { case e1 ~ _ ~ e2 => ConcatExpr(e1, e2) }
 
   lazy val expr: PackratParser[Expr] = concatExpr | normalExpr
-  
-  //def normalExpr = selectExpr | attributeExpr | selectAttributeExpr | literalExpr
-  //def concatExpr: Parser[Expr] = normalExpr ~ "+" ~ expr ^^ { case e1 ~ _ ~ e2 => ConcatExpr(e1, e2) }
-  //def expr = normalExpr | concatExpr
   
     
   // ############################################
@@ -47,7 +48,8 @@ object DSL extends RegexParsers with PackratParsers {
   
   def selectStep: Parser[Step[_]] = "SELECT" ~> value /* ~ ("MAX" ~> int | Int.MaxValue ) */ ~ step ^^ { case e ~ next => SelectStep(e, Int.MaxValue, next) }
   
-  def extractStep: Parser[Step[_]] = "EXTRACT" ~> keyword ~ expr ~ step ^^ { case what ~ e ~ next => ExtractStep(what, e, next) }
+  def extractWhat = """[a-zA-Z0-9_\-]+""".r 
+  def extractStep: Parser[Step[_]] = "EXTRACT" ~> extractWhat ~ expr ~ step ^^ { case what ~ e ~ next => ExtractStep(what.toLowerCase, e, next) }
   
   def terminalStep: Parser[Step[_]] = "END" ^^^ TerminalStep()
   
@@ -63,43 +65,5 @@ object DSL extends RegexParsers with PackratParsers {
 
   def scrapers = rep1(scraper)
   
-  def apply(s: String): List[Scraper[_]] =
-    parseAll(scrapers, s) match {
-      case Success(t, _)     => t
-      case f@NoSuccess(msg,_) => {
-        println(f)
-        Nil
-      }
-    }
-}
-
-
-object DSL_Test {
-  val scraper1 = """
-SCRAPE SUBTITLES AT "SubtitleSource.org" BY "fizzl@foo"
- 
-  BROWSE "http://www.subtitlesource.org/search/" + ATTRIBUTE "foo" + <QUERY> 
-  SELECT "#searchPage li a"
-    
-    # GET "http://www.subtitlesource.org/" + ATTRIBUTE "href"
-    # BROWSE ATTRIBUTE "href" AS FULL URL
-    BROWSE "http://www.subtitlesource.org/" + ATTRIBUTE "href"
-    SELECT "ul#subtitle-list li"
-  
-      EXTRACT SUBTITLE-DOWNLOAD_URL SELECT-ATTRIBUTE "a:eq(1)" href 
-      EXTRACT SUBTITLE-PAGE_URL     SELECT-ATTRIBUTE "a:eq(2)" href 
-      EXTRACT SUBTITLE-LANGUAGE_TITLE SELECT-ATTRIBUTE "a:eq(2)" title
-      //EXTRACT SUBTITLE-LANGUAGE SELECT-ATTRIBUTE "a:eq(2)" title
-END"""
-  
-  def main(args: Array[String]): Unit = {
-    //println( DSL.parseAll(DSL.attributeExpr, """ ATTRIBUTE "foo" """) )
-    //println( DSL.parseAll(DSL.attributeExpr, """ ATTRIBUTE foo """) )
-    println( DSL.parseAll(DSL.attributeExpr, """ ATTRIBUTE "foo" + "bar" """) )
-    
-    val mdl = DSL(scraper1) 
-    
-    println( mdl )
-  
-  }
+  def apply(s: String): ParseResult[List[Scraper[_]]] = parseAll(scrapers, s)
 }
