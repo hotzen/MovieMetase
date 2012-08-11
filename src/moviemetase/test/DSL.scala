@@ -210,10 +210,10 @@ SCRAPE SUBTITLES ON "SubtitleSource"
   BROWSE "http://www.subtitlesource.org/search/" + <QUERY>
   SELECT "#searchPage li a"
     #TRACE STORE $ID ATTRIBUTE "href"
-    TRACE BROWSE "http://www.subtitlesource.org/releaselist/tt1375666%7CDESC%7CAll%7CAll" WITH BASE "http://www.subtitlesource.org/title/tt1234567/"
+    BROWSE "http://www.subtitlesource.org/releaselist/tt1375666%7CDESC%7CAll%7CAll" WITH BASE "http://www.subtitlesource.org/title/tt1234567/"
     SELECT "#subtitle-container"
       EXTRACT Subtitle-Label SELECT "a:eq(0)"
-      TRACE SELECT "#subtitle-list li"
+      SELECT "#subtitle-list li"
         EXTRACT Subtitle-DownloadURL   SELECT "a:eq(0)" ATTRIBUTE href AS URL 
         EXTRACT Subtitle-PageURL       SELECT "a:eq(1)" ATTRIBUTE href AS URL
         EXTRACT Subtitle-LanguageLabel SELECT "a:eq(1)" ATTRIBUTE title
@@ -226,7 +226,6 @@ END"""
       case pr:ParseResult[List[SubtitleScraper]] => pr match {
         case Success(scrapers, _) => {
           for (scraper <- scrapers) {
-            println(scraper)
             scraper.scrape("Inception.1080p.BluRay.x264-REFiNED")
           }
           ()
