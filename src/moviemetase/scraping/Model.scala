@@ -7,27 +7,20 @@ import org.jsoup.nodes.Element
 import scala.collection._
 
 // context while processing an element inside a step 
-case class Context[A](results: List[A], factory: ExtractorFactory[A],
+case class Context[A](baseURL: URL, results: List[A], factory: ExtractorFactory[A],
                       params: Map[String, String], vars: Map[String, String]) {
   
-  def add(result: A): Context[A] =
-    Context(result :: results, factory, params, vars)
+  def withBaseURL(url: URL): Context[A] =
+    Context(url, results, factory, params, vars)
   
-  def param(n: String, v: String): Context[A] =
-    Context(results, factory, params + (n -> v), vars)
+  def withResult(result: A): Context[A] =
+    Context(baseURL, result :: results, factory, params, vars)
+  
+  def withParam(n: String, v: String): Context[A] =
+    Context(baseURL, results, factory, params + (n -> v), vars)
     
-  def store(n: String, v: String): Context[A] =
-    Context(results, factory, params, vars + (n -> v))
-    
-//  def argVal(name: String): String = args.get(name) match {
-//    case Some(v) => v
-//    case None => throw new IllegalArgumentException("Invalid argument '" + name + "'")
-//  }
-//  
-//  def varVal(name: String): String = vars.get(name) match {
-//    case Some(v) => v
-//    case None => throw new IllegalArgumentException("Invalid variable '" + name + "'")
-//  }
+  def withVar(n: String, v: String): Context[A] =
+    Context(baseURL, results, factory, params, vars + (n -> v))
 }
 
 trait Step[A] {
@@ -49,7 +42,7 @@ case class TerminalStep[A]() extends Step[A] {
   override def toString = "End"
 }
 
-case class BrowseStep[A](expr: Expr, next: Step[A]) extends Step[A] with TracingStep with Logging {
+case class BrowseStep[A](expr: Expr, next: Step[A], base: Option[String]) extends Step[A] with TracingStep with Logging {
   val logID = "Browse"
   
   def browse(theUrl: URL): Document = new HtmlTask[Document] {
@@ -63,9 +56,14 @@ case class BrowseStep[A](expr: Expr, next: Step[A]) extends Step[A] with Tracing
     
     if (tracing)
       trace(url.toString)
-
+      
+    val baseURL = base match {
+      case Some(b) => new URL(b)
+      case None => url
+    }
+      
     val doc = browse(url)
-    next.process(doc.body, ctx.param("url", url.toExternalForm))
+    next.process(doc.body, ctx withBaseURL baseURL)
   }
   
   override def toString = "Browse(" + expr + ")\n" + next.toString
@@ -108,7 +106,7 @@ case class ExtractStep[A](what: String, expr: Expr, next: Step[A]) extends Step[
     if (tracing)
       trace("extracted: '" + value + "', crafted: " + result)
     
-    next.process(elem, ctx add result)
+    next.process(elem, ctx withResult result)
   }
     
   override def toString = "Extract(" + what + " <= " + expr + ")\n" + next.toString
@@ -123,7 +121,7 @@ case class StoreStep[A](name: String, expr: Expr, next: Step[A]) extends Step[A]
     if (tracing)
       trace(" = '" + value + "'")
 
-    next.process(elem, ctx.store(name, value))
+    next.process(elem, ctx withVar (name, value))
   }
     
   override def toString = "Store(" + name + " <= " + expr + ")\n" + next.toString
@@ -174,6 +172,7 @@ trait Scraper[A] {
   def factory: ExtractorFactory[A]
   
   def scrape(query: String): List[A] = {
+    val baseURL = new URL("http://UNKNOWN.net/")
     val html = """<html><head></head><body></body></html>"""
     val doc = org.jsoup.Jsoup.parse(html)
     val elem = doc.body
@@ -182,8 +181,7 @@ trait Scraper[A] {
       "QUERY" -> query
     )
     val vars = Map[String, String]()
-    
-    val ctx = Context[A](Nil, factory, args, vars)
+    val ctx = Context[A](baseURL, Nil, factory, args, vars)
     
     start.process(elem, ctx)
   }
@@ -202,9 +200,7 @@ case class SubtitleScraper(desc: String, start: Step[MovieInfos.Subtitle]) exten
           trace(clazz+"/"+name + " = '" + value + "'")
           put(clazz, name, value)
         }
-        case None => {
-          warn("PropertiesStore: invalid Clazz/Name term '" + what + "'")
-        }
+        case None => warn("invalid clazz/name term '" + what + "'")
       }
       
       val label = what + ": " + value
@@ -225,7 +221,7 @@ sealed trait Expr
   case class SelExpr(selector: String) extends Expr
   case class AttrExpr(name: String) extends Expr
   case class SelAttrExpr(selector: String, name: String) extends Expr
-  case class UrlExpr(e: Expr, base: Option[String]) extends Expr
+  case class UrlExpr(e: Expr) extends Expr
   case class ConcatExpr(a: Expr, b: Expr) extends Expr
   trait SubstrExpr extends Expr {
     def pos(pos: Int, max: Int): Int = if (pos < 0) max-pos else pos
@@ -278,19 +274,9 @@ object Expr {
       if (elems.size == 0) ""
       else elems.get(0).attr(attr)
     }
-    case UrlExpr(e, baseSpec) => {
+    case UrlExpr(e) => {
       val s = apply(e, elem, ctx)
-      
-      if (s.indexOf("://") > 0)
-        new URL(s).toExternalForm
-      else {
-        val base = baseSpec match {
-          case Some(b) => b
-          case None => ctx.params.get("url").getOrElse("http://UNKNOWN.net/")
-        }
-        val baseUrl = new URL(base)
-        new URL(baseUrl, s).toExternalForm
-      }
+      new URL(ctx.baseURL, s).toExternalForm
     }
     case ConcatExpr(a, b) => {
       val sb = new StringBuilder

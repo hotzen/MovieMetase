@@ -55,8 +55,8 @@ object DSL extends RegexParsers with PackratParsers {
     case e1 ~ _ ~ e2 => ConcatExpr(e1, e2)
   }
   
-  lazy val urlExprParser: PackratParser[Expr] = expr ~ "AS" ~ "URL" ~ opt("BASE" ~> value) ^^ {
-    case e ~ _ ~ _ ~ base => UrlExpr(e, base)
+  lazy val urlExprParser: PackratParser[Expr] = expr ~ "AS" ~ "URL" ^^ {
+    case e ~ _ ~ _ => UrlExpr(e)
   }
   
 //  val substrRegex = """\((\d+)(([,-])((\d+)))?\)""".r 
@@ -83,9 +83,10 @@ object DSL extends RegexParsers with PackratParsers {
   // steps
   val tracePrefix = opt("TRACE") ^^ { _.isDefined }
   
-  val browseStep: Parser[Step[_]] = tracePrefix ~ "BROWSE" ~ expr ~ step ^^ {
-    case t ~ _ ~ e ~ next =>
-      BrowseStep(e, next).trace(t)
+  val browseBase = "WITH" ~> "BASE" ~> value
+  val browseStep: Parser[Step[_]] = tracePrefix ~ "BROWSE" ~ expr ~ opt(browseBase) ~ step ^^ {
+    case t ~ _ ~ e ~ base ~ next =>
+      BrowseStep(e, next, base).trace(t)
   }
   
   val selectMax = "MAX" ~> int ^^ { case i => i.toInt }

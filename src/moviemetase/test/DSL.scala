@@ -210,14 +210,13 @@ SCRAPE SUBTITLES ON "SubtitleSource"
   BROWSE "http://www.subtitlesource.org/search/" + <QUERY>
   SELECT "#searchPage li a"
     #TRACE STORE $ID ATTRIBUTE "href"
-    TRACE BROWSE "http://www.subtitlesource.org/releaselist/tt1375666%7CDESC%7CAll%7CAll"
-      
+    TRACE BROWSE "http://www.subtitlesource.org/releaselist/tt1375666%7CDESC%7CAll%7CAll" WITH BASE "http://www.subtitlesource.org/title/tt1234567/"
     SELECT "#subtitle-container"
-      EXTRACT Subtitle-Label SELECT "a:eq(1)"
+      EXTRACT Subtitle-Label SELECT "a:eq(0)"
       TRACE SELECT "#subtitle-list li"
-        EXTRACT Subtitle-DownloadURL   SELECT "a:eq(0)" ATTRIBUTE href AS URL BASE "http://www.subtitlesource.org/title/tt1375666/"
-        EXTRACT Subtitle-PageURL       SELECT "a:eq(1)" ATTRIBUTE href AS URL BASE "http://www.subtitlesource.org/title/tt1375666/"
-        EXTRACT Subtitle-LanguageLabel SELECT "a:eq(1)" ATTRIBUTE title AS URL BASE "http://www.subtitlesource.org/title/tt1375666/"
+        EXTRACT Subtitle-DownloadURL   SELECT "a:eq(0)" ATTRIBUTE href AS URL 
+        EXTRACT Subtitle-PageURL       SELECT "a:eq(1)" ATTRIBUTE href AS URL
+        EXTRACT Subtitle-LanguageLabel SELECT "a:eq(1)" ATTRIBUTE title
       
 END"""
     res = DSL(in)
