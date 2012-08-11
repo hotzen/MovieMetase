@@ -5,6 +5,7 @@ import scala.util.parsing.combinator.RegexParsers
 import scala.util.parsing.input.CharSequenceReader
 import scala.util.parsing.combinator.PackratParsers
 import scala.util.matching.Regex
+import java.net.MalformedURLException
 
 object DSL extends RegexParsers with PackratParsers {
   
@@ -14,63 +15,108 @@ object DSL extends RegexParsers with PackratParsers {
   // ############################################
   // basic
   
-  val quoted   = """"[^"]*"""".r
+  val quotedRegex = """"([^"]*)"""".r
+  val quoted = regexMatch(quotedRegex) ^^ { case m => m.group(1) }
   val unquoted = """[^\s"]+""".r
-  val value    = quoted | unquoted
+  val value = quoted | unquoted
   
   val int = """-?[0-9]+""".r ^^ { d => d.toInt }
   
   
   // ############################################
   // expressions
-  val literalExpr = value ^^ { case s => LitExpr(s) }
+  val literalExprParser = value ^^ { case s => LitExpr(s) }
   
-  val varExpr = "<" ~> """[A-Z]+""".r <~ ">" ^^ { case s => VarExpr(s) }
+  val paramName = """[A-Z]+""".r
+  val paramExpr = "<" ~> paramName <~ ">"
+  val paramExprParser = paramExpr ^^ { case name => ParamExpr(name) }
   
-  val selExpr = "SELECT" ~> value ^^ { case s => SelExpr(s) }
+  val varName = """[A-Z]+""".r
+  val varExpr = "$" ~> varName 
+  val varExprParser = varExpr ^^ { case name => VarExpr(name) }
   
-  val attrExpr = "ATTRIBUTE" ~> value ^^ { case s => AttrExpr(s) }
+  val selExpr = "SELECT" ~> value 
+  val selExprParser = selExpr ^^ { case name => SelExpr(name) }
   
-  val selAttrExpr = "SELECT-ATTRIBUTE" ~> value ~ value ^^ { case s ~ a => SelAttrExpr(s, a) }
-    
-  val easyExpr = varExpr | selAttrExpr | selExpr | attrExpr
-    
-  lazy val concatExpr: PackratParser[Expr] = expr ~ "+" ~ expr ^^ { case e1 ~ _ ~ e2 => ConcatExpr(e1, e2) }
+  val attrExpr = "ATTRIBUTE" ~> value
+  val attrExprParser = attrExpr ^^ { case name => AttrExpr(name) }
+  
+//  val selAttrExpr = "SELECT-ATTRIBUTE" ~> value ~ value ^^ { case s ~ a => SelAttrExpr(s, a) }
+//    
+//  val easyExpr = varExpr | selAttrExpr | selExpr | attrExpr
+//    
+//  lazy val concatExpr: PackratParser[Expr] = expr ~ "+" ~ expr ^^ { case e1 ~ _ ~ e2 => ConcatExpr(e1, e2) }
+  
+  lazy val selAttrExprParser: PackratParser[Expr] = "SELECT" ~> value ~ "ATTRIBUTE" ~ value ^^ {
+    case s ~ _ ~ a => SelAttrExpr(s, a)
+  }
+      
+  lazy val concatExprParser: PackratParser[Expr] = expr ~ "+" ~ expr ^^ {
+    case e1 ~ _ ~ e2 => ConcatExpr(e1, e2)
+  }
+  
+  lazy val urlExprParser: PackratParser[Expr] = expr ~ "AS" ~ "URL" ~ opt("BASE" ~> value) ^^ {
+    case e ~ _ ~ _ ~ base => UrlExpr(e, base)
+  }
+  
+//  val substrRegex = """\((\d+)(([,-])((\d+)))?\)""".r 
+//  lazy val substrExprParser: PackratParser[Expr] = expr ~ regexMatch(substrRegex) ^^ {
+//    case e ~ m => {
+//      for (i <- 0 until m.groupCount)
+//        println(i+":  " +m.group(i) )
+//      
+//      val off = m.group(1).toInt
+//      m.group(3) match {
+//        case null => SubstrEndExpr(e, off)
+//        case "-"  => SubstrPosExpr(e, off, m.group(4).toInt)
+//        case ","  => SubstrLenExpr(e, off, m.group(4).toInt) 
+//      }
+//    }
+//  }
+  
+  val basicExprParser = paramExprParser | varExprParser | selAttrExprParser | selExprParser | attrExprParser
 
-  val substrRegex = """\((\d+)(,|-)(\d+)?\)""".r 
-  lazy val substrExpr: PackratParser[Expr] = expr ~ regexMatch(substrRegex) ^^ { case e ~ m => {
-      val off = m.group(1).toInt
-      val op = m.group(2)
-      val x = m.group(3).toInt
-      if (op == ",")
-        SubstrLenExpr(e, off, x)
-      else
-        SubstrPosExpr(e, off, x)
-    }}
-  
-  
-  lazy val expr: PackratParser[Expr] = concatExpr | easyExpr | literalExpr
-  
+//  val expr = substrExprParser | concatExprParser | basicExprParser | literalExprParser
+  val expr = urlExprParser | concatExprParser | basicExprParser | literalExprParser
     
   // ############################################
-  // steps 
-  val browseStep: Parser[Step[_]] = "BROWSE" ~> expr ~ step ^^ { case e ~ next => BrowseStep(e, next) }
+  // steps
+  val tracePrefix = opt("TRACE") ^^ { _.isDefined }
   
-  val selectStep: Parser[Step[_]] = "SELECT" ~> value /* ~ ("MAX" ~> int | Int.MaxValue ) */ ~ step ^^ { case e ~ next => SelectStep(e, Int.MaxValue, next) }
+  val browseStep: Parser[Step[_]] = tracePrefix ~ "BROWSE" ~ expr ~ step ^^ {
+    case t ~ _ ~ e ~ next =>
+      BrowseStep(e, next).trace(t)
+  }
   
-  val extractWhat = """[a-zA-Z0-9_\-]+""".r 
-  val extractStep: Parser[Step[_]] = "EXTRACT" ~> extractWhat ~ expr ~ step ^^ { case what ~ e ~ next => ExtractStep(what.toLowerCase, e, next) }
+  val selectMax = "MAX" ~> int ^^ { case i => i.toInt }
+  val selectStep: Parser[Step[_]] = tracePrefix ~ "SELECT" ~ value ~ opt(selectMax) ~ step ^^ {
+    case t ~ _ ~ e ~ max ~ next =>
+      SelectStep(e, max.getOrElse(Int.MaxValue), next).trace(t)
+  }
+  
+  val extractWhat = """[a-zA-Z0-9_\-/]+""".r 
+  val extractStep: Parser[Step[_]] = tracePrefix ~ "EXTRACT" ~ extractWhat ~ expr ~ step ^^ {
+    case t ~ _ ~ what ~ e ~ next =>
+      ExtractStep(what, e, next).trace(t)
+  }
+  
+  val storeStep: Parser[Step[_]] = tracePrefix ~ ("STORE" | "REMEMBER") ~ varExpr ~ expr ~ step ^^ {
+    case t ~ _ ~ name ~ e ~ next =>
+      StoreStep(name, e, next).trace(t)
+  }
   
   val terminalStep: Parser[Step[_]] = "END" ^^^ TerminalStep()
   
-  val step: Parser[Step[_]] = browseStep | selectStep | extractStep | terminalStep
+  val step: Parser[Step[_]] = browseStep | selectStep | extractStep | storeStep | terminalStep  
 
   
   // ############################################
   // scrapers
-  val subtitlesScraper: PackratParser[Scraper[_]] = "SCRAPE" ~> "SUBTITLES" ~> "AT" ~> value ~ "BY" ~ value ~ step ^^
-                                                           { case site ~ _ ~ author ~ step => SubtitleScraper(site, author, step.asInstanceOf[Step[MovieInfos.Subtitle]]) }  
-  
+  val subtitlesScraper: PackratParser[Scraper[_]] = "SCRAPE" ~> "SUBTITLES" ~> "ON" ~> value ~ step ^^ {
+    case label ~ step =>
+      SubtitleScraper(label, step.asInstanceOf[Step[MovieInfos.Subtitle]])
+  }
+
   val scraper: PackratParser[Scraper[_]] = subtitlesScraper
 
   val scrapers = rep1(scraper)

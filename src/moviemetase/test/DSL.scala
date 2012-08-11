@@ -9,6 +9,8 @@ import scala.collection.mutable.Stack
 
 object DSL_Test extends FunSuite with BeforeAndAfter {
   
+  Logging.level = LogLevel.Trace 
+  
   var in: String = ""
   var res: DSL.ParseResult[_] = null
   
@@ -18,11 +20,12 @@ object DSL_Test extends FunSuite with BeforeAndAfter {
   }
   
   after {
-    assert(!in.isEmpty)
-    assert(res != null)
+    assert(in != null && !in.isEmpty)
+    assert(res != null, "ParseResult is NULL")
     
     assert(!res.isEmpty, "\"\"\"" + in + "\"\"\" => " + res.toString)
   }
+  
   
   // ############################################
   // Basic
@@ -61,15 +64,25 @@ object DSL_Test extends FunSuite with BeforeAndAfter {
     res = DSL.parseAll(DSL.expr, in)
   }
   
-  test("SubstrExpr1") {
-    in = """ "foo"(1-2) """
-    res = DSL.parseAll(DSL.substrExpr, in)
-  }
-  
-  test("SubstrExpr2") {
-    in = """ "foo"(1,2) """
-    res = DSL.parseAll(DSL.substrExpr, in)
-  }
+//  test("SubstrExpr1") {
+//    in = """ "foo"(1) """
+//    res = DSL.parseAll(DSL.expr, in)
+//  }
+//  
+//  test("SubstrExpr2") {
+//    in = """ "foo"(1-2) """
+//    res = DSL.parseAll(DSL.expr, in)
+//  }
+//  
+//  test("SubstrExpr3") {
+//    in = """ "foo"(1,2) """
+//    res = DSL.parseAll(DSL.expr, in)
+//  }
+//  
+//  test("SubstrExpr4") {
+//    in = """ "foo"(-7,2) """
+//    res = DSL.parseAll(DSL.expr, in)
+//  }
     
   test("SelExpr") {
     in = """ SELECT "a:eq(1)" """
@@ -91,20 +104,36 @@ object DSL_Test extends FunSuite with BeforeAndAfter {
     res = DSL.parseAll(DSL.expr, in)
   }
   
+//  test("SelAttrExpr") {
+//    in = """ SELECT-ATTRIBUTE "a:eq(1)" "href" """
+//    res = DSL.parseAll(DSL.expr, in)
+//  }
+//  
+//  test("UnquotedSelAttrExpr1") {
+//    in = """ SELECT-ATTRIBUTE "a:eq(1)" href """
+//    res = DSL.parseAll(DSL.expr, in)
+//  }
+//  
+//  test("UnquotedSelAttrExpr2") {
+//    in = """ SELECT-ATTRIBUTE a href """
+//    res = DSL.parseAll(DSL.expr, in)
+//  }
+  
   test("SelAttrExpr") {
-    in = """ SELECT-ATTRIBUTE "a:eq(1)" "href" """
+    in = """ SELECT "a:eq(1)" ATTRIBUTE "href" """
     res = DSL.parseAll(DSL.expr, in)
   }
   
   test("UnquotedSelAttrExpr1") {
-    in = """ SELECT-ATTRIBUTE "a:eq(1)" href """
+    in = """ SELECT "a:eq(1)" ATTRIBUTE href """
     res = DSL.parseAll(DSL.expr, in)
   }
   
   test("UnquotedSelAttrExpr2") {
-    in = """ SELECT-ATTRIBUTE a href """
+    in = """ SELECT a ATTRIBUTE href """
     res = DSL.parseAll(DSL.expr, in)
   }
+  
   
   // ############################################
   // Steps
@@ -121,6 +150,11 @@ object DSL_Test extends FunSuite with BeforeAndAfter {
   
   test("BrowseStep") {
     in = """ BROWSE SELECT "h1" + "suffix" END """
+    res = DSL.parseAll(DSL.step, in)
+  }
+  
+  test("SelectMaxStep") {
+    in = """ SELECT "h1" MAX 10 END """
     res = DSL.parseAll(DSL.step, in)
   }
   
@@ -143,42 +177,87 @@ object DSL_Test extends FunSuite with BeforeAndAfter {
   // ############################################
   // Scrapes
   
-  test("Complete Scrape") {
-    in = """
-SCRAPE SUBTITLES AT "SubtitleSource.org" BY "fizzl@foo"
- 
-  BROWSE "http://www.subtitlesource.org/search/" + <QUERY> 
-  SELECT "#searchPage li a"
-
-    BROWSE "http://www.subtitlesource.org/" + ATTRIBUTE "href"
-    SELECT "ul#subtitle-list li"
-  
-      EXTRACT SUBTITLE-DOWNLOAD_URL SELECT-ATTRIBUTE "a:eq(1)" "href"
-      EXTRACT SUBTITLE-PAGE_URL     SELECT-ATTRIBUTE "a:eq(2)" "href"
-      EXTRACT SUBTITLE-LANGUAGE_TITLE SELECT-ATTRIBUTE "a:eq(2)" "title"
+  test("SubtitleScrape") {
+        in = """
+SCRAPE SUBTITLES ON "FoobarSiteDescription"
+  BROWSE "http://www.site.net/search/" + <QUERY>
+  SELECT "ul li"
+    BROWSE "http://www.site.net/" + ATTRIBUTE "attr"
+    SELECT "a"
+      EXTRACT Something SELECT "a:eq(1)" ATTRIBUTE "-funky-attribute"
+      EXTRACT AnotherProperty SELECT "a:eq(2)" ATTRIBUTE href 
+      EXTRACT PropClazz-PropName SELECT "a:eq(2)"
 END"""
     res = DSL(in)
+    //println(res)
   }
   
-  test("Complex Scrape") {
+  test("RunSubtitleScrape") {
+//    in = """
+//SCRAPE SUBTITLES ON "SubtitleSource"
+//  BROWSE "http://www.subtitlesource.org/search/" + <QUERY>
+//  SELECT "#searchPage li a"
+//    BROWSE ATTRIBUTE "href"
+//    SELECT "#subtitle-container"
+//      EXTRACT Subtitle-Label SELECT "a:eq(1)" ATTRIBUTE href
+//      SELECT "#subtitle-list li"
+//        EXTRACT Subtitle-DownloadURL   SELECT "a:eq(1)" ATTRIBUTE href 
+//        EXTRACT Subtitle-PageURL       SELECT "a:eq(2)" ATTRIBUTE href 
+//        EXTRACT Subtitle-LanguageLabel SELECT "a:eq(2)" ATTRIBUTE title
+//END"""
     in = """
-SCRAPE SUBTITLES AT "SubtitleSource.org" BY "fizzl@foo"
- 
-  BROWSE "http://www.subtitlesource.org/search/" + ATTRIBUTE "foo" + <QUERY> 
+SCRAPE SUBTITLES ON "SubtitleSource"
+  BROWSE "http://www.subtitlesource.org/search/" + <QUERY>
   SELECT "#searchPage li a"
+    #TRACE STORE $ID ATTRIBUTE "href"
+    TRACE BROWSE "http://www.subtitlesource.org/releaselist/tt1375666%7CDESC%7CAll%7CAll"
+      
+    SELECT "#subtitle-container"
+      EXTRACT Subtitle-Label SELECT "a:eq(1)"
+      TRACE SELECT "#subtitle-list li"
+        EXTRACT Subtitle-DownloadURL   SELECT "a:eq(0)" ATTRIBUTE href AS URL BASE "http://www.subtitlesource.org/title/tt1375666/"
+        EXTRACT Subtitle-PageURL       SELECT "a:eq(1)" ATTRIBUTE href AS URL BASE "http://www.subtitlesource.org/title/tt1375666/"
+        EXTRACT Subtitle-LanguageLabel SELECT "a:eq(1)" ATTRIBUTE title AS URL BASE "http://www.subtitlesource.org/title/tt1375666/"
+      
+END"""
+    res = DSL(in)
     
-    # GET "http://www.subtitlesource.org/" + ATTRIBUTE "href"
-    # BROWSE ATTRIBUTE "href" AS FULL URL
-    BROWSE "http://www.subtitlesource.org/" + ATTRIBUTE "href"
-    SELECT "ul#subtitle-list li"
-  
-      EXTRACT SUBTITLE-DOWNLOAD_URL SELECT-ATTRIBUTE "a:eq(1)" href 
-      EXTRACT SUBTITLE-PAGE_URL     SELECT-ATTRIBUTE "a:eq(2)" href 
-      EXTRACT SUBTITLE-LANGUAGE_TITLE SELECT-ATTRIBUTE "a:eq(2)" title
-
-END"""
-    res = DSL(in)
+    import DSL._
+    res match {
+      case pr:ParseResult[List[SubtitleScraper]] => pr match {
+        case Success(scrapers, _) => {
+          for (scraper <- scrapers) {
+            println(scraper)
+            scraper.scrape("Inception.1080p.BluRay.x264-REFiNED")
+          }
+          ()
+        }
+      }
+    }
+    
   }
+  
+//  test("RunScrape") {
+//    in = """
+//SCRAPE SUBTITLES ON "SubtitleSource"
+// 
+//  BROWSE "http://www.subtitlesource.org/search/" + <QUERY> 
+//  SELECT "#searchPage li a"
+//
+//    BROWSE ATTRIBUTE "href"
+//    
+//    SELECT "td#subtitle-container"
+//      EXTRACT Subtitle-Label SELECT-ATTRIBUTE "a:eq(1)" href
+//      
+//    SELECT "#release-list ul#subtitle-list li"
+//  
+//      EXTRACT Subtitle-DownloadURL   SELECT-ATTRIBUTE "a:eq(1)" href 
+//      EXTRACT Subtitle-PageURL       SELECT-ATTRIBUTE "a:eq(2)" href 
+//      EXTRACT Subtitle-LanguageLabel SELECT-ATTRIBUTE "a:eq(2)" title
+//
+//END"""
+//    res = DSL(in)
+//  }
   
     
   def main(args: Array[String]): Unit = execute(color = false)
