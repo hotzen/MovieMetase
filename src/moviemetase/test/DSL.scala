@@ -163,10 +163,8 @@ END"""
   test("Complex Scrape") {
     in = """
 SCRAPE SUBTITLES AT "SubtitleSource.org" BY "fizzl@foo"
- 
   BROWSE "http://www.subtitlesource.org/search/" + ATTRIBUTE "foo" + <QUERY> 
-  SELECT "#searchPage li a"
-    
+  SELECT "#searchPage li a"    
     # GET "http://www.subtitlesource.org/" + ATTRIBUTE "href"
     # BROWSE ATTRIBUTE "href" AS FULL URL
     BROWSE "http://www.subtitlesource.org/" + ATTRIBUTE "href"
