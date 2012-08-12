@@ -43,7 +43,7 @@ case class FinalStep[A]() extends Step[A] with Logging {
   def process(elem: Element, ctx: Context[A]): List[A] = {
     val results = ctx.factory.create( ctx.extracts )
     if (results.isEmpty)
-      warn("no results were produced")
+      warn("no results")
     
     results.reverse
   }
@@ -64,7 +64,7 @@ case class BrowseStep[A](expr: Expr, next: Step[A], base: Option[String]) extend
     val url = new URL(value)
     
     if (tracing)
-      trace(url.toString)
+      trace(url.toExternalForm)
       
     val baseURL = base match {
       case Some(b) => new URL(b)
@@ -137,7 +137,7 @@ trait Scraper[A] {
   def factory: Factory[A]
   
   def scrape(query: String): List[A] = {
-    val baseURL = new URL("http://UNKNOWN.net/")
+    val baseURL = new URL("http://initial.net/")
     val html = """<html><head></head><body></body></html>"""
     val doc = org.jsoup.Jsoup.parse(html)
     val elem = doc.body
