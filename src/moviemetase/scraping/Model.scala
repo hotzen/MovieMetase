@@ -4,29 +4,54 @@ package scraping
 import java.net.URL
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import scala.collection._
+import Util._
 
-case class Context[A](results: List[A], factory: ExtractorFactory[A], vars: Map[String, String]) {
+// context while processing an element inside a step 
+case class Context[A](baseURL: URL, extracts: List[(String, String)], factory: Factory[A],
+                      params: Map[String, String], vars: Map[String, String]) {
   
-  def add(result: A): Context[A] =
-    Context(result :: results, factory, vars)
+  def setBaseURL(url: URL): Context[A] =
+    Context(url, extracts, factory, params, vars)
   
-  def value(v: String): String = vars.get(v) match {
-    case Some(v) => v
-    case None => throw new Exception("Invalid Variable '" + v + "'")
-  }
+  def addExtract(name: String, value: String): Context[A] =
+    Context(baseURL, (name, value) :: extracts, factory, params, vars)
+  
+  def setParam(n: String, v: String): Context[A] =
+    Context(baseURL, extracts, factory, params + (n -> v), vars)
+    
+  def setVar(n: String, v: String): Context[A] =
+    Context(baseURL, extracts, factory, params, vars + (n -> v))
 }
 
 trait Step[A] {
   def process(elem: Element, ctx: Context[A]): List[A]
 }
 
-case class TerminalStep[A]() extends Step[A] {
-  def process(elem: Element, ctx: Context[A]): List[A] = ctx.results
+trait TracingStep {
+  var tracing = false
+  
+  def trace(on: Boolean): this.type = {
+    tracing = on
+    this
+  }
+}
+
+case class FinalStep[A]() extends Step[A] with Logging {
+  val logID = "Final"
+  
+  def process(elem: Element, ctx: Context[A]): List[A] = {
+    val results = ctx.factory.create( ctx.extracts )
+    if (results.isEmpty)
+      warn("no results were produced")
+    
+    results.reverse
+  }
   
   override def toString = "End"
 }
 
-case class BrowseStep[A](expr: Expr, next: Step[A]) extends Step[A] with Logging {
+case class BrowseStep[A](expr: Expr, next: Step[A], base: Option[String]) extends Step[A] with TracingStep with Logging {
   val logID = "Browse"
   
   def browse(theUrl: URL): Document = new HtmlTask[Document] {
@@ -37,112 +62,180 @@ case class BrowseStep[A](expr: Expr, next: Step[A]) extends Step[A] with Logging
   def process(elem: Element, ctx: Context[A]): List[A] = {
     val value = Expr.apply(expr, elem, ctx)
     val url = new URL(value)
-    trace("browsing '" + url + "'")
-    val doc = browse(url)
     
-    next.process(doc.body, ctx)
+    if (tracing)
+      trace(url.toString)
+      
+    val baseURL = base match {
+      case Some(b) => new URL(b)
+      case None => url
+    }
+      
+    val doc = browse(url)
+    next.process(doc.body, ctx setBaseURL baseURL)
   }
   
   override def toString = "Browse(" + expr + ")\n" + next.toString
 }
 
-case class SelectStep[A](selector: String, max: Int, next: Step[A]) extends Step[A] with Logging {
+case class SelectStep[A](selector: String, max: Int, next: Step[A]) extends Step[A] with TracingStep with Logging {
   import language.implicitConversions
   implicit def jiter[A](jiter: java.util.Iterator[A]): Iterator[A] =
     scala.collection.convert.Wrappers.JIteratorWrapper[A]( jiter )
  
-  val logID = "Select"
+  val logID = "Select(" + selector + { if (max < Int.MaxValue) ", Max="+max else "" } + ")"
     
   def process(elem: Element, ctx: Context[A]): List[A] = {
     val selElems = elem.select(selector)
-    trace("selected '" + selector + "': " + selElems.size)
     
-    selElems.iterator.take(max).flatMap(selElem => next.process(selElem, ctx)).toList
+    if (selElems.isEmpty)
+      warn("no match!")
+    else if (tracing)
+      trace("selected " + selElems.size)
+      
+    selElems.iterator.take(max).flatMap(selElem => {
+      next.process(selElem, ctx)
+    }).toList
   }
   
   override def toString = "Select("+selector+")\n" + next.toString
 }
 
-trait ExtractorFactory[A] {
-  def create(what: String, value: String): A
+trait Factory[A] {
+  def create(extracts: List[(String,String)]): List[A]
 }
 
-case class ExtractStep[A](what: String, expr: Expr, next: Step[A]) extends Step[A] with Logging {
-  val logID = "Extract(" + what + ")"
-  
-  val factory: ExtractorFactory[A] = null
+case class ExtractStep[A](name: String, expr: Expr, next: Step[A]) extends Step[A] with TracingStep with Logging {
+  val logID = "Extract(" + name + ")"
   
   def process(elem: Element, ctx: Context[A]): List[A] = {
     val value = Expr.apply(expr, elem, ctx)
-    val result = factory.create(what, value)
-    trace("extracted '" + value + "': " + result)
-
-    next.process(elem, ctx.add(result))
+    if (tracing)
+      trace("extracted " + name + ": '" + value + "'")
+    next.process(elem, ctx.addExtract(name, value))
   }
+    
+  override def toString = "Extract(" + name + ", " + expr + ")\n" + next.toString
+}
+
+case class StoreStep[A](name: String, expr: Expr, next: Step[A]) extends Step[A] with TracingStep with Logging {
+  val logID = "Store(" + name + ")"
   
-  override def toString = "Extract(" + what + " <= " + expr + ")\n" + next.toString
+  def process(elem: Element, ctx: Context[A]): List[A] = {
+    val value = Expr.apply(expr, elem, ctx)
+    if (tracing)
+      trace("'" + value + "'")
+
+    next.process(elem, ctx setVar (name, value))
+  }
+    
+  override def toString = "Store(" + name + ", " + expr + ")\n" + next.toString
 }
 
 trait Scraper[A] {
   def start: Step[A]
-  def factory: ExtractorFactory[A]
+  def factory: Factory[A]
   
   def scrape(query: String): List[A] = {
+    val baseURL = new URL("http://UNKNOWN.net/")
     val html = """<html><head></head><body></body></html>"""
     val doc = org.jsoup.Jsoup.parse(html)
     val elem = doc.body
     
-    val idents = Map[String, String](
+    val args = Map[String, String](
       "QUERY" -> query
     )
+    val vars = Map[String, String]()
+    val ctx = Context[A](baseURL, Nil, factory, args, vars)
     
-    val ctx = Context[A](Nil, factory, idents)
     start.process(elem, ctx)
   }
   
   override def toString = "Scraper: " + start.toString
 }
 
-case class SubtitleScraper(site: String, author: String, start: Step[MovieInfos.Subtitle]) extends Scraper[MovieInfos.Subtitle] with Logging {
-  val logID = "SubtitleScraper(" + site + ")"
-  val factory = new ExtractorFactory[MovieInfos.Subtitle] {
-    def create(what: String, value: String): MovieInfos.Subtitle = {
-      MovieInfos.Subtitle("test", "de", new URL("http://foo.bar"), new URL("http://foo.baz"))
+case class SubtitleScraper(desc: String, start: Step[MovieInfos.Subtitle]) extends Scraper[MovieInfos.Subtitle] with Logging {
+  val logID = "SubtitleScraper(" + desc + ")"
+  
+  val factory = new Factory[MovieInfos.Subtitle] {
+    def create(extracts: List[(String, String)]): List[MovieInfos.Subtitle] = {
+      trace("extracts: "+ extracts.mkString(",\n  "))
+      val extractsLC = extracts.map({case (n,v) => (n.toLowerCase, v) })
+      
+      val label = extractsLC.collect({ case ("subtitle-label",v) => v }).headOption.getOrElse("N/A")
+      val lang = extractsLC.collect({ case ("subtitle-language",v) => v }).headOption.getOrElse("N/A")
+      val page = extractsLC.collect({ case ("subtitle-pageurl",v) => v }).headOption.getOrElse("http://unknown.net").toURL
+      val dl = extractsLC.collect({ case ("subtitle-downloadurl",v) => v }).headOption.getOrElse("http://unknown.net").toURL
+      
+      MovieInfos.Subtitle(label, lang, page, dl) :: Nil
     }
   }
 }
 
 sealed trait Expr
   case class LitExpr(s: String) extends Expr
-  case class VarExpr(n: String) extends Expr
+  case class ParamExpr(name: String) extends Expr
+  case class VarExpr(name: String) extends Expr
   case class SelExpr(selector: String) extends Expr
   case class AttrExpr(name: String) extends Expr
   case class SelAttrExpr(selector: String, name: String) extends Expr
+  case class UrlExpr(e: Expr) extends Expr
   case class ConcatExpr(a: Expr, b: Expr) extends Expr
-  case class SubstrLenExpr(e: Expr, off: Int, len: Int) extends Expr
-  case class SubstrPosExpr(e: Expr, off: Int, pos: Int) extends Expr
-  // TODO RegexExpr
-  // ...
+  trait SubstrExpr extends Expr {
+    def expr: Expr
+    def absPos(pos: Int, len: Int): Int = if (pos < 0) len + pos else pos
+    def apply(s: String): String
+  }
+  case class SubstrEndExpr(expr: Expr, off: Int) extends SubstrExpr {
+    def apply(s: String): String =
+      s.substring(absPos(off, s.length))
+  }
+  case class SubstrLenExpr(expr: Expr, off: Int, len: Int) extends SubstrExpr {
+    def apply(s: String): String = {
+      val a = absPos(off, s.length)
+      val b = a + len
+      s.substring(a, b)
+    }
+  }
+  case class SubstrPosExpr(expr: Expr, off: Int, pos: Int) extends SubstrExpr {
+    def apply(s: String): String = {
+      val len = s.length
+      val a = absPos(off, len)
+      val b = absPos(pos, len)
+      s.substring(a, b)
+    }
+  }
 
 object Expr {
   import language.implicitConversions
   implicit def jiter[A](jiter: java.util.Iterator[A]): Iterator[A] =
     scala.collection.convert.Wrappers.JIteratorWrapper[A]( jiter )
-  
+      
   def apply(e: Expr, elem: Element, ctx: Context[_]): String = e match {
     case LitExpr(s) => s
-    case VarExpr(v) => ctx value v
-    case SelExpr(s) => {
-      val elems = elem.select(s)
+    case ParamExpr(name) => ctx.params.get(name) match {
+      case Some(v) => v
+      case None => throw new Exception("invalid parameter '" + name + "'")
+    }
+    case VarExpr(name) => ctx.vars.get(name) match {
+      case Some(v) => v
+      case None => throw new Exception("invalid variable '" + name + "'")
+    }  
+    case SelExpr(sel) => {
+      val elems = elem.select(sel)
       if (elems.size == 0) ""
       else elems.get(0).text
     }
-    case AttrExpr(a) =>
-      elem.attr(a)
-    case SelAttrExpr(s, a) => {
-      val elems = elem.select(s)
+    case AttrExpr(attr) =>
+      elem.attr(attr)
+    case SelAttrExpr(sel, attr) => {
+      val elems = elem.select(sel)
       if (elems.size == 0) ""
-      else elems.get(0).attr(a)
+      else elems.get(0).attr(attr)
+    }
+    case UrlExpr(e) => {
+      val s = apply(e, elem, ctx)
+      new URL(ctx.baseURL, s).toExternalForm
     }
     case ConcatExpr(a, b) => {
       val sb = new StringBuilder
@@ -150,13 +243,7 @@ object Expr {
       sb append apply(b, elem, ctx)
       sb.toString
     }
-    case SubstrLenExpr(e, off, len) => {
-      val s = apply(e, elem, ctx)
-      s.substring(off, off+len)
-    }
-    case SubstrPosExpr(e, off, pos) => {
-      val s = apply(e, elem, ctx)
-      s.substring(off, pos)
-    }
+    case substr:SubstrExpr =>
+      substr.apply( apply(substr.expr, elem, ctx) )
   }
 }

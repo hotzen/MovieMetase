@@ -26,18 +26,24 @@ object Logging {
 }
 
 trait Logging {
+  def logLevel: LogLevel  = Logging.level 
+  def logOut: PrintWriter = Logging.out 
+  
   def logID:  String
   
-  final def isLogging(lvl: LogLevel): Boolean = (lvl.id >= Logging.level.id)
+  def isLogging(lvl: LogLevel): Boolean = (lvl.id >= logLevel.id)
   
   private val logBuf = new StringBuffer()
   
   final def trace(msg: =>String, infos: List[(String,Any)] = Nil): Unit = log(LogLevel.Trace, msg, infos)
-  final def info(msg: String,    infos: List[(String,Any)] = Nil): Unit = log(LogLevel.Info,  msg, infos)
-  final def warn(msg: String,    infos: List[(String,Any)] = Nil): Unit = log(LogLevel.Warn,  msg, infos)
-  final def error(msg: String,   infos: List[(String,Any)] = Nil): Unit = log(LogLevel.Error, msg, infos)
   
-  final def log(lvl: LogLevel, msg: String, infos: List[(String,Any)]): Unit = {
+  final def info(msg: String, infos: List[(String,Any)] = Nil): Unit = log(LogLevel.Info,  msg, infos)
+  
+  final def warn(msg: String, infos: List[(String,Any)] = Nil): Unit = log(LogLevel.Warn,  msg, infos)
+  
+  final def error(msg: String, infos: List[(String,Any)] = Nil): Unit = log(LogLevel.Error, msg, infos)
+  
+  def log(lvl: LogLevel, msg: String, infos: List[(String,Any)]): Unit = {
     if (!isLogging(lvl))
       return
     
@@ -55,10 +61,11 @@ trait Logging {
         logBuf append k append "='" append v append "'"
       logBuf append "}"
     }
-        
-    Logging.out synchronized {
-      Logging.out.println( logBuf.toString )
-      Logging.out.flush()
+     
+    val out = logOut
+    out synchronized {
+      out.println( logBuf.toString )
+      out.flush()
     }
   }
 }
