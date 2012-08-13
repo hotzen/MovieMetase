@@ -2,127 +2,247 @@ package moviemetase
 package test
 
 import scraping._
-
 import org.scalatest.FunSuite
 import org.scalatest.BeforeAndAfter
 import scala.collection.mutable.Stack
 
-object DSL_Test extends FunSuite with BeforeAndAfter {
+object DSL_Test extends FunSuite {
   
   Logging.level = LogLevel.Trace 
-  
-  var in: String = ""
-  var res: DSL.ParseResult[_] = null
-  
-  before {
-    in  = ""
-    res = null
-  }
-  
-  after {
-    assert(in != null && !in.isEmpty)
-    assert(res != null, "ParseResult is NULL")
-    
-    assert(!res.isEmpty, "\"\"\"" + in + "\"\"\" => " + res.toString)
-  }
-  
+
   
   // ############################################
   // Basic
   
-  test("ValueValueSeqExpr1") {
-    in = """ "foo" "bar" """
-    res = DSL.parseAll(DSL.value ~ DSL.value, in)
+  test("QuotedQuoted") {
+    val in = """ "foo" "bar" """
+    DSL.parseAll(DSL.value ~ DSL.value, in) match {
+      case DSL.Success(_, _) =>
+      case res => fail(res.toString)
+    }
   }
   
-  test("ValueValueSeqExpr2") {
-    in = """ "foo" bar """
-    res = DSL.parseAll(DSL.value ~ DSL.value, in)
+  test("QuotedUnquoted") {
+    val in = """ "foo" bar """
+    DSL.parseAll(DSL.value ~ DSL.value, in) match {
+      case DSL.Success(_, _) =>
+      case res => fail(res.toString)
+    }
   }
   
-  test("ValueValueSeqExpr3") {
-    in = """ foo bar """
-    res = DSL.parseAll(DSL.value ~ DSL.value, in)
+  test("UnquotedUnquoted") {
+    val in = """ foo bar """
+    DSL.parseAll(DSL.value ~ DSL.value, in) match {
+      case DSL.Success(_, _) =>
+      case res => fail(res.toString)
+    }
   }
   
-  test("ValueValueSeqExpr4") {
-    in = """ foo "bar" """
-    res = DSL.parseAll(DSL.value ~ DSL.value, in)
+  test("UnquotedQuoted") {
+    val in = """ foo "bar" """
+    DSL.parseAll(DSL.value ~ DSL.value, in) match {
+      case DSL.Success(_, _) =>
+      case res => fail(res.toString)
+    }
   }
     
   
   // ############################################
   // Expressions
+  
+  test("QuotedQuotedConcatExpr") {
+    val in = """ "foo" + "bar" """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(e:ConcatExpr, _) =>
+      case res => fail(res.toString)
+    }
+  }
+  
+  test("QuotedUnquotedConcatExpr") {
+    val in = """ "foo" + bar """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(e:ConcatExpr, _) =>
+      case res => fail(res.toString)
+    }
+  }
+  
+  test("UnquotedQuotedConcatExpr") {
+    val in = """ foo + "bar" """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(e:ConcatExpr, _) =>
+      case res => fail(res.toString)
+    }
+  }
+  
+  test("ParensExpr1") {
+    val in = """ ( foo ) """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(_, _) =>
+      case res => fail(res.toString)
+    }
+  }
+  test("ParensExpr1'") {
+    val in = """ (foo) """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(_, _) =>
+      case res => fail(res.toString)
+    }
+  }
+  
+  test("ParensExpr2") {
+    val in = """ ( foo + bar ) """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(ConcatExpr(_,_), _) =>
+      case res => fail(res.toString)
+    }
+  }
+  test("ParensExpr2'") {
+    val in = """ (foo + bar) """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(ConcatExpr(_,_), _) =>
+      case res => fail(res.toString)
+    }
+  }
+  test("ParensExpr2''") {
+    val in = """ (foo+bar) """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(ConcatExpr(_,_), _) =>
+      case res => fail(res.toString)
+    }
+  }
+  
+  test("ParensExpr3") {
+    val in = """ ( foo + bar ) + baz """
+    DSL.parseAll(DSL.expr, in) match {
+      case res@DSL.Success(ConcatExpr(ConcatExpr(_,_), _), _) => 
+      case res => fail(res.toString)
+    }
+  }
+  test("ParensExpr3'") {
+    val in = """(foo + bar)+baz """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(ConcatExpr(ConcatExpr(_,_), _), _) =>
+      case res => fail(res.toString)
+    }
+  }
+  
+  test("ParensExpr4") {
+    val in = """ foo + ( bar + baz ) """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(ConcatExpr(_, ConcatExpr(_,_)), _) =>
+      case res => fail(res.toString)
+    }
+  }
+  test("ParensExpr4'") {
+    val in = """ foo+(bar+baz) """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(ConcatExpr(_, ConcatExpr(_, _)), _) =>
+      case res => fail(res.toString)
+    }
+  }
     
-  test("ParensExpr") {
-    in = """ baz + ( foo + bar ) """
-    res = DSL.parseAll(DSL.expr, in)
-    //println(res)
-  }
-  
-  test("ConcatExpr") {
-    in = """ "foo" + "bar" """
-    res = DSL.parseAll(DSL.expr, in)
-  }
-  
-  test("UnquotedConcatExpr") {
-    in = """ "foo" + bar """
-    res = DSL.parseAll(DSL.expr, in)
-  }
-  
   test("SubstrExpr1") {
-    in = """ "foo"[1] """
-    res = DSL.parseAll(DSL.expr, in)
+    val in = """ "foo"[1] """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(e:SubstrEndExpr, _) =>
+      case res => fail(res.toString)
+    }
   }
   
   test("SubstrExpr2") {
-    in = """ "foo"[1-2] """
-    res = DSL.parseAll(DSL.expr, in)
+    val in = """ "foo"[1-2] """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(e:SubstrPosExpr, _) =>
+      case res => fail(res.toString)
+    }
   }
   
   test("SubstrExpr3") {
-    in = """ "foo"[1,2] """
-    res = DSL.parseAll(DSL.expr, in)
-  }
-  
-  test("SubstrExpr4") {
-    in = """ "foo"[-7,2] """
-    res = DSL.parseAll(DSL.expr, in)
+    val in = """ "foo"[1,2] """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(e:SubstrLenExpr, _) =>
+      case res => fail(res.toString)
+    }
   }
     
+  test("SubstrExpr4") {
+    val in = """ "foo"[-7,2] """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(e:SubstrLenExpr, _) =>
+      case res => fail(res.toString)
+    }
+  }
+  
+  test("SubstrExpr5") {
+    val in = """ "foo" + bar [1,2] """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(ConcatExpr(e1, e2:SubstrExpr), _) =>
+      case res => fail(res.toString)
+    }
+  }
+  
+  test("SubstrExpr6") {
+    val in = """ ("foo" + bar) [1,2] """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(e:SubstrExpr, _) =>
+      case res => fail(res.toString)
+    }
+  }
+      
   test("SelExpr") {
-    in = """ SELECT "a:eq(1)" """
-    res = DSL.parseAll(DSL.expr, in)
+    val in = """ SELECT "a:eq(1)" """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(e:SelExpr, _) =>
+      case res => fail(res.toString)
+    }
   }
   
   test("UnquotedSelExpr") {
-    in = """ SELECT a """
-    res = DSL.parseAll(DSL.expr, in)
+    val in = """ SELECT a """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(e:SelExpr, _) =>
+      case res => fail(res.toString)
+    }
   }
   
   test("AttrExpr") {
-    in = """ ATTRIBUTE "href" """
-    res = DSL.parseAll(DSL.expr, in)
+    val in = """ ATTRIBUTE "href" """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(e:AttrExpr, _) =>
+      case res => fail(res.toString)
+    }
   }
   
   test("UnquotedAttrExpr") {
-    in = """ ATTRIBUTE href """
-    res = DSL.parseAll(DSL.expr, in)
+    val in = """ ATTRIBUTE href """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(e:AttrExpr, _) =>
+      case res => fail(res.toString)
+    }
   }
   
   test("SelAttrExpr") {
-    in = """ SELECT "a:eq(1)" ATTRIBUTE "href" """
-    res = DSL.parseAll(DSL.expr, in)
+    val in = """ SELECT "a:eq(1)" ATTRIBUTE "href" """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(e:SelAttrExpr, _) =>
+      case res => fail(res.toString)
+    }
   }
   
   test("UnquotedSelAttrExpr1") {
-    in = """ SELECT "a:eq(1)" ATTRIBUTE href """
-    res = DSL.parseAll(DSL.expr, in)
+    val in = """ SELECT "a:eq(1)" ATTRIBUTE href """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(e:SelAttrExpr, _) =>
+      case res => fail(res.toString)
+    }
   }
   
   test("UnquotedSelAttrExpr2") {
-    in = """ SELECT a ATTRIBUTE href """
-    res = DSL.parseAll(DSL.expr, in)
+    val in = """ SELECT a ATTRIBUTE href """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(e:SelAttrExpr, _) =>
+      case res => fail(res.toString)
+    }
   }
   
   
@@ -130,46 +250,67 @@ object DSL_Test extends FunSuite with BeforeAndAfter {
   // Steps
    
   test("SelectStep") {
-    in = """ SELECT "h1" END """
-    res = DSL.parseAll(DSL.step, in)
+    val in = """ SELECT "h1" END """
+    DSL.parseAll(DSL.step, in) match {
+      case DSL.Success(s:SelectStep[_], _) =>
+      case res => fail(res.toString)
+    }
   }
   
   test("UnquotedSelectStep") {
-    in = """ SELECT h1 END """
-    res = DSL.parseAll(DSL.step, in)
-  }
-  
-  test("BrowseStep") {
-    in = """ BROWSE SELECT "h1" + "suffix" END """
-    res = DSL.parseAll(DSL.step, in)
+    val in = """ SELECT h1 END """
+    DSL.parseAll(DSL.step, in) match {
+      case DSL.Success(s:SelectStep[_], _) =>
+      case res => fail(res.toString)
+    }
   }
   
   test("SelectMaxStep") {
-    in = """ SELECT "h1" MAX 10 END """
-    res = DSL.parseAll(DSL.step, in)
+    val in = """ SELECT "h1" MAX 10 END """
+    DSL.parseAll(DSL.step, in) match {
+      case DSL.Success(s:SelectStep[_], _) =>
+      case res => fail(res.toString)
+    }
+  }
+    
+  test("BrowseSelectStep") {
+    val in = """ BROWSE SELECT "h1" + "suffix" END """
+    DSL.parseAll(DSL.step, in) match {
+      case DSL.Success(s:BrowseStep[_], _) =>
+      case res => fail(res.toString)
+    }
   }
   
-  test("UnquotedBrowseStep") {
-    in = """ BROWSE ATTRIBUTE foo + bar END """
-    res = DSL.parseAll(DSL.step, in)
+  test("BrowseAttributeUnquotedStep") {
+    val in = """ BROWSE ATTRIBUTE foo + bar END """
+    DSL.parseAll(DSL.step, in) match {
+      case DSL.Success(s:BrowseStep[_], _) =>
+      case res => fail(res.toString)
+    }
   }
 
   test("ExtractStep") {
-    in = """ EXTRACT Something SELECT "div" + "suffix" END """
-    res = DSL.parseAll(DSL.step, in)
+    val in = """ EXTRACT Something SELECT "div" + "suffix" END """
+    DSL.parseAll(DSL.step, in) match {
+      case DSL.Success(s:ExtractStep[_], _) =>
+      case res => fail(res.toString)
+    }
   }
   
   test("UnquotedExtractStep") {
-    in = """ EXTRACT Something SELECT h1 + suffix END """
-    res = DSL.parseAll(DSL.step, in)
+    val in = """ EXTRACT Something SELECT h1 + suffix END """
+    DSL.parseAll(DSL.step, in) match {
+      case DSL.Success(s:ExtractStep[_], _) =>
+      case res => fail(res.toString)
+    }
   }     
   
   
   // ############################################
   // Scrapes
   
-  test("SubtitleScrape") {
-        in = """
+  test("GenericScraper") {
+        val in = """
 SCRAPE SUBTITLES ON "FoobarSiteDescription"
   BROWSE "http://www.site.net/search/" + <QUERY>
   SELECT "ul li"
@@ -179,12 +320,14 @@ SCRAPE SUBTITLES ON "FoobarSiteDescription"
       EXTRACT AnotherProperty SELECT "a:eq(2)" ATTRIBUTE href 
       EXTRACT PropClazz-PropName SELECT "a:eq(2)"
 END"""
-    res = DSL(in)
-    //println(res)
+    DSL(in) match {
+      case DSL.Success(((scraper:SubtitleScraper) :: xs), _) =>
+      case res => fail(res.toString)
+    }
   }
   
-  test("RunSubtitleScrape") {
-    in = """
+  test("SubtitleSourceScraper") {
+    val in = """
 SCRAPE SUBTITLES ON "SubtitleSource"
   BROWSE "http://www.subtitlesource.org/search/" + <QUERY>
   SELECT "#searchPage li a"
@@ -200,46 +343,11 @@ SCRAPE SUBTITLES ON "SubtitleSource"
         EXTRACT Subtitle-PageURL       SELECT "a:eq(1)" ATTRIBUTE href AS URL
         EXTRACT Subtitle-Language      SELECT "a:eq(1)" ATTRIBUTE title
 END"""
-    res = DSL(in)
-    
-    import DSL._
-    res match {
-      case pr:ParseResult[List[SubtitleScraper]] => pr match {
-        case Success(scrapers, _) => {
-          for (scraper <- scrapers) {
-            //val res = scraper.scrape("Inception.1080p.BluRay.x264-REFiNED")
-            val res = scraper.scrape("Terminator")
-            println("  " + res.mkString("\n  "))
-          }
-          ()
-        }
-      }
+    DSL(in) match {
+      case DSL.Success(((scraper:SubtitleScraper) :: xs), _) =>
+      case res => fail(res.toString)
     }
-    
   }
-  
-//  test("RunScrape") {
-//    in = """
-//SCRAPE SUBTITLES ON "SubtitleSource"
-// 
-//  BROWSE "http://www.subtitlesource.org/search/" + <QUERY> 
-//  SELECT "#searchPage li a"
-//
-//    BROWSE ATTRIBUTE "href"
-//    
-//    SELECT "td#subtitle-container"
-//      EXTRACT Subtitle-Label SELECT-ATTRIBUTE "a:eq(1)" href
-//      
-//    SELECT "#release-list ul#subtitle-list li"
-//  
-//      EXTRACT Subtitle-DownloadURL   SELECT-ATTRIBUTE "a:eq(1)" href 
-//      EXTRACT Subtitle-PageURL       SELECT-ATTRIBUTE "a:eq(2)" href 
-//      EXTRACT Subtitle-LanguageLabel SELECT-ATTRIBUTE "a:eq(2)" title
-//
-//END"""
-//    res = DSL(in)
-//  }
-  
     
   def main(args: Array[String]): Unit = execute(color = false)
 }

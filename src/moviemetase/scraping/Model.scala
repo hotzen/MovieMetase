@@ -187,6 +187,16 @@ sealed trait Expr
       s.substring(a, b)
     }
   }
+  case class RegexExpr(expr: Expr, pattern: String) extends Expr {
+    val regex = pattern.r
+    // TODO
+//    def apply(s: String): List[(Int,String)] = {
+//      { for (m <- regex.findAllMatchIn(s)) yield {
+//        
+//        (0,"")
+//      }}.toList       
+//    }
+  }
 
 object Expr {
   import language.implicitConversions
@@ -227,5 +237,7 @@ object Expr {
     }
     case substr:SubstrExpr =>
       substr.apply( apply(substr.expr, elem, ctx) )
+    case RegexExpr(e, p) =>
+      throw new UnsupportedOperationException("RegexExpr TODO")
   }
 }

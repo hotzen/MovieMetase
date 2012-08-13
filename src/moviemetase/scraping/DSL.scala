@@ -46,22 +46,22 @@ object DSL extends RegexParsers with PackratParsers {
     case name => AttrExpr(name)
   }
   
-  lazy val selAttrExpr: PackratParser[Expr] = "SELECT" ~> value ~ "ATTRIBUTE" ~ value ^^ {
+  val selAttrExpr: PackratParser[Expr] = "SELECT" ~> value ~ "ATTRIBUTE" ~ value ^^ {
     case s ~ _ ~ a => SelAttrExpr(s, a)
   }
   
   val parensExpr: Parser[Expr] = "(" ~> expr <~ ")"
   
-  lazy val concatExpr: PackratParser[Expr] = expr ~ "+" ~ expr ^^ {
+  val concatExpr: PackratParser[Expr] = expr ~ "+" ~ expr ^^ {
     case e1 ~ _ ~ e2 => ConcatExpr(e1, e2)
   }
 
-  lazy val urlExpr: PackratParser[Expr] = expr ~ "AS" ~ "URL" ^^ {
+  val urlExpr: PackratParser[Expr] = expr ~ "AS" ~ "URL" ^^ {
     case e ~ _ ~ _ => UrlExpr(e)
   }
 
   val substrRegex = """(-?\d+)(([,-])(\d+))?""".r
-  lazy val substrExpr: PackratParser[Expr] = expr ~ "[" ~ regexMatch(substrRegex) ~ "]" ^^ {
+  val substrExpr: PackratParser[Expr] = expr ~ "[" ~ regexMatch(substrRegex) ~ "]" ^^ {
     case e ~ _ ~ m ~ _ => {
       val off = m.group(1).toInt
       m.group(3) match {
@@ -71,11 +71,18 @@ object DSL extends RegexParsers with PackratParsers {
       }
     }
   }
+  
+  // TODO
+  val regexExpr: PackratParser[Expr] = expr ~ "REGEX" ~ quoted ^^ {
+    case e ~ _ ~ p =>
+      RegexExpr(e, p)
+  }
 
-  val basicExpr: PackratParser[Expr] = paramExpr | varExpr | selAttrExpr | selExpr | attrExpr | literalExpr
+  val basicExpr = paramExpr | varExpr | selAttrExpr | selExpr | attrExpr | literalExpr
   val postfixExpr: PackratParser[Expr] = substrExpr | urlExpr
   val binExpr: PackratParser[Expr] = concatExpr
-  val expr: PackratParser[Expr] = parensExpr | postfixExpr | binExpr | basicExpr
+//  val expr: PackratParser[Expr] = postfixExpr | parensExpr | binExpr | basicExpr
+  val expr: PackratParser[Expr] = postfixExpr | binExpr | parensExpr | basicExpr
 
 
   // ############################################
