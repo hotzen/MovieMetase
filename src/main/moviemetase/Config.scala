@@ -2,6 +2,7 @@ package moviemetase
 
 import scala.io.BufferedSource
 import scraping.Scraper
+import org.omg.CORBA.portable.OutputStream
 
 object Config extends Logging {
   val logID = "Config"
@@ -39,7 +40,7 @@ object Config extends Logging {
     val fs = App.dataDir("scraper").listFiles(p).toList
     
     fs.flatMap(f => {
-      info("loading Scraper " + f.getAbsolutePath)
+      info("loading " + f.getAbsolutePath)
       val src = scala.io.Source.fromFile(f)
       val cnt = src.getLines.mkString("\n")
       DSL.apply( cnt ) match {
@@ -50,8 +51,50 @@ object Config extends Logging {
   }
 
   def readFile(name: String): BufferedSource = {
-    val is = App.resourceStream( "/config/" + name )
-    scala.io.Source.fromInputStream(is, "utf-8")
+    import java.io._
+    
+    val resPath = "/config/" + name
+    
+    val configDir = App.dataDir("config")
+    val configFile = new File(configDir, name)
+    val configPath = configFile.getAbsolutePath
+    
+    // if config-file does not exist yet, write the bundled resource file to the config-file
+    if (!configFile.exists)
+      writeResourceToFile(resPath, configPath)
+    
+    info("loading " + configPath)
+      
+    val configIS = new FileInputStream(configFile)
+      
+    // use an additional extra-file if it exists
+    val configExtraFile = new File(configDir, name + ".extra")
+    val configExtraPath = configExtraFile.getAbsolutePath 
+        
+    val is =
+      if (configExtraFile.exists) {
+        info("loading extra " + configExtraPath)
+        val configExtraIS = new FileInputStream(configExtraFile)
+        new java.io.SequenceInputStream(configIS, configExtraIS)
+      } else
+        configIS
+
+    scala.io.Source.fromInputStream(is, "UTF-8")
+  }
+  
+  def writeResourceToFile(resPath: String, filePath: String) {
+    import java.io._
+    import java.nio._
+    
+    val is = App.resourceStream(resPath)
+    val src = channels.Channels.newChannel( is )
+    val dest = new FileOutputStream(new File(filePath)).getChannel
+    try {
+      dest.transferFrom(src, 0, Long.MaxValue)
+    } finally {
+      src.close()
+      dest.close()
+    }
   }
 
   def load() {
