@@ -1,2 +1,0 @@
-# Exclusion-List of dir- & file-names
-sample

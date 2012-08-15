@@ -27,7 +27,7 @@ class MoviesPanel(val top: UI) extends FS_ScrollPane {
   def renderMovies(movies: List[Movie]): Elem =
     <html>
       <head>
-        <style type="text/css">@import url("/res/css/movies.css") screen;</style>
+        <style type="text/css">@import url("/css/movies.css") screen;</style>
       </head>
       <body>
       { movies.map( renderMovie(_) ) }

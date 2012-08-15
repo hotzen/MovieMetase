@@ -27,7 +27,7 @@ object Config {
       map(xs => (xs.head, if (xs.tail.isEmpty) "" else xs.tail.head)).toList
   
   def readFile(name: String): BufferedSource = {
-    val resPath = "/res/config/" + name
+    val resPath = "/config/" + name
     val res = App.resource( resPath ).toURI
     scala.io.Source.fromFile(res, "utf-8")
   }

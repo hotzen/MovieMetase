@@ -20,7 +20,7 @@ object JImage {
   val Caching   = true
   val NoCaching = false
   
-  lazy val LoadingImage: BufferedImage = ImageIO.read( App.resource("/res/img/image-loading.png") ) 
+  lazy val LoadingImage: BufferedImage = ImageIO.read( App.resource("/img/image-loading.png") ) 
 }
 
 class JImage(val url: URL, resizeTo: Option[(Int, Int)], parLoad: Boolean = true, caching: Boolean = true) extends JComponent {

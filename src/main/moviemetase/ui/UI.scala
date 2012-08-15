@@ -28,7 +28,7 @@ object UI {
     
     Swing.onEDT {
       val top = new UI
-      top.iconImage = UI.toolkit.getImage( App.resource("/res/img/icon.png") )
+      top.iconImage = UI.toolkit.getImage( App.resource("/img/icon.png") )
                   
       val screenSize = toolkit.getScreenSize
       top.size = new Dimension(
@@ -124,7 +124,7 @@ class UI extends Frame {
   }
   
   title = App.name + " " + App.version
-  iconImage = UI.toolkit.getImage("/res/icon.png")
+  iconImage = UI.toolkit.getImage("/img/icon.png")
     
   override def closeOperation = App.shutdown()
   

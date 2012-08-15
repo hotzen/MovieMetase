@@ -18,7 +18,7 @@ case class SearchingMoviesByFileFailed(file: FileInfo, t: Throwable) extends Eve
 
 class DropPanel(val top: UI) extends Component {
 
-  override lazy val peer = new JImage( App.resource("/res/img/drop.png"), JImage.OriginalWidth, JImage.Blocking, JImage.NoCaching )
+  override lazy val peer = new JImage( App.resource("/img/drop.png"), JImage.OriginalWidth, JImage.Blocking, JImage.NoCaching )
   
   tooltip = "Drop directories or files or a mix of both here"
     

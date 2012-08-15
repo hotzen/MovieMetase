@@ -1,0 +1,53 @@
+* {
+	margin: 0;
+	padding: 0;
+}
+
+body {
+	background-color: #F0F0F0;
+}
+
+a {
+	font-family: sans-serif;
+	color: #383838;
+	text-decoration: underline;
+}
+
+a:hover {
+	text-decoration: none;
+}
+
+img {
+	border-width: 0px;
+}
+
+.search {
+	background-color: #D6D9DF;
+	border: 1px solid #A8A8A8;
+	margin: 5px;
+	padding: 2px;
+}
+
+.selected {
+	background-color: #D6F0DF;
+	border: 1px solid #8BD12E;
+}
+
+img.main {
+  float: left;
+  width: 20px;
+  border: 0;
+}
+
+.dir, .file {
+  font-family: serif;
+  font-size: 9pt;
+}
+
+.dir {
+  text-decoration: underline;
+}
+
+.file {
+
+}

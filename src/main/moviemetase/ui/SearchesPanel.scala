@@ -43,22 +43,22 @@ class SearchesPanel(val top: UI) extends ScrollPane {
 
       case 0 => (search.status, search.result.length, search.error) match {
         case (Pending,   _, _) =>
-          ("/res/img/internet-bw.png", "queued for execution") 
+          ("/img/internet-bw.png", "queued for execution") 
         
         case (Searching, _, _) =>
-          ("/res/img/internet.png", "searching ...")
+          ("/img/internet.png", "searching ...")
         
         case (Completed, 0, _) =>
-          ("/res/img/minus.png", "completed with no results")
+          ("/img/minus.png", "completed with no results")
         
         case (Completed, 1, _) =>
-          ("/res/img/ok.png", "completed with one result, yay!")
+          ("/img/ok.png", "completed with one result, yay!")
 
         case (Completed, _, _) =>
-          ("/res/img/plus.png", "completed with multiple results")
+          ("/img/plus.png", "completed with multiple results")
 
         case (Failed, _, Some(t)) =>
-          ("/res/img/fail.png", "failed: " + t.getMessage)
+          ("/img/fail.png", "failed: " + t.getMessage)
 
         case x =>
           throw new Exception("invalid search-state: " + x) 
@@ -79,7 +79,7 @@ class SearchesPanel(val top: UI) extends ScrollPane {
         //(search.fileInfo.dirName, search.fileInfo.fileName)
       }
       case 3 =>
-        new ImageIcon(App.resource("/res/img/open-dir.png"))
+        new ImageIcon(App.resource("/img/open-dir.png"))
     }
   }
   
