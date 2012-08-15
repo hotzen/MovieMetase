@@ -9,14 +9,14 @@ import java.net.URL
 import java.awt.Color
 import javax.swing.BorderFactory
 import javax.swing.border.EtchedBorder
-import comp._
 import java.net.URI
 import java.net.URLEncoder
+import javax.swing.UIManager
+import comp._
 
 object UI {
-  def start(): Unit = {
-    import javax.swing.UIManager
-    
+  
+  def show(): Unit = {
     // Look & Feel
     try   { UIManager setLookAndFeel "javax.swing.plaf.nimbus.NimbusLookAndFeel" } 
     catch { case e:Exception => UIManager setLookAndFeel UIManager.getSystemLookAndFeelClassName }

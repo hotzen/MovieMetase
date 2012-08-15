@@ -7,20 +7,18 @@ object App {
   val version = "0.1"
   
   def main(args: Array[String]): Unit = {
-    
     Config.load()
-    
+
     if (args.isEmpty) {
-      ui.UI.start()
+      ui.UI.show()
     } else {
-      //TODO CLI?
+      throw new UnsupportedOperationException("no CLI mode yet")
     }
     
     ()
   }
   
   def shutdown() = {
-    println("shutting down ...")
     TaskManager.shutdown()
     System.exit(0)
   }

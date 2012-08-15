@@ -24,6 +24,7 @@ class StatusBar(val top: UI) extends MigPanel("fillx, aligny center") {
     progressBar.value = stats.completedPercent
     progressBar.paintBorder(true)
     
+    progressBar.tooltip = "Active Tasks " + stats.active + " / Completed Tasks " + stats.completed + " / Total Tasks " + stats.total
     //progressBar.label = stats.active + " / " + stats.total
     //progressBar.labelPainted = false // does not look good, weird font
   }}

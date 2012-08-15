@@ -9,8 +9,8 @@ import java.nio.file.Paths
 object Analyzer {
     
 // ----------------------------------------------  
-  def isTag(s: String):  Boolean = Config.tags contains s.toLowerCase
-  def isExt(s: String):  Boolean = Config.exts contains s.toLowerCase
+  def isTag(s: String):  Boolean = Config.releaseTags contains s.toLowerCase
+  def isExt(s: String):  Boolean = Config.videoExts contains s.toLowerCase
 
 // ----------------------------------------------
   type Tokens = List[String]
@@ -20,7 +20,7 @@ object Analyzer {
   def tokenize(in: String): Tokens = {
     var s = in.toLowerCase
     
-    for ( (a,b) <- Config.replMap )
+    for ( (a,b) <- Config.tokenRepl )
       s = s.replace(a, b)
     
     TokenSplitRegex.split(s).map(_.trim).filter(!_.isEmpty).toList
@@ -185,8 +185,8 @@ object Dissected {
   
   def sim(d1: Dissected, d2: Dissected, exact: Boolean = true): (Float, Float) = {
     val simNames = Analyzer.sim(
-      d1.names.filter(!Config.simExcludes.contains(_)),
-      d2.names.filter(!Config.simExcludes.contains(_))
+      d1.names.filter(!Config.stopWords.contains(_)),
+      d2.names.filter(!Config.stopWords.contains(_))
     )
     val simTags  = Analyzer.sim(d1.tags, d2.tags)
     (simNames, simTags)
