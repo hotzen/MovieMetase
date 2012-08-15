@@ -1,14 +1,14 @@
 #Fat Jar Configuration File
-#Wed Aug 15 20:54:04 CEST 2012
+#Wed Aug 15 21:05:46 CEST 2012
 onejar.license.required=false
-manifest.classpath=/lib/
+manifest.classpath=
 manifest.removesigners=true
 onejar.checkbox=true
-jarname=MovieMetase_fat.jar
+jarname=dist\\MovieMetase_fat.jar
 manifest.mergeall=true
 manifest.mainclass=moviemetase.App
 manifest.file=<createnew>
 jarname.isextern=false
 onejar.expand=
-excludes=<po|MovieMetase>~Inception.1080p.BluRay.x264-REFiNED/;<po|MovieMetase>~moviemetase/~test/;<jar|scala-actors.jar>;<jar|scala-reflect.jar>;<jar|xml-apis-xerces-2.9.1.jar>;<jar|scalatest_2.10.0-M6-1.9-2.10.0-M6-B2.jar>
-includes=<inc|MovieMetase/res>
+excludes=<po|MovieMetase>~Inception.1080p.BluRay.x264-REFiNED/;<po|MovieMetase>~moviemetase/~test/;<po|MovieMetase>~path-probs.txt;<po|MovieMetase>~path.txt;<jar|scala-actors.jar>;<jar|scala-reflect.jar>;<jar|core-renderer-minimal.jar>;<jar|scalatest_2.10.0-M6-1.9-2.10.0-M6-B2.jar>
+includes=

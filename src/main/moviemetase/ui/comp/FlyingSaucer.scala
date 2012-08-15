@@ -47,7 +47,7 @@ class FS_UserAgent extends NaiveUserAgent { // UserAgentCallback {
   // load css as resources from classpath
   override def getCSSResource(uri: String): CSSResource = {
     //println("loading css " + uri)
-    val is = App.resource(uri).openStream()
+    val is = App.resourceStream(uri)
     new CSSResource(is)
   }
 

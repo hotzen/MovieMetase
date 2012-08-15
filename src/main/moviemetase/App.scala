@@ -27,12 +27,18 @@ object App {
 
   def resource(path: String): java.net.URL = {
     val url = this.getClass.getResource(path)
-    //val url = ClassLoader.getSystemResource( path )
     if (url == null)
       throw new IOException("resource '" + path + "' does not exist")
     url
   }
-
+  
+  def resourceStream(path: String): java.io.InputStream = {
+    val is = this.getClass.getResourceAsStream(path)
+    if (is == null)
+      throw new IOException("resource '" + path + "' does not exist")
+    is
+  }
+  
   val userDir: java.io.File = new java.io.File( util.Properties.userHome )
 
   def dataDir(subDirName: String = ""): java.io.File = {
