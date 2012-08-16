@@ -139,6 +139,22 @@ object DSL_Test extends FunSuite {
       case res => fail(res.toString)
     }
   }
+  
+  test("ParamExpr") {
+    val in = """ <FOO> """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(ParamExpr(_, None), _) =>
+      case res => fail(res.toString)
+    }
+  }
+  
+  test("ParamDefaultExpr") {
+    val in = """ <FOO> DEFAULT bar """
+    DSL.parseAll(DSL.expr, in) match {
+      case DSL.Success(ParamExpr(_, Some(_)), _) =>
+      case res => fail(res.toString)
+    }
+  }
     
   test("SubstrExpr1") {
     val in = """ "foo"[1] """
@@ -340,12 +356,37 @@ SCRAPE SUBTITLES ON "SubtitleSource"
       SELECT "#subtitle-list li"
         EXTRACT Subtitle-DownloadURL   SELECT "a:eq(0)" ATTRIBUTE href AS URL 
         EXTRACT Subtitle-PageURL       SELECT "a:eq(1)" ATTRIBUTE href AS URL
-        EXTRACT Subtitle-Language      SELECT "a:eq(1)" ATTRIBUTE title
+        EXTRACT Subtitle-LangText      SELECT "a:eq(1)" ATTRIBUTE title
 END"""
     DSL(in) match {
       case res@DSL.Success(((scraper:SubtitleScraper) :: xs), _) => {
         println(res)
-        println( scraper.scrape("Inception.1080p.BluRay.x264-REFiNED").mkString("\n") )
+        
+        val params = ("QUERY" -> "Inception.1080p.BluRay.x264-REFiNED") :: Nil
+        //println( scraper.execute(params).mkString("\n") )
+      }
+      case res => fail(res.toString)
+    }
+  }
+  
+  test("PodnapisiScraper") {
+    val in = """
+ SCRAPE SUBTITLES ON "Podnapisi.net"
+  SET $LANG = <PODNAPISI_LANG> DEFAULT "5,2" AS URL-ENCODED # english, german
+  BROWSE "http://www.podnapisi.net/en/ppodnapisi/search?sJ=" + $LANG + "&sK=" + <QUERY>
+  
+  SELECT "tr"
+    EXTRACT Subtitle-Label SELECT "a.subtitle_page_link"
+    EXTRACT Subtitle-PageURL SELECT "a.subtitle_page_link" ATTRIBUTE href AS URL
+    EXTRACT Subtitle-LangText SELECT "div.flag" ATTRIBUTE alt 
+    EXTRACT Subtitle-ReleaseText SELECT ".release"
+END"""
+    DSL(in) match {
+      case res@DSL.Success(((scraper:SubtitleScraper) :: xs), _) => {
+        println(res)
+        
+        val params = ("QUERY" -> "Inception.1080p.BluRay.x264-REFiNED") :: Nil
+        println( scraper.execute(params).mkString("\n") )
       }
       case res => fail(res.toString)
     }

@@ -6,21 +6,28 @@ import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import scala.collection._
 
-// context while processing an element inside a step 
-case class Context[A](url: URL, extracts: List[(String, String)], factory: Factory[A],
-                      params: Map[String, String], vars: Map[String, String]) {
-  
+object Contexet {
+  def defaultParams: Map[String, String] = {
+    val locale = java.util.Locale.getDefault
+    ("LANG" -> locale.getLanguage) ::
+    ("LANG_ISO3" -> locale.getISO3Language) ::
+    Nil
+  }.toMap
+}
+
+case class Context[A](url: URL, extracts: List[(String, String)], factory: Factory[A], params: Map[String, String], vars: Map[String, String]) {
+
   def setURL(url: URL): Context[A] =
     Context(url, extracts, factory, params, vars)
   
   def addExtract(name: String, value: String): Context[A] =
     Context(url, (name, value) :: extracts, factory, params, vars)
   
-  def setParam(n: String, v: String): Context[A] =
-    Context(url, extracts, factory, params + (n -> v), vars)
+  def setParam(name: String, value: String): Context[A] =
+    Context(url, extracts, factory, params - name + (name -> value), vars)
     
-  def setVar(n: String, v: String): Context[A] =
-    Context(url, extracts, factory, params, vars + (n -> v))
+  def setVar(name: String, value: String): Context[A] =
+    Context(url, extracts, factory, params, vars - name + (name -> value))
 }
 
 trait Step[A] {
@@ -50,22 +57,36 @@ case class FinalStep[A]() extends Step[A] with Logging {
   override def toString = "End"
 }
 
-case class BrowseStep[A](expr: Expr, next: Step[A], force: Option[String]) extends Step[A] with TracingStep with Logging {
+case class BrowseStep[A](expr: Expr, postData: List[(String,String)], forceCtxUrl: Option[String], next: Step[A]) extends Step[A] with TracingStep with Logging {
   val logID = "Browse"
   
   def loadDoc(theUrl: URL): Document = new HtmlTask[Document] {
     def url = theUrl
+        
+    RequestMethod = if (postData.isEmpty) "GET" else "POST"
+    RequestData = Some(os => {
+      import java.io.OutputStreamWriter
+      import java.net.URLEncoder
+      val osw = new OutputStreamWriter(os)
+      val data =
+        for ((k,v) <- postData)
+          yield URLEncoder.encode(k, "UTF-8") + "=" + URLEncoder.encode(v, "UTF-8")
+      osw.write( data.mkString("&") )
+      osw.flush()
+      osw.close()
+    })
+    
     def processDocument(doc: Document): Document = doc
-  }.execute()
+  }.submit().get() // enforce utiliziation of proper pool
 
   def process(elem: Element, ctx: Context[A]): List[A] = {
-    val value = Expr.apply(expr, elem, ctx)
+    val value = expr.apply(elem, ctx)
     val url = new URL(value)
     
     if (tracing)
       trace(url.toExternalForm)
       
-    val ctxUrl = force match {
+    val ctxUrl = forceCtxUrl match {
       case Some(f) => new URL(f)
       case None => url
     }
@@ -81,20 +102,31 @@ case class SelectStep[A](selector: String, max: Int, next: Step[A]) extends Step
   import language.implicitConversions
   implicit def jiter[A](jiter: java.util.Iterator[A]): Iterator[A] =
     scala.collection.convert.Wrappers.JIteratorWrapper[A]( jiter )
- 
+      
   val logID = "Select(" + selector + { if (max < Int.MaxValue) ", Max="+max else "" } + ")"
-    
+  
+//  private def task(elem: Element, ctx: Context[A]): Task[List[A]] = new Task[List[A]] {
+//    def execute(): List[A] = next.process(elem, ctx)
+//  }
+  
   def process(elem: Element, ctx: Context[A]): List[A] = {
-    val selElems = elem.select(selector)
+    val selElemsJIter = elem.select(selector)
     
-    if (selElems.isEmpty)
+    if (selElemsJIter.isEmpty)
       warn("no match!")
     else if (tracing)
-      trace("selected " + selElems.size)
-      
-    selElems.iterator.take(max).flatMap(selElem => {
-      next.process(selElem, ctx)
-    }).toList
+      trace("selected " + selElemsJIter.size)
+    
+    val selElems = selElemsJIter.iterator.take(max).toList
+    if (selElems.isEmpty)
+      Nil
+    else {
+      //XXX really fork join each select-result?
+      //val hd = next.process(selElems.head, ctx)
+      //val tl = selElems.tail.map( task(_, ctx) ).map( _.submit ).map( _.get ) // fork-join
+      //(hd :: tl).flatten
+      selElems.flatMap(selElem => next.process(selElem, ctx))
+    }
   }
   
   override def toString = "Select("+selector+")\n  " + next.toString
@@ -108,7 +140,7 @@ case class ExtractStep[A](name: String, expr: Expr, next: Step[A]) extends Step[
   val logID = "Extract(" + name + ")"
   
   def process(elem: Element, ctx: Context[A]): List[A] = {
-    val value = Expr.apply(expr, elem, ctx)
+    val value = expr.apply(elem, ctx)
     if (tracing)
       trace("extracted " + name + ": '" + value + "'")
     next.process(elem, ctx.addExtract(name, value))
@@ -121,10 +153,10 @@ case class BindVarStep[A](name: String, expr: Expr, next: Step[A]) extends Step[
   val logID = "BindVar(" + name + ")"
   
   def process(elem: Element, ctx: Context[A]): List[A] = {
-    val value = Expr.apply(expr, elem, ctx)
+    val value = expr.apply(elem, ctx)
     if (tracing)
       trace("'" + value + "'")
-
+    
     next.process(elem, ctx setVar (name, value))
   }
     
@@ -135,114 +167,128 @@ trait Scraper[A] {
   def start: Step[A]
   def factory: Factory[A]
   
-  def scrape(query: String): List[A] = {
-    val baseURL = new URL("http://initial.net/")
+  def execute(params: List[(String, String)]): List[A] = {
+    val url  = new URL("http://initial.net/")
     val html = """<html><head></head><body></body></html>"""
-    val doc = org.jsoup.Jsoup.parse(html)
-    val elem = doc.body
-    
-    val args = Map[String, String](
-      "QUERY" -> query
-    )
+    val doc  = org.jsoup.Jsoup.parse(html)
     val vars = Map[String, String]()
-    val ctx = Context[A](baseURL, Nil, factory, args, vars)
-    
-    start.process(elem, ctx)
+
+    val ctx = Context[A](url, Nil, factory, params.toMap, vars)
+    start.process(doc.body, ctx)
   }
   
   override def toString = "Scraper: " + start.toString
 }
 
 
-sealed trait Expr
-  case class LitExpr(s: String) extends Expr
-  case class ParamExpr(name: String) extends Expr
-  case class VarExpr(name: String) extends Expr
-  case class SelExpr(selector: String) extends Expr
-  case class AttrExpr(name: String) extends Expr
-  case class SelAttrExpr(selector: String, name: String) extends Expr
-  case class UrlExpr(e: Expr) extends Expr
-  case class ConcatExpr(a: Expr, b: Expr) extends Expr
-  trait SubstrExpr extends Expr {
-    def expr: Expr
-    def absPos(pos: Int, len: Int): Int = if (pos < 0) len + pos else pos
-    def apply(s: String): String
-  }
-  case class SubstrEndExpr(expr: Expr, off: Int) extends SubstrExpr {
-    def apply(s: String): String =
-      s.substring(absPos(off, s.length))
-  }
-  case class SubstrLenExpr(expr: Expr, off: Int, len: Int) extends SubstrExpr {
-    def apply(s: String): String = {
-      val a = absPos(off, s.length)
-      val b = a + len
-      s.substring(a, b)
-    }
-  }
-  case class SubstrPosExpr(expr: Expr, off: Int, pos: Int) extends SubstrExpr {
-    def apply(s: String): String = {
-      val len = s.length
-      val a = absPos(off, len)
-      val b = absPos(pos, len)
-      s.substring(a, b)
-    }
-  }
-  case class RegexExpr(expr: Expr, pattern: String) extends Expr {
-    val regex = pattern.r
-    // TODO
-//    def apply(s: String): List[(Int,String)] = {
-//      { for (m <- regex.findAllMatchIn(s)) yield {
-//        
-//        (0,"")
-//      }}.toList       
-//    }
-  }
-//  case class ScriptExpr(script: String) extends Expr {
-//    def apply(elem: Element, ctx: Context[_]): String = {
-//      "TODO" // TODO
-//    }
-//  }
 
-object Expr {
-  import language.implicitConversions
-  implicit def jiter[A](jiter: java.util.Iterator[A]): Iterator[A] =
-    scala.collection.convert.Wrappers.JIteratorWrapper[A]( jiter )
-      
-  def apply(e: Expr, elem: Element, ctx: Context[_]): String = e match {
-    case LitExpr(s) => s
-    case ParamExpr(name) => ctx.params.get(name) match {
+// **********************************************
+// Expressions
+
+sealed trait Expr {
+  def apply(elem: Element, ctx: Context[_]): String
+}
+
+case class LitExpr(s: String) extends Expr {
+  def apply(elem: Element, ctx: Context[_]): String = s
+}
+
+case class ParamExpr(name: String, default: Option[String]) extends Expr {
+  def apply(elem: Element, ctx: Context[_]): String = ctx.params.get(name) match {
+    case Some(v) => v
+    case None => default match {
       case Some(v) => v
-      case None => throw new Exception("invalid parameter '" + name + "'")
+      case None => throw new IllegalArgumentException("no default value specified for parameter '" + name + "'") 
     }
-    case VarExpr(name) => ctx.vars.get(name) match {
-      case Some(v) => v
-      case None => throw new Exception("invalid variable '" + name + "'")
-    }  
-    case SelExpr(sel) => {
-      val elems = elem.select(sel)
-      if (elems.size == 0) ""
-      else elems.get(0).text
-    }
-    case AttrExpr(attr) =>
-      elem.attr(attr)
-    case SelAttrExpr(sel, attr) => {
-      val elems = elem.select(sel)
-      if (elems.size == 0) ""
-      else elems.get(0).attr(attr)
-    }
-    case UrlExpr(e) => {
-      val s = apply(e, elem, ctx)
-      new URL(ctx.url, s).toExternalForm
-    }
-    case ConcatExpr(a, b) => {
-      val sb = new StringBuilder
-      sb append apply(a, elem, ctx)
-      sb append apply(b, elem, ctx)
-      sb.toString
-    }
-    case substr:SubstrExpr =>
-      substr.apply( apply(substr.expr, elem, ctx) )
-    case RegexExpr(e, p) =>
-      throw new UnsupportedOperationException("RegexExpr TODO")
   }
 }
+
+case class VarExpr(name: String) extends Expr {
+  def apply(elem: Element, ctx: Context[_]): String = ctx.vars.get(name) match {
+    case Some(v) => v
+    case None => throw new IllegalArgumentException("invalid variable '" + name + "'")
+  }
+}
+
+case class SelExpr(selector: String) extends Expr {
+  def apply(elem: Element, ctx: Context[_]): String = {
+    val elems = elem.select(selector)
+    if (elems.size == 0) ""
+    else elems.get(0).text
+  }
+}
+
+case class AttrExpr(name: String) extends Expr {
+  def apply(elem: Element, ctx: Context[_]): String = {
+    val value = elem.attr(name)
+    if (value == null) ""
+    else value
+  }
+}
+
+case class SelAttrExpr(selector: String, name: String) extends Expr {
+  def apply(elem: Element, ctx: Context[_]): String = {
+    val elems = elem.select(selector)
+    if (elems.size == 0) ""
+    else {
+      val value = elems.get(0).attr(name)
+      if (value == null) ""
+      else value
+    }
+  }
+}
+
+case class UrlExpr(e: Expr) extends Expr {
+  def apply(elem: Element, ctx: Context[_]): String = {
+    val s = e.apply(elem, ctx)
+    new URL(ctx.url, s).toExternalForm
+  }
+}
+
+case class UrlEncExpr(e: Expr) extends Expr {
+  def apply(elem: Element, ctx: Context[_]): String = {
+    val s = e.apply(elem, ctx)
+    java.net.URLEncoder.encode(s, "UTF-8")
+  }
+}
+
+case class ConcatExpr(a: Expr, b: Expr) extends Expr {
+  def apply(elem: Element, ctx: Context[_]): String = {
+    val sb = new StringBuilder
+    sb append a.apply(elem, ctx)
+    sb append b.apply(elem, ctx)
+    sb.toString
+  }
+}
+
+trait SubstrExpr extends Expr {
+  def expr: Expr
+  def absPos(pos: Int, len: Int): Int = if (pos < 0) len + pos else pos
+  def apply(s: String): String
+  
+  def apply(elem: Element, ctx: Context[_]): String =
+    apply( expr.apply(elem, ctx) )
+}
+
+case class SubstrEndExpr(expr: Expr, off: Int) extends SubstrExpr {
+  def apply(s: String): String =
+    s.substring(absPos(off, s.length))
+}
+
+case class SubstrLenExpr(expr: Expr, off: Int, len: Int) extends SubstrExpr {
+  def apply(s: String): String = {
+    val a = absPos(off, s.length)
+    val b = a + len
+    s.substring(a, b)
+  }
+}
+
+case class SubstrPosExpr(expr: Expr, off: Int, pos: Int) extends SubstrExpr {
+  def apply(s: String): String = {
+    val len = s.length
+    val a = absPos(off, len)
+    val b = absPos(pos, len)
+    s.substring(a, b)
+  }
+}
+// TODO RegexExpr

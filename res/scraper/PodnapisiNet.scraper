@@ -1,0 +1,13 @@
+# Subtitlesource.org Scraper Version 0.1
+# allowed selectors: http://jsoup.org/apidocs/org/jsoup/select/Selector.html
+
+SCRAPE SUBTITLES ON "Podnapisi.net"
+  TRACE SET $LANG = ( <PODNAPISI_LANG> DEFAULT "5,2" AS URL-ENCODED ) # english, german
+  BROWSE "http://www.podnapisi.net/en/ppodnapisi/search?sJ=" + $LANG + "&sK=" + <QUERY>
+  
+  SELECT "tr"
+    EXTRACT Subtitle-Label SELECT "a.subtitle_page_link"
+    EXTRACT Subtitle-PageURL SELECT "a.subtitle_page_link" ATTRIBUTE href AS URL
+    EXTRACT Subtitle-LangText SELECT "div.flag" ATTRIBUTE alt 
+    EXTRACT Subtitle-ReleaseText SELECT ".release"
+END

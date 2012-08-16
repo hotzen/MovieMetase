@@ -294,7 +294,7 @@ trait HttpTask[A] extends IOTask[A] {
   // POSTing data ...
   var RequestContentType: Option[String] = None
   var RequestData: Option[OutputStream => Unit] = None
-  
+    
   // basic browser-mimicry
   var UserAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:14.0) Gecko/20100101 Firefox/14.0.1"
   var Referer   = "http://stackoverflow.com/questions/tagged/referer" 

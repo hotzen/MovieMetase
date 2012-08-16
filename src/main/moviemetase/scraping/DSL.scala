@@ -28,8 +28,9 @@ object DSL extends RegexParsers with PackratParsers {
   val literalExpr = value ^^ { case s => LitExpr(s) }
   
   val paramName = """[A-Z]+""".r
-  val paramExpr = "<" ~> paramName <~ ">" ^^ {
-    case name => ParamExpr(name)
+  val paramDefault = "DEFAULT" ~> value
+  val paramExpr = "<" ~ paramName ~ ">" ~ opt(paramDefault) ^^ {
+    case _ ~ name ~ _ ~ default => ParamExpr(name, default)
   }
   
   val varName = """[A-Z]+""".r
@@ -59,6 +60,10 @@ object DSL extends RegexParsers with PackratParsers {
   val urlExpr: PackratParser[Expr] = expr ~ "AS" ~ "URL" ^^ {
     case e ~ _ ~ _ => UrlExpr(e)
   }
+  
+  val urlEncExpr: PackratParser[Expr] = expr ~ "AS" ~ "URL-ENCODED" ^^ {
+    case e ~ _ ~ _ => UrlEncExpr(e)
+  }
 
   val substrRegex = """(-?\d+)(([,-])(\d+))?""".r
   val substrExpr: PackratParser[Expr] = expr ~ "[" ~ regexMatch(substrRegex) ~ "]" ^^ {
@@ -73,10 +78,10 @@ object DSL extends RegexParsers with PackratParsers {
   }
   
   // TODO
-  val regexExpr: PackratParser[Expr] = expr ~ "REGEX" ~ quoted ^^ {
-    case e ~ _ ~ p =>
-      RegexExpr(e, p)
-  }
+//  val regexExpr: PackratParser[Expr] = expr ~ "REGEX" ~ quoted ^^ {
+//    case e ~ _ ~ p =>
+//      RegexExpr(e, p)
+//  }
   
 //  val scriptRegex: PackratParser[Expr] = "{{{" ~ """[^\}]+""".r ~ "}}}" ^^ {
 //    case _ ~ script ~ _ =>
@@ -84,9 +89,8 @@ object DSL extends RegexParsers with PackratParsers {
 //  }
 
   val basicExpr = paramExpr | varExpr | selAttrExpr | selExpr | attrExpr | literalExpr
-  val postfixExpr: PackratParser[Expr] = substrExpr | urlExpr
+  val postfixExpr: PackratParser[Expr] = substrExpr | urlEncExpr | urlExpr
   val binExpr: PackratParser[Expr] = concatExpr
-//  val expr: PackratParser[Expr] = postfixExpr | parensExpr | binExpr | basicExpr
   val expr: PackratParser[Expr] = postfixExpr | binExpr | parensExpr | basicExpr
 
 
@@ -95,9 +99,15 @@ object DSL extends RegexParsers with PackratParsers {
   val trace = opt("TRACE") ^^ { _.isDefined }
   
   val browseAsUrl = "AS" ~> value
-  val browseStep: Parser[Step[_]] = trace ~ "BROWSE" ~ expr ~ opt(browseAsUrl) ~ step ^^ {
-    case t ~ _ ~ e ~ url ~ next =>
-      BrowseStep(e, next, url).trace(t)
+  val browsePostData = "POST" ~> rep1(value ~ "=" ~ value)
+  val browseStep: Parser[Step[_]] = trace ~ "BROWSE" ~ expr ~ opt(browseAsUrl) ~ opt(browsePostData) ~ step ^^ {
+    case t ~ _ ~ e ~ url ~ pd ~ next => {
+      val postData = pd match {
+        case Some(xs) => for (x <- xs) yield x match { case k ~ _ ~ v => (k, v)  }
+        case None => Nil
+      }
+      BrowseStep(e, postData, url, next).trace(t)
+    }
   }
   
   val selectMax = "MAX" ~> int ^^ { case i => i.toInt }

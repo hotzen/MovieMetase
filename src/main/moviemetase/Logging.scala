@@ -4,68 +4,62 @@ import java.io.PrintWriter
 import java.util.Date
 
 object LogLevel {
-  val Trace = LogLevel(2,  "trace")
-  val Info  = LogLevel(4,  "info")
-  val Warn  = LogLevel(8,  "warn")
-  val Error = LogLevel(16, "ERROR")
+  val Trace = LogLevel(1, "trace")
+  val Info  = LogLevel(2, "info")
+  val Warn  = LogLevel(3, "warn")
+  val Error = LogLevel(4, "ERROR")
 }
-
-case class LogLevel(id: Int, label: String) {
-  override def equals(a: Any): Boolean = a match {
-    case LogLevel(x, _) => (x == id)
-    case _ => false
-  }
-}
+case class LogLevel(id: Int, name: String)
 
 object Logging {
-  var out: PrintWriter = new PrintWriter( System.out )
-  
+  @volatile var out: PrintWriter = new PrintWriter( System.out )
   @volatile var level: LogLevel = LogLevel.Info
-
-  var TimestampFormat: java.text.DateFormat = new java.text.SimpleDateFormat("HH:mm:ss")
+  //var TimestampFormat: java.text.DateFormat = new java.text.SimpleDateFormat("HH:mm:ss")
 }
 
 trait Logging {
   def logLevel: LogLevel  = Logging.level 
   def logOut: PrintWriter = Logging.out 
-  
-  def logID:  String
-  
-  def isLogging(lvl: LogLevel): Boolean = (lvl.id >= logLevel.id)
-  
-  private val logBuf = new StringBuffer()
-  
+  def logID: String
+    
+  final def isLogging(lvl: LogLevel): Boolean = (lvl.id >= logLevel.id)
   final def trace(msg: =>String, infos: List[(String,Any)] = Nil): Unit = log(LogLevel.Trace, msg, infos)
-  
-  final def info(msg: String, infos: List[(String,Any)] = Nil): Unit = log(LogLevel.Info,  msg, infos)
-  
-  final def warn(msg: String, infos: List[(String,Any)] = Nil): Unit = log(LogLevel.Warn,  msg, infos)
-  
+  final def info(msg: String, infos: List[(String,Any)] = Nil): Unit = log(LogLevel.Info, msg, infos)
+  final def warn(msg: String, infos: List[(String,Any)] = Nil): Unit = log(LogLevel.Warn, msg, infos)
+  final def error(thrown: Throwable, msg: String): Unit = log(LogLevel.Error, msg, ("exception" -> thrown) :: Nil)
   final def error(msg: String, infos: List[(String,Any)] = Nil): Unit = log(LogLevel.Error, msg, infos)
   
-  def log(lvl: LogLevel, msg: String, infos: List[(String,Any)]): Unit = {
+  private val buf = new StringBuffer()
+  final def log(lvl: LogLevel, msg: String, infos: List[(String,Any)]) {
     if (!isLogging(lvl))
       return
     
-    logBuf setLength 0 // reset
+    buf setLength 0 // reset
 
-    logBuf append "[" append Thread.currentThread.getName append "] "
-    logBuf append "[" append lvl.label append "] "
-    //logBuf append Logging.TimestampFormat.format( new Date() ) 
-    logBuf append " " append logID append " " //append "\t"
-    logBuf append msg
+    //buf append "[" append Thread.currentThread.getName append "] "
+    buf append "[" append lvl.name append "] "
+    //buf append Logging.TimestampFormat.format( new Date() ) 
+    buf append " " append logID append " " //append "\t"
+    buf append msg
     
     if (!infos.isEmpty) {
-      logBuf append " {"
+      buf append " {"
       for ((k,v) <- infos)
-        logBuf append k append "='" append v append "'"
-      logBuf append "}"
+        buf append k append "='" append v append "'"
+      buf append "}"
+      
+      infos.collect({case (_, t:Throwable) => t}).map(t => {
+        val sw = new java.io.StringWriter()
+        val pw = new java.io.PrintWriter(sw)
+        t.printStackTrace(pw)
+        buf append "\n" append sw.toString
+      })
     }
-     
-    val out = logOut
-    out synchronized {
-      out.println( logBuf.toString )
-      out.flush()
+    
+    val s = buf.toString
+    logOut synchronized {
+      logOut.println( s )
+      logOut.flush()
     }
   }
 }
