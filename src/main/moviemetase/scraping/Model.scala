@@ -5,11 +5,13 @@ import java.net.URL
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import scala.collection._
+import org.jsoup.select.Elements
 
-object Contexet {
+object Context {
   def defaultParams: Map[String, String] = {
     val locale = java.util.Locale.getDefault
     ("LANG" -> locale.getLanguage) ::
+    ("LANG_ISO2" -> locale.getLanguage) ::
     ("LANG_ISO3" -> locale.getISO3Language) ::
     Nil
   }.toMap
@@ -34,15 +36,6 @@ trait Step[A] {
   def process(elem: Element, ctx: Context[A]): List[A]
 }
 
-trait TracingStep {
-  var tracing = false
-  
-  def trace(on: Boolean): this.type = {
-    tracing = on
-    this
-  }
-}
-
 case class FinalStep[A]() extends Step[A] with Logging {
   val logID = "Final"
   
@@ -57,7 +50,43 @@ case class FinalStep[A]() extends Step[A] with Logging {
   override def toString = "End"
 }
 
-case class BrowseStep[A](expr: Expr, postData: List[(String,String)], forceCtxUrl: Option[String], next: Step[A]) extends Step[A] with TracingStep with Logging {
+case class Selector(sel: String, idx: Int, max: Int) extends Traceable with Logging {
+  import language.implicitConversions
+  implicit def jiter[A](jiter: java.util.Iterator[A]): Iterator[A] =
+    scala.collection.convert.Wrappers.JIteratorWrapper[A]( jiter )
+
+  val logID = "Selector(" + sel + 
+                { if (idx >= 0) ", idx="+idx else "" } + 
+                { if (max >= 0) ", max="+max else "" } + ")"
+    
+  def apply(elem: Element): List[Element] = {
+    val selElemsJIter = elem.select(sel)
+    
+    if (tracing)
+      if (selElemsJIter.isEmpty) warn("no match")
+      else trace(selElemsJIter.size + " selected")
+    
+    if (selElemsJIter.isEmpty)
+      return Nil
+    
+    val iter = selElemsJIter.iterator
+      
+    val idxd = 
+      if (idx < 0)
+        iter.toList
+      else
+        try { iter.toList(idx) :: Nil }
+        catch { case e:IndexOutOfBoundsException => Nil }
+    
+    val maxd =
+      if (max < 0) idxd
+      else idxd.take(max)
+    
+    maxd
+  }
+}
+
+case class BrowseStep[A](expr: Expr, postData: List[(String,String)], forceCtxUrl: Option[String], next: Step[A]) extends Step[A] with Traceable with Logging {
   val logID = "Browse"
   
   def loadDoc(theUrl: URL): Document = new HtmlTask[Document] {
@@ -98,35 +127,15 @@ case class BrowseStep[A](expr: Expr, postData: List[(String,String)], forceCtxUr
   override def toString = "Browse(" + expr + ")\n  " + next.toString
 }
 
-case class SelectStep[A](selector: String, max: Int, next: Step[A]) extends Step[A] with TracingStep with Logging {
+case class SelectStep[A](selector: Selector, next: Step[A]) extends Step[A] with Traceable with Logging {
   import language.implicitConversions
   implicit def jiter[A](jiter: java.util.Iterator[A]): Iterator[A] =
     scala.collection.convert.Wrappers.JIteratorWrapper[A]( jiter )
       
-  val logID = "Select(" + selector + { if (max < Int.MaxValue) ", Max="+max else "" } + ")"
-  
-//  private def task(elem: Element, ctx: Context[A]): Task[List[A]] = new Task[List[A]] {
-//    def execute(): List[A] = next.process(elem, ctx)
-//  }
+  val logID = "Select(" + selector + ")"
   
   def process(elem: Element, ctx: Context[A]): List[A] = {
-    val selElemsJIter = elem.select(selector)
-    
-    if (selElemsJIter.isEmpty)
-      warn("no match!")
-    else if (tracing)
-      trace("selected " + selElemsJIter.size)
-    
-    val selElems = selElemsJIter.iterator.take(max).toList
-    if (selElems.isEmpty)
-      Nil
-    else {
-      //XXX really fork join each select-result?
-      //val hd = next.process(selElems.head, ctx)
-      //val tl = selElems.tail.map( task(_, ctx) ).map( _.submit ).map( _.get ) // fork-join
-      //(hd :: tl).flatten
-      selElems.flatMap(selElem => next.process(selElem, ctx))
-    }
+    selector.trace(tracing).apply(elem).flatMap(selElem => next.process(selElem, ctx))
   }
   
   override def toString = "Select("+selector+")\n  " + next.toString
@@ -136,27 +145,26 @@ trait Factory[A] {
   def create(extracts: List[(String,String)]): List[A]
 }
 
-case class ExtractStep[A](name: String, expr: Expr, next: Step[A]) extends Step[A] with TracingStep with Logging {
+case class ExtractStep[A](name: String, expr: Expr, next: Step[A]) extends Step[A] with Traceable with Logging {
   val logID = "Extract(" + name + ")"
   
   def process(elem: Element, ctx: Context[A]): List[A] = {
     val value = expr.apply(elem, ctx)
     if (tracing)
-      trace("extracted " + name + ": '" + value + "'")
+      trace("'" + value + "'")
     next.process(elem, ctx.addExtract(name, value))
   }
     
   override def toString = "Extract(" + name + ", " + expr + ")\n  " + next.toString
 }
 
-case class BindVarStep[A](name: String, expr: Expr, next: Step[A]) extends Step[A] with TracingStep with Logging {
+case class BindVarStep[A](name: String, expr: Expr, next: Step[A]) extends Step[A] with Traceable with Logging {
   val logID = "BindVar(" + name + ")"
   
   def process(elem: Element, ctx: Context[A]): List[A] = {
     val value = expr.apply(elem, ctx)
     if (tracing)
       trace("'" + value + "'")
-    
     next.process(elem, ctx setVar (name, value))
   }
     
@@ -185,7 +193,7 @@ trait Scraper[A] {
 // **********************************************
 // Expressions
 
-sealed trait Expr {
+sealed trait Expr extends Traceable {
   def apply(elem: Element, ctx: Context[_]): String
 }
 
@@ -210,11 +218,9 @@ case class VarExpr(name: String) extends Expr {
   }
 }
 
-case class SelExpr(selector: String) extends Expr {
+case class SelExpr(selector: Selector) extends Expr {
   def apply(elem: Element, ctx: Context[_]): String = {
-    val elems = elem.select(selector)
-    if (elems.size == 0) ""
-    else elems.get(0).text
+    selector.apply(elem).map(_.text).mkString("")
   }
 }
 
@@ -226,15 +232,12 @@ case class AttrExpr(name: String) extends Expr {
   }
 }
 
-case class SelAttrExpr(selector: String, name: String) extends Expr {
+case class SelAttrExpr(selector: Selector, attr: String) extends Expr {
   def apply(elem: Element, ctx: Context[_]): String = {
-    val elems = elem.select(selector)
-    if (elems.size == 0) ""
-    else {
-      val value = elems.get(0).attr(name)
-      if (value == null) ""
-      else value
-    }
+    selector.apply(elem).flatMap(selElem => selElem.attr(attr) match {
+      case null => None
+      case x => Some(x)
+    }).mkString("")
   }
 }
 

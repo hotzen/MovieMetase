@@ -129,45 +129,50 @@ object MovieInfos {
     
   case class IMDB(imdbID: String, rating: Option[Float] = None) extends MovieInfo with Website {
     val order: Int = 80
-    lazy val page: URL = new URL( "http://www.imdb.com/title/" + imdbID + "/" )
+    lazy val website: URL = new URL( "http://www.imdb.com/title/" + imdbID + "/" )
   }
   
   case class TMDB(tmdbID: String, rating: Option[Float] = None) extends MovieInfo with Website {
     val order: Int = 81
-    lazy val page: URL = new URL( "http://www.themoviedb.org/movie/" + tmdbID )
+    lazy val website: URL = new URL( "http://www.themoviedb.org/movie/" + tmdbID )
   }
   
   case class Thumbnail(url: URL) extends MovieInfo with Image {
     val order = 50
+    def image = url
     val preview = Some(url)
   }
   
-  case class Poster(url: URL, preview: Option[URL] = None) extends MovieInfo with Image { val order = 51 }
-  case class Backdrop(url: URL, preview: Option[URL] = None) extends MovieInfo with Image { val order = 52 }
+  case class Poster(url: URL, preview: Option[URL] = None) extends MovieInfo with Image {
+    def image = url
+    val order = 51
+  }
+  case class Backdrop(url: URL, preview: Option[URL] = None) extends MovieInfo with Image {
+    def image = url
+    val order = 52
+  }
   
-  case class Subtitle(label: String, lang: String, page: URL, url: URL) extends MovieInfo with Website with Downloadable { val order = 60 }  
-  case class Trailer(label: String, page: URL) extends MovieInfo with Website { val order = 70 }
+  case class Subtitle(label: String, lang: String, website: URL, download: Option[URL] = None, releaseText: Option[String] = None) extends MovieInfo with Website { val order = 60 }
+  
+  case class Trailer(label: String, website: URL) extends MovieInfo with Website { val order = 70 }
     
   case class Extra(name: String, value: String) extends MovieInfo { val order = 100 }
     
   
   trait Downloadable extends MovieInfo {
-    import java.io.File
-        
-    def url: URL
-    
-    def downloader(to: File): Task[(URL,File)] = DownloadTask(url, to)
+    def download: URL
+    def downloader(to: java.io.File): Task[(URL,java.io.File)] = DownloadTask(download, to)
   }
     
   
   trait Image extends MovieInfo with Downloadable {
-    def url: URL
+    def image: URL
     def preview: Option[URL]
     
-    def file = url // Downloadable
+    def download = image
   }
   
   trait Website extends MovieInfo {
-    def page: URL
+    def website: URL
   }
 }

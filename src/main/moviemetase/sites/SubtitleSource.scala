@@ -76,7 +76,7 @@ object SubtitleSource {
             releaseInfo.label,
             releaseInfo.lang,
             subInfo.subtitlePage,
-            subInfo.downloadUrl
+            Some(subInfo.downloadUrl)
           )//.withSourceInfo( subInfo.subtitlePage.toString )
           
           if (!subInfo.moviePage.isEmpty) {

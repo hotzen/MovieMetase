@@ -318,7 +318,39 @@ object DSL_Test extends FunSuite {
       case DSL.Success(s:ExtractStep[_], _) =>
       case res => fail(res.toString)
     }
-  }     
+  }
+  
+  test("BindVarStep") {
+    val in = """ SET $FOO = bar END """
+    DSL.parseAll(DSL.step, in) match {
+      case DSL.Success(s:BindVarStep[_], _) =>
+      case res => fail(res.toString)
+    }
+  }
+  
+  test("BindVarStep'") {
+    val in = """ SET $FOO=bar END """
+    DSL.parseAll(DSL.step, in) match {
+      case DSL.Success(s:BindVarStep[_], _) =>
+      case res => fail(res.toString)
+    }
+  }
+  
+  test("BindVarFromParamStep") {
+    val in = """ SET $FOO = <PARAM> END """
+    DSL.parseAll(DSL.step, in) match {
+      case DSL.Success(s:BindVarStep[_], _) =>
+      case res => fail(res.toString)
+    }
+  }
+  
+  test("BindVarFromParamDefaultStep") {
+    val in = """ SET $FOO = <PARAM> DEFAULT baz END """
+    DSL.parseAll(DSL.step, in) match {
+      case DSL.Success(s:BindVarStep[_], _) =>
+      case res => fail(res.toString)
+    }
+  }
   
   
   // ############################################
@@ -354,8 +386,8 @@ SCRAPE SUBTITLES ON "SubtitleSource"
     SELECT "#subtitle-container"
       EXTRACT Subtitle-Label SELECT "a:eq(0)"
       SELECT "#subtitle-list li"
-        EXTRACT Subtitle-DownloadURL   SELECT "a:eq(0)" ATTRIBUTE href AS URL 
-        EXTRACT Subtitle-PageURL       SELECT "a:eq(1)" ATTRIBUTE href AS URL
+        EXTRACT Subtitle-DownloadURL   ( SELECT "a:eq(0)" ATTRIBUTE href ) AS-URL 
+        EXTRACT Subtitle-PageURL       ( SELECT "a:eq(1)" ATTRIBUTE href ) AS-URL
         EXTRACT Subtitle-LangText      SELECT "a:eq(1)" ATTRIBUTE title
 END"""
     DSL(in) match {
@@ -372,14 +404,14 @@ END"""
   test("PodnapisiScraper") {
     val in = """
  SCRAPE SUBTITLES ON "Podnapisi.net"
-  SET $LANG = <PODNAPISI_LANG> DEFAULT "5,2" AS URL-ENCODED # english, german
-  BROWSE "http://www.podnapisi.net/en/ppodnapisi/search?sJ=" + $LANG + "&sK=" + <QUERY>
+  TRACE SET $LANG = ( <PODNAPISI_LANG> DEFAULT "5,2" ) URL-ENCODED # english, german
+  TRACE BROWSE "http://www.podnapisi.net/en/ppodnapisi/search?sJ=" + $LANG + "&sK=" + <QUERY>
   
   SELECT "tr"
-    EXTRACT Subtitle-Label SELECT "a.subtitle_page_link"
-    EXTRACT Subtitle-PageURL SELECT "a.subtitle_page_link" ATTRIBUTE href AS URL
+    TRACE EXTRACT Subtitle-Label SELECT "a.subtitle_page_link"
+    EXTRACT Subtitle-PageURL ( SELECT "a.subtitle_page_link" ATTRIBUTE href ) AS-URL
     EXTRACT Subtitle-LangText SELECT "div.flag" ATTRIBUTE alt 
-    EXTRACT Subtitle-ReleaseText SELECT ".release"
+    TRACE EXTRACT Subtitle-ReleaseText SELECT ".release"
 END"""
     DSL(in) match {
       case res@DSL.Success(((scraper:SubtitleScraper) :: xs), _) => {

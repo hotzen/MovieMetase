@@ -22,7 +22,7 @@ object IMDB {
     RequestHeaders += ("Accept-Language" -> "en-US,en")
     
     val imdbInfo = MovieInfos.IMDB(id)
-    def url = imdbInfo.page
+    def url = imdbInfo.website
     
     def processDocument(doc: nu.xom.Document): Option[Movie] = {
       import Util._

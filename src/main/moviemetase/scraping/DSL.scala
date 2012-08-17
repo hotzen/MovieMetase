@@ -22,12 +22,23 @@ object DSL extends RegexParsers with PackratParsers {
   
   val int = """-?[0-9]+""".r ^^ { d => d.toInt }
   
+  val selectorIdxFirst = "FIRST" ^^^ 0
+  val selectorIdxNum = "#" ~> """\d+""".r ^^ {
+    case i => i.toInt
+  }
+  val selectorIdx = selectorIdxFirst | selectorIdxNum
+  val selectorMax = "MAX" ~> int ^^ { case i => i.toInt }
+  val selector = value ~ opt(selectorIdx) ~ opt(selectorMax) ^^ {
+    case s ~ idx ~ max => {
+      Selector(s, idx.getOrElse(-1), max.getOrElse(-1))
+    }
+  }
   
   // ############################################
   // expressions
   val literalExpr = value ^^ { case s => LitExpr(s) }
   
-  val paramName = """[A-Z]+""".r
+  val paramName = """[A-Z_]+""".r
   val paramDefault = "DEFAULT" ~> value
   val paramExpr = "<" ~ paramName ~ ">" ~ opt(paramDefault) ^^ {
     case _ ~ name ~ _ ~ default => ParamExpr(name, default)
@@ -39,16 +50,16 @@ object DSL extends RegexParsers with PackratParsers {
     case name => VarExpr(name)
   }
   
-  val selExpr = "SELECT" ~> value ^^ {
-    case name => SelExpr(name)
+  val selExpr = "SELECT" ~> selector ^^ {
+    case sel => SelExpr(sel)
   }
   
   val attrExpr = "ATTRIBUTE" ~> value ^^ {
     case name => AttrExpr(name)
   }
   
-  val selAttrExpr: PackratParser[Expr] = "SELECT" ~> value ~ "ATTRIBUTE" ~ value ^^ {
-    case s ~ _ ~ a => SelAttrExpr(s, a)
+  val selAttrExpr: PackratParser[Expr] = "SELECT" ~ selector ~ "ATTRIBUTE" ~ value ^^ {
+    case _ ~ sel ~ _ ~ attr => SelAttrExpr(sel, attr)
   }
   
   val parensExpr: Parser[Expr] = "(" ~> expr <~ ")"
@@ -57,12 +68,12 @@ object DSL extends RegexParsers with PackratParsers {
     case e1 ~ _ ~ e2 => ConcatExpr(e1, e2)
   }
 
-  val urlExpr: PackratParser[Expr] = expr ~ "AS" ~ "URL" ^^ {
-    case e ~ _ ~ _ => UrlExpr(e)
+  val urlExpr: PackratParser[Expr] = expr <~ "AS-URL" ^^ {
+    case e => UrlExpr(e)
   }
   
-  val urlEncExpr: PackratParser[Expr] = expr ~ "AS" ~ "URL-ENCODED" ^^ {
-    case e ~ _ ~ _ => UrlEncExpr(e)
+  val urlEncExpr: PackratParser[Expr] = expr <~ "URL-ENCODED" ^^ {
+    case e => UrlEncExpr(e)
   }
 
   val substrRegex = """(-?\d+)(([,-])(\d+))?""".r
@@ -110,10 +121,10 @@ object DSL extends RegexParsers with PackratParsers {
     }
   }
   
-  val selectMax = "MAX" ~> int ^^ { case i => i.toInt }
-  val selectStep: Parser[Step[_]] = trace ~ "SELECT" ~ value ~ opt(selectMax) ~ step ^^ {
-    case t ~ _ ~ e ~ max ~ next =>
-      SelectStep(e, max.getOrElse(Int.MaxValue), next).trace(t)
+  
+  val selectStep: Parser[Step[_]] = trace ~ "SELECT" ~ selector ~ step ^^ {
+    case t ~ _ ~ sel ~ next =>
+      SelectStep(sel, next).trace(t)
   }
   
   val extractWhat = """[a-zA-Z0-9_\-/]+""".r 

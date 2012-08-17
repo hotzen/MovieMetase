@@ -63,3 +63,13 @@ trait Logging {
     }
   }
 }
+
+
+trait Traceable {
+  var tracing = false
+  
+  def trace(on: Boolean): this.type = {
+    tracing = on
+    this
+  }
+}

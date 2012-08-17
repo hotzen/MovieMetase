@@ -114,7 +114,7 @@ object OpenSubtitles {
         
         val file  = memberValue("ZipDownloadLink").get.toURL
         
-        val sub = MovieInfos.Subtitle(label, lang, page, file)
+        val sub = MovieInfos.Subtitle(label, lang, page, Some(file))
         trace("found " + sub)
         sub
       }

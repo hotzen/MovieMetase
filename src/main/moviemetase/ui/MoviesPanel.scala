@@ -44,7 +44,7 @@ class MoviesPanel(val top: UI) extends FS_ScrollPane {
       </h1>
       <span class="websites">
         { for (info <- movie.infos.collect({ case i:MovieInfos.Website => i })) yield {
-          val url = info.page
+          val url = info.website
           val host = url.getHost
           val label = if (host startsWith "www.") host.substring(4)
                       else host
