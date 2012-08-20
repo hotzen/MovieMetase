@@ -407,11 +407,11 @@ END"""
   TRACE SET $LANG = ( <PODNAPISI_LANG> DEFAULT "5,2" ) URL-ENCODED # english, german
   TRACE BROWSE "http://www.podnapisi.net/en/ppodnapisi/search?sJ=" + $LANG + "&sK=" + <QUERY>
   
-  SELECT "tr"
-    TRACE EXTRACT Subtitle-Label SELECT "a.subtitle_page_link"
+  TRACE SELECT "td.sort_column"
+    EXTRACT Subtitle-Label SELECT "a.subtitle_page_link"
     EXTRACT Subtitle-PageURL ( SELECT "a.subtitle_page_link" ATTRIBUTE href ) AS-URL
     EXTRACT Subtitle-LangText SELECT "div.flag" ATTRIBUTE alt 
-    TRACE EXTRACT Subtitle-ReleaseText SELECT ".release"
+    EXTRACT Subtitle-ReleaseText SELECT ".release"
 END"""
     DSL(in) match {
       case res@DSL.Success(((scraper:SubtitleScraper) :: xs), _) => {
@@ -424,5 +424,8 @@ END"""
     }
   }
     
-  def main(args: Array[String]): Unit = execute(color = false)
+  def main(args: Array[String]): Unit = {
+    execute(color = false)
+    App.shutdown
+  }
 }

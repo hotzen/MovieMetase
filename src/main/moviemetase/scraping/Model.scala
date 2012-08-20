@@ -52,7 +52,7 @@ case class FinalStep[A]() extends Step[A] with Logging {
 
 case class Selector(sel: String, idx: Int, max: Int) extends Traceable with Logging {
   import language.implicitConversions
-  implicit def jiter[A](jiter: java.util.Iterator[A]): Iterator[A] =
+  implicit def JIterToIter[A](jiter: java.util.Iterator[A]): Iterator[A] =
     scala.collection.convert.Wrappers.JIteratorWrapper[A]( jiter )
 
   val logID = "Selector(" + sel + 
@@ -60,22 +60,32 @@ case class Selector(sel: String, idx: Int, max: Int) extends Traceable with Logg
                 { if (max >= 0) ", max="+max else "" } + ")"
     
   def apply(elem: Element): List[Element] = {
-    val selElemsJIter = elem.select(sel)
+    val jiter = elem.select(sel)
     
-    if (tracing)
-      if (selElemsJIter.isEmpty) warn("no match")
-      else trace(selElemsJIter.size + " selected")
-    
-    if (selElemsJIter.isEmpty)
+    if (tracing && jiter.isEmpty)
+      warn("NOTHING SELECTED")
+    if (jiter.isEmpty)
       return Nil
+
+    val selElems: List[Element] = jiter.iterator().toList
+
+    if (tracing) {
+      val total = selElems.length
+      val sb = new StringBuffer
+      sb append "selected " append total append " elements:\n"
+      selElems.zipWithIndex.foreach({case (elem,idx) =>
+        sb append "*** " append (idx+1) append "/" append total append " *** "
+        sb append elem.html append "\n"
+      })
+      sb append "*** END-OF-SELECT"
+      trace(sb.toString)
+    }
     
-    val iter = selElemsJIter.iterator
-      
     val idxd = 
       if (idx < 0)
-        iter.toList
+        selElems
       else
-        try { iter.toList(idx) :: Nil }
+        try { selElems(idx) :: Nil }
         catch { case e:IndexOutOfBoundsException => Nil }
     
     val maxd =
@@ -152,7 +162,11 @@ case class ExtractStep[A](name: String, expr: Expr, next: Step[A]) extends Step[
     val value = expr.apply(elem, ctx)
     if (tracing)
       trace("'" + value + "'")
-    next.process(elem, ctx.addExtract(name, value))
+    
+    if (value.isEmpty)
+      next.process(elem, ctx)
+    else
+      next.process(elem, ctx.addExtract(name, value))
   }
     
   override def toString = "Extract(" + name + ", " + expr + ")\n  " + next.toString
@@ -244,7 +258,8 @@ case class SelAttrExpr(selector: Selector, attr: String) extends Expr {
 case class UrlExpr(e: Expr) extends Expr {
   def apply(elem: Element, ctx: Context[_]): String = {
     val s = e.apply(elem, ctx)
-    new URL(ctx.url, s).toExternalForm
+    if (s.isEmpty) ""
+    else new URL(ctx.url, s).toExternalForm
   }
 }
 
