@@ -3,12 +3,14 @@ package scraping
 
 import Util._
 
-case class SubtitleScraper(desc: String, start: Step[MovieInfos.Subtitle]) extends Scraper[MovieInfos.Subtitle] with Logging {
+case class SubtitleScraper(desc: String, start: Step[MovieInfos.Subtitle]) extends Scraper[MovieInfos.Subtitle] with Traceable with Logging {
   val logID = "SubtitleScraper(" + desc + ")"
     
   val factory = new Factory[MovieInfos.Subtitle] {
     def create(extracts: List[(String, String)]): List[MovieInfos.Subtitle] = {
-      trace("extracts: "+ extracts.mkString(", "))
+      if (tracing)
+        trace("extracts: "+ extracts.mkString(", "))
+      
       val extractsLC = extracts.map({case (n,v) => (n.toLowerCase, v) })
             
       val label = extractsLC.collect({ case ("subtitle-label",v) => v }).headOption.getOrElse("N/A")

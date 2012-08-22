@@ -83,16 +83,10 @@ case class Selector(sel: String, idx: Int, max: Int) extends Traceable with Logg
   }
 }
 
-case class FinalStep[A]() extends Step[A] with Logging {
-  val logID = "Final"
-  
-  def process(elem: Element, ctx: Context[A]): List[A] = {
-    val extracts = ctx.extracts.reverse
-    val results = ctx.factory.create( extracts )
-    if (results.isEmpty)
-      warn("no results")
-    results
-  }
+case class FinalStep[A]() extends Step[A] {
+
+  def process(elem: Element, ctx: Context[A]): List[A] =
+    ctx.factory.create( ctx.extracts.reverse )
   
   override def toString = "End"
 }
@@ -194,9 +188,11 @@ trait Scraper[A] {
     val url  = new URL("http://initial.net/")
     val html = """<html><head></head><body></body></html>"""
     val doc  = org.jsoup.Jsoup.parse(html)
-    val vars = Map[String, String]()
+    
+    val paramsMap = params.toMap ++ Context.defaultParams
+    val varsMap = Map[String, String]()
 
-    val ctx = Context[A](url, Nil, factory, params.toMap, vars)
+    val ctx = Context[A](url, Nil, factory, paramsMap, varsMap)
     start.process(doc.body, ctx)
   }
   
