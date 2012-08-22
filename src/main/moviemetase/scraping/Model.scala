@@ -36,20 +36,6 @@ trait Step[A] {
   def process(elem: Element, ctx: Context[A]): List[A]
 }
 
-case class FinalStep[A]() extends Step[A] with Logging {
-  val logID = "Final"
-  
-  def process(elem: Element, ctx: Context[A]): List[A] = {
-    val results = ctx.factory.create( ctx.extracts )
-    if (results.isEmpty)
-      warn("no results")
-    
-    results.reverse
-  }
-  
-  override def toString = "End"
-}
-
 case class Selector(sel: String, idx: Int, max: Int) extends Traceable with Logging {
   import language.implicitConversions
   implicit def jiter[A](jiter: java.util.Iterator[A]): Iterator[A] =
@@ -84,6 +70,20 @@ case class Selector(sel: String, idx: Int, max: Int) extends Traceable with Logg
     
     maxd
   }
+}
+
+case class FinalStep[A]() extends Step[A] with Logging {
+  val logID = "Final"
+  
+  def process(elem: Element, ctx: Context[A]): List[A] = {
+    val results = ctx.factory.create( ctx.extracts )
+    if (results.isEmpty)
+      warn("no results")
+    
+    results.reverse
+  }
+  
+  override def toString = "End"
 }
 
 case class BrowseStep[A](expr: Expr, postData: List[(String,String)], forceCtxUrl: Option[String], next: Step[A]) extends Step[A] with Traceable with Logging {
