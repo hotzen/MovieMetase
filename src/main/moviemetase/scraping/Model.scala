@@ -267,7 +267,7 @@ case class BrowseStep[A](expr: Expr, postData: List[(String,String)], forceCtxUr
     next.process(doc.body, ctx setURL ctxUrl)
   }
   
-  override def toString = "Browse(" + expr + ")\n  " + next.toString
+  override def toString = "Browse(" + expr + ")\n => " + next.toString
 }
 
 case class SelectStep[A](selector: Selector, next: Step[A]) extends Step[A] with Traceable with Logging {
@@ -281,7 +281,7 @@ case class SelectStep[A](selector: Selector, next: Step[A]) extends Step[A] with
     selector.trace(tracing).apply(elem).flatMap(selElem => next.process(selElem, ctx))
   }
   
-  override def toString = "Select("+selector+")\n  " + next.toString
+  override def toString = "Select("+selector+")\n => " + next.toString
 }
 
 case class ExtractStep[A](name: String, expr: Expr, next: Step[A]) extends Step[A] with Traceable with Logging {
@@ -298,7 +298,7 @@ case class ExtractStep[A](name: String, expr: Expr, next: Step[A]) extends Step[
       next.process(elem, ctx.addExtract(name, value))
   }
     
-  override def toString = "Extract(" + name + ", " + expr + ")\n  " + next.toString
+  override def toString = "Extract(" + name + ", " + expr + ")\n => " + next.toString
 }
 
 case class BindVarStep[A](name: String, expr: Expr, next: Step[A]) extends Step[A] with Traceable with Logging {
@@ -311,7 +311,7 @@ case class BindVarStep[A](name: String, expr: Expr, next: Step[A]) extends Step[
     next.process(elem, ctx setVar (name, value))
   }
     
-  override def toString = "BindVar(" + name + ", " + expr + ")\n  " + next.toString
+  override def toString = "BindVar(" + name + ", " + expr + ")\n => " + next.toString
 }
 
 
@@ -319,21 +319,52 @@ trait Factory[A] {
   def create(extracts: List[(String,String)]): List[A]
 }
 
-trait Scraper[A] {
+trait Scraper[A] extends Traceable {
   def start: Step[A]
   def factory: Factory[A]
   
-  def execute(params: List[(String, String)]): List[A] = {
-    val url  = new URL("http://initial.net/")
-    val html = """<html><head></head><body></body></html>"""
-    val doc  = org.jsoup.Jsoup.parse(html)
-    
+  def execute(params: List[(String, String)], startElem: Element, startURL: URL): List[A] = {
     val paramsMap = params.toMap ++ Context.defaultParams
     val varsMap = Map[String, String]()
 
-    val ctx = Context[A](url, Nil, factory, paramsMap, varsMap)
-    start.process(doc.body, ctx)
+    val ctx = Context[A](startURL, Nil, factory, paramsMap, varsMap)
+    start.process(startElem, ctx)
   }
   
   override def toString = "Scraper: " + start.toString
+}
+
+trait PageScraper[A] extends Scraper[A] {
+    
+  def pageBodyTask(page: URL) = new HtmlTask[Element] {
+    def url = page
+    def processDocument(doc: Document): Element = doc.body
+  }
+  
+  def scrapePage(page: java.net.URL): List[A] = {
+    val params = ("PAGE" -> page.toExternalForm) :: Nil
+    
+    val startElem = pageBodyTask(page).submit().get()
+    val startURL  = page
+    
+    execute(params, startElem, startURL)
+  }
+  
+  override def toString = "PageScraper: " + start.toString
+}
+
+trait SearchScraper[A] extends Scraper[A] {
+  import org.jsoup.Jsoup
+  
+  def search(term: String): List[A] = {
+    val params = ("SEARCH" -> term) :: Nil
+    
+    val doc = Jsoup.parse( """<html><head></head><body></body></html>""" )
+    val startElem = doc.body
+    val startURL = new URL("http://initial.net/") 
+
+    execute(params, startElem, startURL)
+  }
+  
+  override def toString = "SearchScraper: " + start.toString
 }

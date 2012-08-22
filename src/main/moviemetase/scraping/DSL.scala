@@ -145,12 +145,17 @@ object DSL extends RegexParsers with PackratParsers {
   
   // ############################################
   // scrapers
-  val subtitlesScraper: PackratParser[Scraper[_]] = "SCRAPE" ~> "SUBTITLES" ~> "ON" ~> value ~ step ^^ {
-    case label ~ step =>
-      SubtitleScraper(label, step.asInstanceOf[Step[MovieInfos.Subtitle]])
+  val subtitleScraper: Parser[Scraper[_]] = trace ~ "SCRAPE" ~ "SUBTITLES" ~ "ON" ~ value ~ step ^^ {
+    case t ~ _ ~ x ~ _ ~ label ~ step =>
+      SubtitleScraper(label, step.asInstanceOf[Step[MovieInfos.Subtitle]]).trace(t)
+  }
+  
+  val subtitleSearcher: Parser[Scraper[_]] = trace ~ "SEARCH" ~ "SUBTITLES" ~ "ON" ~ value ~ step ^^ {
+    case t ~ _ ~ x ~ _ ~ label ~ step =>
+      SubtitleSearcher(label, step.asInstanceOf[Step[MovieInfos.Subtitle]]).trace(t)
   }
 
-  val scraper: PackratParser[Scraper[_]] = subtitlesScraper
+  val scraper: Parser[Scraper[_]] = subtitleScraper | subtitleSearcher 
 
   val scrapers = rep1(scraper)
   

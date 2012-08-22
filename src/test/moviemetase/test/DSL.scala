@@ -356,10 +356,10 @@ object DSL_Test extends FunSuite {
   // ############################################
   // Scrapes
   
-  test("GenericScraper") {
+  test("GenericSubtitlePageScraper") {
         val in = """
 SCRAPE SUBTITLES ON "FoobarSiteDescription"
-  BROWSE "http://www.site.net/search/" + <QUERY>
+  BROWSE <PAGE>
   SELECT "ul li"
     BROWSE "http://www.site.net/" + ATTRIBUTE "attr"
     SELECT "a"
@@ -373,10 +373,29 @@ END"""
     }
   }
   
-  test("SubtitleSourceScraper") {
+  test("GenericSubtitleSearchScraper") {
+        val in = """
+SEARCH SUBTITLES ON "FoobarSiteDescription"
+  BROWSE "http://www.site.net/search/" + <QUERY>
+  SELECT "ul li"
+    BROWSE "http://www.site.net/" + ATTRIBUTE "attr"
+    SELECT "a"
+      EXTRACT Something SELECT "a:eq(1)" ATTRIBUTE "-funky-attribute"
+      EXTRACT AnotherProperty SELECT "a:eq(2)" ATTRIBUTE href 
+      EXTRACT PropClazz-PropName SELECT "a:eq(2)"
+END"""
+    DSL(in) match {
+      case DSL.Success(((scraper:SubtitleSearcher) :: xs), _) =>
+      case res => fail(res.toString)
+    }
+  }
+  
+  
+  
+  test("SubtitleSourceSearchScraper") {
     val in = """
-SCRAPE SUBTITLES ON "SubtitleSource"
-  BROWSE "http://www.subtitlesource.org/search/" + <QUERY>
+SEARCH SUBTITLES ON "SubtitleSource"
+  BROWSE "http://www.subtitlesource.org/search/" + <SEARCH>
   SELECT "#searchPage li a"
     # BROWSE "http://www.subtitlesource.org/releaselist/" + ATTRIBUTE "href"[-9] + "%7CDESC%7CAll%7CAll" AS "http://www.subtitlesource.org/title/tt1234567/"
 
@@ -391,21 +410,18 @@ SCRAPE SUBTITLES ON "SubtitleSource"
         EXTRACT Subtitle-LangText      SELECT "a:eq(1)" ATTRIBUTE title
 END"""
     DSL(in) match {
-      case res@DSL.Success(((scraper:SubtitleScraper) :: xs), _) => {
+      case res@DSL.Success(((searcher:SubtitleSearcher) :: xs), _) => {
         println(res)
-        
-        val params = ("QUERY" -> "Inception.1080p.BluRay.x264-REFiNED") :: Nil
-        //println( scraper.execute(params).mkString("\n") )
       }
       case res => fail(res.toString)
     }
   }
   
-  test("PodnapisiScraper") {
+  test("PodnapisiSearchScraper") {
     val in = """
- SCRAPE SUBTITLES ON "Podnapisi.net"
+SEARCH SUBTITLES ON "Podnapisi.net"
   SET $LANG = ( <PODNAPISI_LANG> DEFAULT "5,2" ) URL-ENCODED # default: english, german
-  BROWSE "http://www.podnapisi.net/en/ppodnapisi/search?sJ=" + $LANG + "&sK=" + <QUERY>
+  BROWSE "http://www.podnapisi.net/en/ppodnapisi/search?sJ=" + $LANG + "&sK=" + ( <SEARCH> URL-ENCODED )
   
   SELECT "td.sort_column"
     EXTRACT Subtitle-Label SELECT "a.subtitle_page_link"
@@ -414,11 +430,39 @@ END"""
     EXTRACT Subtitle-ReleaseText SELECT ".release"
 END"""
     DSL(in) match {
+      case res@DSL.Success(((searcher:SubtitleSearcher) :: xs), _) => {
+        println(res)
+        
+        val term = "Inception.1080p.BluRay.x264-REFiNED"
+        //println( searcher.search(term).mkString("\n") )
+      }
+      case res => fail(res.toString)
+    }
+  }
+  
+  test("PodnapisiPageScraper") {
+    val in = """
+TRACE SCRAPE SUBTITLES ON "Podnapisi.net"
+  SELECT "#subtitle"
+    EXTRACT Subtitle-PageURL <PAGE>
+    TRACE EXTRACT Subtitle-Label SELECT "h1"
+    EXTRACT Subtitle-DownloadURL SELECT a.download ATTRIBUTE href AS-URL    
+  
+    SELECT ".right_side fieldset" #2
+      SELECT p FIRST
+        SELECT span #2
+          EXTRACT Subtitle-LangText SELECT a
+    
+    SELECT ".right_side fieldset" #3
+      EXTRACT Subtitle-ReleaseText SELECT a
+END"""
+    DSL(in) match {
       case res@DSL.Success(((scraper:SubtitleScraper) :: xs), _) => {
         println(res)
         
-        val params = ("QUERY" -> "Inception.1080p.BluRay.x264-REFiNED") :: Nil
-        println( scraper.execute(params).mkString("\n") )
+        val page = "http://www.podnapisi.net/en/inception-2010-subtitles-p814512"
+        val url = new java.net.URL(page)
+        println( scraper.scrapePage(url).mkString("\n") )
       }
       case res => fail(res.toString)
     }
