@@ -6,6 +6,7 @@ import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import scala.collection._
 import org.jsoup.select.Elements
+import java.net.MalformedURLException
 
 object Context {
   def defaultParams: Map[String, String] = {
@@ -38,7 +39,7 @@ trait Step[A] {
 
 case class Selector(sel: String, idx: Int, max: Int) extends Traceable with Logging {
   import language.implicitConversions
-  implicit def jiter[A](jiter: java.util.Iterator[A]): Iterator[A] =
+  implicit def JIterToIter[A](jiter: java.util.Iterator[A]): Iterator[A] =
     scala.collection.convert.Wrappers.JIteratorWrapper[A]( jiter )
 
   val logID = "Selector(" + sel + 
@@ -46,22 +47,32 @@ case class Selector(sel: String, idx: Int, max: Int) extends Traceable with Logg
                 { if (max >= 0) ", max="+max else "" } + ")"
     
   def apply(elem: Element): List[Element] = {
-    val selElemsJIter = elem.select(sel)
+    val jiter = elem.select(sel)
     
-    if (tracing)
-      if (selElemsJIter.isEmpty) warn("no match")
-      else trace(selElemsJIter.size + " selected")
-    
-    if (selElemsJIter.isEmpty)
+    if (tracing && jiter.isEmpty)
+      warn("NOTHING SELECTED")
+    if (jiter.isEmpty)
       return Nil
+
+    val selElems: List[Element] = jiter.iterator().toList
+
+    if (tracing) {
+      val total = selElems.length
+      val sb = new StringBuffer
+      sb append "selected " append total append " elements:\n"
+      selElems.zipWithIndex.foreach({case (elem,idx) =>
+        sb append "*** " append (idx+1) append "/" append total append " *** "
+        sb append elem.html append "\n"
+      })
+      sb append "*** END-OF-SELECT"
+      trace(sb.toString)
+    }
     
-    val iter = selElemsJIter.iterator
-      
     val idxd = 
       if (idx < 0)
-        iter.toList
+        selElems
       else
-        try { iter.toList(idx) :: Nil }
+        try { selElems(idx) :: Nil }
         catch { case e:IndexOutOfBoundsException => Nil }
     
     val maxd =
@@ -76,11 +87,11 @@ case class FinalStep[A]() extends Step[A] with Logging {
   val logID = "Final"
   
   def process(elem: Element, ctx: Context[A]): List[A] = {
-    val results = ctx.factory.create( ctx.extracts )
+    val extracts = ctx.extracts.reverse
+    val results = ctx.factory.create( extracts )
     if (results.isEmpty)
       warn("no results")
-    
-    results.reverse
+    results
   }
   
   override def toString = "End"
@@ -152,7 +163,11 @@ case class ExtractStep[A](name: String, expr: Expr, next: Step[A]) extends Step[
     val value = expr.apply(elem, ctx)
     if (tracing)
       trace("'" + value + "'")
-    next.process(elem, ctx.addExtract(name, value))
+    
+    if (value.isEmpty)
+      next.process(elem, ctx)
+    else
+      next.process(elem, ctx.addExtract(name, value))
   }
     
   override def toString = "Extract(" + name + ", " + expr + ")\n  " + next.toString
@@ -193,6 +208,15 @@ trait Scraper[A] {
 // **********************************************
 // Expressions
 
+class ExprEvalException(msg: String) extends Exception {
+  var cause: Throwable = null
+  
+  def causedBy(t: Throwable): this.type = {
+    cause = t
+    this
+  }   
+}
+
 sealed trait Expr extends Traceable {
   def apply(elem: Element, ctx: Context[_]): String
 }
@@ -206,7 +230,7 @@ case class ParamExpr(name: String, default: Option[String]) extends Expr {
     case Some(v) => v
     case None => default match {
       case Some(v) => v
-      case None => throw new IllegalArgumentException("no default value specified for parameter '" + name + "'") 
+      case None => throw new ExprEvalException("no default value specified for parameter '" + name + "'") 
     }
   }
 }
@@ -214,7 +238,7 @@ case class ParamExpr(name: String, default: Option[String]) extends Expr {
 case class VarExpr(name: String) extends Expr {
   def apply(elem: Element, ctx: Context[_]): String = ctx.vars.get(name) match {
     case Some(v) => v
-    case None => throw new IllegalArgumentException("invalid variable '" + name + "'")
+    case None => throw new ExprEvalException("invalid variable '" + name + "'")
   }
 }
 
@@ -244,7 +268,9 @@ case class SelAttrExpr(selector: Selector, attr: String) extends Expr {
 case class UrlExpr(e: Expr) extends Expr {
   def apply(elem: Element, ctx: Context[_]): String = {
     val s = e.apply(elem, ctx)
-    new URL(ctx.url, s).toExternalForm
+    if (s.isEmpty) ""
+    else try { new URL(ctx.url, s).toExternalForm }
+         catch { case e:java.net.MalformedURLException => throw new ExprEvalException(e.getMessage).causedBy(e) }
   }
 }
 
@@ -275,14 +301,16 @@ trait SubstrExpr extends Expr {
 
 case class SubstrEndExpr(expr: Expr, off: Int) extends SubstrExpr {
   def apply(s: String): String =
-    s.substring(absPos(off, s.length))
+    try { s.substring(absPos(off, s.length)) }
+    catch { case e:IndexOutOfBoundsException => throw new ExprEvalException(e.getMessage).causedBy(e) }
 }
 
 case class SubstrLenExpr(expr: Expr, off: Int, len: Int) extends SubstrExpr {
   def apply(s: String): String = {
     val a = absPos(off, s.length)
     val b = a + len
-    s.substring(a, b)
+    try { s.substring(a, b) }
+    catch { case e:IndexOutOfBoundsException => throw new ExprEvalException(e.getMessage).causedBy(e) }
   }
 }
 
@@ -291,7 +319,8 @@ case class SubstrPosExpr(expr: Expr, off: Int, pos: Int) extends SubstrExpr {
     val len = s.length
     val a = absPos(off, len)
     val b = absPos(pos, len)
-    s.substring(a, b)
+    try { s.substring(a, b) }
+    catch { case e:IndexOutOfBoundsException => throw new ExprEvalException(e.getMessage).causedBy(e) }
   }
 }
 // TODO RegexExpr
