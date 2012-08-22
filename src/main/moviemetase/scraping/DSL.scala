@@ -22,16 +22,15 @@ object DSL extends RegexParsers with PackratParsers {
   
   val int = """-?[0-9]+""".r ^^ { d => d.toInt }
   
-  val selectorIdxFirst = "FIRST" ^^^ 0
-  val selectorIdxNum = "#" ~> """\d+""".r ^^ {
-    case i => i.toInt
-  }
-  val selectorIdx = selectorIdxFirst | selectorIdxNum
-  val selectorMax = "MAX" ~> int ^^ { case i => i.toInt }
+  val selectorIdxFirst = "FIRST" ^^^ 1
+  val selectorIdxLast = "LAST" ^^^ -1
+  val selectorIdxNum = "#" ~> int
+  val selectorIdx = selectorIdxFirst | selectorIdxLast | selectorIdxNum
+  
+  val selectorMax = "MAX" ~> int
+    
   val selector = value ~ opt(selectorIdx) ~ opt(selectorMax) ^^ {
-    case s ~ idx ~ max => {
-      Selector(s, idx.getOrElse(-1), max.getOrElse(-1))
-    }
+    case s ~ idx ~ max => Selector(s, idx, max)
   }
   
   // ############################################

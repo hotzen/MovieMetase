@@ -407,7 +407,7 @@ END"""
   SET $LANG = ( <PODNAPISI_LANG> DEFAULT "5,2" ) URL-ENCODED # default: english, german
   BROWSE "http://www.podnapisi.net/en/ppodnapisi/search?sJ=" + $LANG + "&sK=" + <QUERY>
   
-  TRACE SELECT "td.sort_column"
+  SELECT "td.sort_column"
     EXTRACT Subtitle-Label SELECT "a.subtitle_page_link"
     EXTRACT Subtitle-PageURL ( SELECT "a.subtitle_page_link" ATTRIBUTE href ) AS-URL
     EXTRACT Subtitle-LangText SELECT "div.flag" ATTRIBUTE alt 
