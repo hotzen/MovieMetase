@@ -45,7 +45,7 @@ case class Selector(sel: String, idx: Option[Int], max: Option[Int]) extends Tra
       case Some(x) => {
         val y =
           if (x > 0) x - 1
-          else if (x < 0) selElems.length - x
+          else if (x < 0) selElems.length + x
           else throw new ExprEvalException("invalid Selector index " + x + " (1=first, 2=second, ..., n=last, -1=last, -2=second last, ..., -n=first )")
 
         try selElems(y) :: Nil

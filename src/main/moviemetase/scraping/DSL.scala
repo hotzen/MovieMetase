@@ -33,6 +33,7 @@ object DSL extends RegexParsers with PackratParsers {
     case s ~ idx ~ max => Selector(s, idx, max)
   }
   
+  
   // ############################################
   // expressions
   val literalExpr = value ^^ { case s => LitExpr(s) }
@@ -87,7 +88,7 @@ object DSL extends RegexParsers with PackratParsers {
     }
   }
   
-  // TODO
+  // TODO 
 //  val regexExpr: PackratParser[Expr] = expr ~ "REGEX" ~ quoted ^^ {
 //    case e ~ _ ~ p =>
 //      RegexExpr(e, p)
