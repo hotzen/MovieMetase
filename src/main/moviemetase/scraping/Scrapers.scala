@@ -3,13 +3,13 @@ package scraping
 
 import Util._
 
-class SubtitleFactory(traceable: Traceable, logging: Logging) extends Factory[MovieInfos.Subtitle] {
+class SubtitleFactory(scraper: Scraper[MovieInfos.Subtitle]) extends Factory[MovieInfos.Subtitle] with Logging {
   val logID = "SubtitleFactory"
   
   def create(extracts: List[(String, String)]): List[MovieInfos.Subtitle] = {
-    if (traceable.tracing)
-      logging.trace("extracts: "+ extracts.mkString(", "))
-    
+    if (scraper.tracing)
+      trace("extracts: "+ extracts.mkString(", "))
+
     val extractsLC = extracts.map({case (n,v) => (n.toLowerCase, v) })
           
     val label = extractsLC.collect({ case ("subtitle-label",v) => v }).headOption.getOrElse("N/A")
@@ -25,11 +25,11 @@ class SubtitleFactory(traceable: Traceable, logging: Logging) extends Factory[Mo
 case class SubtitleScraper(desc: String, start: Step[MovieInfos.Subtitle]) extends PageScraper[MovieInfos.Subtitle] with Logging {
   val logID = "SubtitleScraper(" + desc + ")"
   
-  val factory = new SubtitleFactory(this, this)
+  val factory = new SubtitleFactory(this)
 } 
 
 case class SubtitleSearcher(desc: String, start: Step[MovieInfos.Subtitle]) extends SearchScraper[MovieInfos.Subtitle] with Logging {
   val logID = "SubtitleSearcher(" + desc + ")"
 
-  val factory = new SubtitleFactory(this, this)
+  val factory = new SubtitleFactory(this)
 }

@@ -445,7 +445,7 @@ END"""
 TRACE SCRAPE SUBTITLES ON "Podnapisi.net"
   SELECT "#subtitle"
     EXTRACT Subtitle-PageURL <PAGE>
-    TRACE EXTRACT Subtitle-Label SELECT "h1"
+    EXTRACT Subtitle-Label SELECT "h1"
     EXTRACT Subtitle-DownloadURL SELECT a.download ATTRIBUTE href AS-URL    
   
     SELECT ".right_side fieldset" #2
@@ -453,8 +453,8 @@ TRACE SCRAPE SUBTITLES ON "Podnapisi.net"
         SELECT span #2
           EXTRACT Subtitle-LangText SELECT a
     
-    SELECT ".right_side fieldset" #3
-      EXTRACT Subtitle-ReleaseText SELECT a
+    #SELECT ".right_side fieldset" #3
+    #  EXTRACT Subtitle-ReleaseText SELECT a
 END"""
     DSL(in) match {
       case res@DSL.Success(((scraper:SubtitleScraper) :: xs), _) => {

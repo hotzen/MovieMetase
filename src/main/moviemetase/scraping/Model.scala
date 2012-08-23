@@ -335,7 +335,7 @@ trait Scraper[A] extends Traceable {
 }
 
 trait PageScraper[A] extends Scraper[A] {
-    
+
   def pageBodyTask(page: URL) = new HtmlTask[Element] {
     def url = page
     def processDocument(doc: Document): Element = doc.body
@@ -358,9 +358,8 @@ trait SearchScraper[A] extends Scraper[A] {
   
   def search(term: String): List[A] = {
     val params = ("SEARCH" -> term) :: Nil
-    
-    val doc = Jsoup.parse( """<html><head></head><body></body></html>""" )
-    val startElem = doc.body
+        
+    val startElem = Jsoup.parse( """<html><head></head><body></body></html>""" ).body
     val startURL = new URL("http://initial.net/") 
 
     execute(params, startElem, startURL)
