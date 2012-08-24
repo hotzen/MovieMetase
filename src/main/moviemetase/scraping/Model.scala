@@ -31,14 +31,7 @@ case class Selector(sel: String, idx: Option[Int], max: Option[Int]) extends Tra
 
     if (tracing) {
       val total = selElems.length
-      val sb = new StringBuffer
-      sb append "selected " append total append " elements:\n"
-      selElems.zipWithIndex.foreach({case (elem,idx) =>
-        sb append "*** " append (idx+1) append "/" append total append " *** "
-        sb append elem.html append "\n"
-      })
-      sb append "*** END-OF-SELECT"
-      trace(sb.toString)
+      trace("selector matches " + total + " elements")
     }
     
     val idxd = idx match {
@@ -55,11 +48,25 @@ case class Selector(sel: String, idx: Option[Int], max: Option[Int]) extends Tra
     } 
     
     val maxd = max match {
-      case Some(x) => idxd take x
+      case Some(x) => idxd take x 
       case None => idxd
     }
     
-    maxd
+    val result = maxd
+    
+    if (tracing) {
+      val total = result.length
+      val sb = new StringBuffer
+      sb append "selected " append total append " elements:\n"
+      result.zipWithIndex.foreach({case (elem,idx) =>
+        sb append "*** " append (idx+1) append "/" append total append " *** "
+        sb append elem.html append "\n"
+      })
+      sb append "*** END-OF-SELECT"
+      trace(sb.toString)
+    }
+    
+    result
   }
 }
 

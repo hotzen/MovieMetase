@@ -10,7 +10,8 @@ import java.util.regex.Pattern
 
 object DSL extends RegexParsers with PackratParsers {
   
-  override protected val whiteSpace = """(\s|#.*)+""".r
+  // haskell style comments
+  override protected val whiteSpace = """(\s|\Q-- \E.*)+""".r
   
   // ############################################
   // basic
@@ -20,17 +21,20 @@ object DSL extends RegexParsers with PackratParsers {
   val unquoted = """[^\s\Q"[]()+\E]+""".r
   val value = quoted | unquoted
   
-  val int = """-?[0-9]+""".r ^^ { d => d.toInt }
+  val int = """-?\d+""".r ^^ { d => d.toInt }
   
   val selectorIdxFirst = "FIRST" ^^^ 1
   val selectorIdxLast = "LAST" ^^^ -1
-  val selectorIdxNum = "#" ~> int
+  val selectorIdxNum = "#" ~> int ^^ {
+    case i => i.toInt
+  }
   val selectorIdx = selectorIdxFirst | selectorIdxLast | selectorIdxNum
   
   val selectorMax = "MAX" ~> int
     
   val selector = value ~ opt(selectorIdx) ~ opt(selectorMax) ^^ {
-    case s ~ idx ~ max => Selector(s, idx, max)
+    case s ~ idx ~ max =>
+      Selector(s, idx, max) 
   }
   
   

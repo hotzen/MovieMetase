@@ -44,6 +44,34 @@ object DSL_Test extends FunSuite {
       case res => fail(res.toString)
     }
   }
+  
+  
+  // ############################################
+  // Selector
+  
+  test("BasicSelector") {
+    val in = """ a.href """
+    DSL.parseAll(DSL.selector, in) match {
+      case DSL.Success(Selector("a.href", None, None), _) =>
+      case res => fail(res.toString)
+    }
+  }
+  
+  test("IdxSelector") {
+    val in = """ a.href #1 """
+    DSL.parseAll(DSL.selector, in) match {
+      case DSL.Success(Selector("a.href", Some(1), None), _) =>
+      case res => fail(res.toString)
+    }
+  }
+  
+  test("MaxSelector") {
+    val in = """ a.href MAX 3 """
+    DSL.parseAll(DSL.selector, in) match {
+      case DSL.Success(Selector("a.href", None, Some(3)), _) =>
+      case res => fail(res.toString)
+    }
+  }
     
   
   // ############################################
@@ -397,7 +425,7 @@ END"""
 SEARCH SUBTITLES ON "SubtitleSource"
   BROWSE "http://www.subtitlesource.org/search/" + <SEARCH>
   SELECT "#searchPage li a"
-    # BROWSE "http://www.subtitlesource.org/releaselist/" + ATTRIBUTE "href"[-9] + "%7CDESC%7CAll%7CAll" AS "http://www.subtitlesource.org/title/tt1234567/"
+    -- BROWSE "http://www.subtitlesource.org/releaselist/" + ATTRIBUTE "href"[-9] + "%7CDESC%7CAll%7CAll" AS "http://www.subtitlesource.org/title/tt1234567/"
 
     SET $ID = ATTRIBUTE "href"[-9]
     BROWSE "http://www.subtitlesource.org/releaselist/" + $ID + "%7CDESC%7CAll%7CAll" AS "http://www.subtitlesource.org/title/tt1234567/"
@@ -420,7 +448,7 @@ END"""
   test("PodnapisiSearchScraper") {
     val in = """
 SEARCH SUBTITLES ON "Podnapisi.net"
-  SET $LANG = ( <PODNAPISI_LANG> DEFAULT "5,2" ) URL-ENCODED # default: english, german
+  SET $LANG = ( <PODNAPISI_LANG> DEFAULT "5,2" ) URL-ENCODED -- default: english, german
   BROWSE "http://www.podnapisi.net/en/ppodnapisi/search?sJ=" + $LANG + "&sK=" + ( <SEARCH> URL-ENCODED )
   
   SELECT "td.sort_column"
@@ -442,7 +470,7 @@ END"""
   
   test("PodnapisiPageScraper") {
     val in = """
-TRACE SCRAPE SUBTITLES ON "Podnapisi.net"
+SCRAPE SUBTITLES ON "Podnapisi.net"
   SELECT "#subtitle"
     EXTRACT Subtitle-PageURL <PAGE>
     EXTRACT Subtitle-Label SELECT "h1"
@@ -453,8 +481,8 @@ TRACE SCRAPE SUBTITLES ON "Podnapisi.net"
         SELECT span #2
           EXTRACT Subtitle-LangText SELECT a
     
-    #SELECT ".right_side fieldset" #3
-    #  EXTRACT Subtitle-ReleaseText SELECT a
+    -- SELECT ".right_side fieldset" #3
+      -- EXTRACT Subtitle-ReleaseText SELECT a
 END"""
     DSL(in) match {
       case res@DSL.Success(((scraper:SubtitleScraper) :: xs), _) => {
