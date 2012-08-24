@@ -2,15 +2,14 @@ package moviemetase
 package scraping
 
 import scala.util.parsing.combinator.RegexParsers
-import scala.util.parsing.input.CharSequenceReader
 import scala.util.parsing.combinator.PackratParsers
 import scala.util.matching.Regex
-import java.net.MalformedURLException
 import java.util.regex.Pattern
+import java.net.MalformedURLException
 
 object DSL extends RegexParsers with PackratParsers {
   
-  // haskell style comments
+  // haskell style comments: "-- comment"
   override protected val whiteSpace = """(\s|\Q-- \E.*)+""".r
   
   // ############################################
@@ -22,6 +21,11 @@ object DSL extends RegexParsers with PackratParsers {
   val value = quoted | unquoted
   
   val int = """-?\d+""".r ^^ { d => d.toInt }
+  
+  
+  // ############################################
+  // selector
+  
   
   val selectorIdxFirst = "FIRST" ^^^ 1
   val selectorIdxLast = "LAST" ^^^ -1

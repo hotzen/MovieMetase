@@ -254,16 +254,23 @@ case class HttpResponseException(code: Int, message: String, url: URL) extends I
     "HTTP " + code + ": " + message + " {" + url + "}"
 }
 
+
 object HttpTask {
   //import scala.collection.concurrent.Map
-  //import java.util.concurrent.ConcurrentHashMap
+  import java.util.concurrent.ConcurrentHashMap
   
   case class HttpCookie(name: String, value: String, attrs: List[String] = Nil) {
     def toHeader(): String = name+"="+value
   }
+    
+  
+
   
   //val CookieStore = new ConcurrentHashMap[String, List[HttpCookie]]()
   val CookieStore = new scala.collection.mutable.HashMap[String, List[HttpCookie]]()
+  
+  //case class HostCookies(host: String, cookies: List[HttpCookie])
+  //val CookieStore = new ConcurrentHashMap[HostCookies]()
 }
 
 // Task processing an HTTP-URL
