@@ -1,7 +1,7 @@
 package moviemetase
 
 import scala.io.BufferedSource
-import scraping.Scraper
+import extraction.Extractor
 import org.omg.CORBA.portable.OutputStream
 
 object Config extends Logging {
@@ -30,21 +30,21 @@ object Config extends Logging {
       filter(xs => !xs.isEmpty && !xs.head.isEmpty).
       map(xs => (xs.head, if (xs.tail.isEmpty) "" else xs.tail.head)).toList
   
-  lazy val scrapers: List[Scraper[_]] = {
+  lazy val extractors: List[Extractor[_]] = {
     import java.io._
-    import scraping.DSL
+    import extraction.DSL
     
     val p = new FileFilter {
-      def accept(f: File): Boolean = f.getName.endsWith(".scraper")
+      def accept(f: File): Boolean = true // f.getName.endsWith(".extractor")
     }
-    val fs = App.dataDir("scraper").listFiles(p).toList
+    val fs = App.dataDir("extractors").listFiles(p).toList
     
     fs.flatMap(f => {
       info("loading " + f.getAbsolutePath)
       val src = scala.io.Source.fromFile(f)
       val cnt = src.getLines.mkString("\n")
       DSL.apply( cnt ) match {
-        case DSL.Success(scrapers, _) => scrapers
+        case DSL.Success(extractors, _) => extractors
         case failure => error( failure.toString ); Nil
       }
     })
@@ -104,6 +104,6 @@ object Config extends Logging {
     stopWords.headOption
     scanExcludes.headOption
     tokenRepl.headOption
-    scrapers.headOption
+    extractors.headOption
   }
 }
