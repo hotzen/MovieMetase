@@ -46,7 +46,7 @@ object GoogleTest extends swing.Reactor {
       
       val resp = sites.GoogleWeb.CaptchaResponse(prompt, challenge)
       println("replying: " + resp)
-      e reply resp        
+      e feedback resp        
     }
   }
 }

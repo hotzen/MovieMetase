@@ -185,7 +185,7 @@ object GoogleWeb {
   case class CaptchaFailed(code: Int)
 
   case class CaptchaRequired(challenge: CaptchaChallenge, cb: CaptchaResponse => Unit) extends HumanTaskEvent[CaptchaResponse] {
-    def reply(a: CaptchaResponse) = cb(a)
+    def feedback(a: CaptchaResponse) = cb(a)
   }
     
   private case class CaptchaReader(url: URL) extends HtmlTask[CaptchaChallenge] with Logging {

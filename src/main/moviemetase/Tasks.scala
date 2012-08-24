@@ -183,7 +183,7 @@ trait DedicatedPool {
 object HumanTasks extends scala.swing.Publisher
 
 trait HumanTaskEvent[A] extends scala.swing.event.Event {
-  def reply(a: A): Unit //XXX better name?
+  def feedback(a: A): Unit
 }
 
 trait HumanTask[A] extends Task[A] with DedicatedPool {
@@ -256,21 +256,41 @@ case class HttpResponseException(code: Int, message: String, url: URL) extends I
 
 
 object HttpTask {
-  //import scala.collection.concurrent.Map
+  import scala.collection.mutable
   import java.util.concurrent.ConcurrentHashMap
   
-  case class HttpCookie(name: String, value: String, attrs: List[String] = Nil) {
+  case class Cookie(name: String, value: String, attrs: List[String] = Nil) {
     def toHeader(): String = name+"="+value
   }
+  
+  private val CookieStore = new ConcurrentHashMap[String, mutable.Map[String, Cookie]]()
+  
+  private def getOrInitCookies(domain: String): mutable.Map[String,Cookie] = {
+    val map = CookieStore.get(domain)
+    if (map ne null)
+      return map
     
+    // init
+    val empty = mutable.Map.empty[String, Cookie]
+    val alreadyExists = CookieStore.putIfAbsent(domain, empty)
+    if (alreadyExists eq null)
+      empty 
+    else
+      alreadyExists
+  }
   
-
+  def updateCookies(domain: String, newCookies: List[Cookie]): Unit = {
+    val map = getOrInitCookies(domain)
+    map synchronized {
+      for (cookie <- newCookies)
+        map.put(cookie.name, cookie)
+    }
+  }
   
-  //val CookieStore = new ConcurrentHashMap[String, List[HttpCookie]]()
-  val CookieStore = new scala.collection.mutable.HashMap[String, List[HttpCookie]]()
-  
-  //case class HostCookies(host: String, cookies: List[HttpCookie])
-  //val CookieStore = new ConcurrentHashMap[HostCookies]()
+  def getCookies(domain: String): List[Cookie] = CookieStore.get(domain) match {
+    case null => Nil
+    case map  => map.values.toList
+  }
 }
 
 // Task processing an HTTP-URL
@@ -328,8 +348,9 @@ trait HttpTask[A] extends IOTask[A] {
     if (StoreCookies) {
       CookieStore synchronized {
         val domain = cookieDomain( conn.getURL )
+        val cookies = getCookies(domain)
         
-        for (cookies <- CookieStore get domain) {
+        if (!cookies.isEmpty) {
           val header = cookies.map(_.toHeader).mkString(";")
           conn setRequestProperty ("Cookie", header)
         }
@@ -410,7 +431,7 @@ trait HttpTask[A] extends IOTask[A] {
     if (StoreCookies) {
       val domain = cookieDomain( conn.getURL )
       
-      val newCookies: List[HttpCookie] = 
+      val newCookies: List[Cookie] = 
         headers.get("Set-Cookie").getOrElse( Nil ).
           map( str => str.split(";") ).
           flatMap( parts => {
@@ -418,19 +439,11 @@ trait HttpTask[A] extends IOTask[A] {
             if (pos > 0) {
               val name  = parts.head.slice(0, pos)
               val value = parts.head.slice(pos+1, parts.head.length)
-              Some( HttpCookie(name, value, parts.tail.toList) )
+              Some( Cookie(name, value, parts.tail.toList) )
             } else None
           }).distinct
-        
-      val newCookieNames: Set[String] = newCookies.map(_.name).toSet
-            
-      CookieStore.synchronized {
-        val keep = CookieStore.get(domain) match {
-          case Some(cs) => cs.filter(c => !newCookieNames.contains(c.name) )
-          case None     => Nil
-        }
-        CookieStore.put(domain, newCookies ::: keep)
-      }
+      
+      updateCookies(domain, newCookies)
     }
   }
   

@@ -174,7 +174,7 @@ abstract class SearchTask(q: BlockingQueue[Path]) extends Task[Unit] with Dedica
         onCompleted(fileInfo, movies)
         
       } catch { case t:Throwable =>
-        error("search for " + fileInfo + " failed: " + t.getMessage)
+        error(t, "search for " + fileInfo + " failed")
         onFailed(fileInfo, t)
       }
     }

@@ -151,7 +151,7 @@ class UI extends Frame {
       
       val resp = sites.GoogleWeb.CaptchaResponse(prompt, challenge)
       println("replying: " + resp)
-      e reply resp        
+      e feedback resp        
     }
   }
   
