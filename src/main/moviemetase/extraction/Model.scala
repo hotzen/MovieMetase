@@ -1,13 +1,11 @@
 package moviemetase
 package extraction
 
-import java.net.URL
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import scala.collection._
 import org.jsoup.select.Elements
+import java.net.URL
 import java.net.MalformedURLException
-
 
 case class Selector(sel: String, idx: Option[Int], max: Option[Int]) extends Traceable with Logging {
   import language.implicitConversions
@@ -323,7 +321,7 @@ case class DeselectStep[A](num: Int, next: Step[A]) extends Step[A] with Traceab
     next.process(newCtx)
   }
   
-  override def toString = "Deselect\n => " + next.toString
+  override def toString = "Deselect(" + num + ")\n => " + next.toString
 }
 
 case class ExtractStep[A](name: String, expr: Expr, next: Step[A]) extends Step[A] with Traceable with Logging {
@@ -361,11 +359,6 @@ trait Factory[A] extends Traceable {
   def create(extracts: List[(String,String)]): List[A]
 }
 
-object Extractor {
-  val defaultStartElem = org.jsoup.Jsoup.parse( """<html><head></head><body>undefined</body></html>""" ).body
-  val defaultStartURL = new URL("http://undefined.net/")
-}
-
 trait ExtractorParamType
 object ExtractorParamType {
   case object Term extends ExtractorParamType
@@ -375,12 +368,16 @@ object ExtractorParamType {
 case class Extractor[A](id: String, domain: String, paramType: ExtractorParamType, paramName: String, start: Step[A], factory: Factory[A]) extends Traceable with Logging {
   val logID = "Extractor(" + id + ")"
   
-  def execute(input: String): List[A] =
+  def execute(input: String): List[A] = {
     execute((paramName -> input) :: Nil)
-  
-  def execute(params: List[(String, String)]): List[A] =
-    execute(params, Extractor.defaultStartElem, Extractor.defaultStartURL)
-    
+  }
+
+  def execute(params: List[(String, String)]): List[A] = {
+    val startElem = org.jsoup.Jsoup.parse( """<html><head></head><body>undefined</body></html>""" ).body
+    val startURL = new URL("http://undefined.net/")
+    execute(params, startElem, startURL)
+  }
+
   def execute(params: List[(String, String)], startElem: Element, startURL: URL): List[A] = {
     val paramsMap = params.toMap ++ Context.defaultParams
     val varsMap = Map[String, String]()
@@ -391,54 +388,3 @@ case class Extractor[A](id: String, domain: String, paramType: ExtractorParamTyp
   
   override def toString = "Extractor(" + id + " @ " + domain + "):\n => " + start.toString
 }
-
-//case class TermExtractor[A](id: String, domain: String, paramName: String, start: Step[A], factory: Factory[A]) extends Traceable with Logging {
-//  val logID = "TermExtractor(" + id + ")"
-//  
-//  def execute(params: List[(String, String)]): List[A] =
-//    execute(params, Extractor.defaultStartElem, Extractor.defaultStartURL)
-//    
-//  def execute(params: List[(String, String)], startElem: Element, startURL: URL): List[A] = {
-//    val paramsMap = params.toMap ++ Context.defaultParams
-//    val varsMap = Map[String, String]()
-//
-//    val ctx = Context[A](startElem :: Nil, startURL, Nil, paramsMap, varsMap, factory.trace(tracing))
-//    start.process(ctx)
-//  }
-//  
-//  override def toString = "Extractor(" + id + " @ " + domain + "):\n => " + start.toString
-//}
-//
-//trait PageScraper[A] extends Scraper[A] {
-//
-//  def pageBodyTask(page: URL) = new HtmlTask[Element] {
-//    def url = page
-//    def processDocument(doc: Document): Element = doc.body
-//  }
-//  
-//  def scrapePage(page: java.net.URL): List[A] = {
-//    val params = ("PAGE" -> page.toExternalForm) :: Nil
-//    
-//    val startElem = pageBodyTask(page).submit().get()
-//    val startURL  = page
-//    
-//    execute(params, startElem, startURL)
-//  }
-//  
-//  override def toString = "PageScraper: " + start.toString
-//}
-//
-//trait SearchScraper[A] extends Scraper[A] {
-//  import org.jsoup.Jsoup
-//  
-//  def search(term: String): List[A] = {
-//    val params = ("SEARCH" -> term) :: Nil
-//        
-//    val startElem = Jsoup.parse( """<html><head></head><body></body></html>""" ).body
-//    val startURL = new URL("http://initial.net/") 
-//
-//    execute(params, startElem, startURL)
-//  }
-//  
-//  override def toString = "SearchScraper: " + start.toString
-//}
