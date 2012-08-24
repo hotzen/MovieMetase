@@ -274,7 +274,7 @@ object HttpTask {
     val empty = mutable.Map.empty[String, Cookie]
     val alreadyExists = CookieStore.putIfAbsent(domain, empty)
     if (alreadyExists eq null)
-      empty 
+      empty
     else
       alreadyExists
   }
@@ -289,7 +289,9 @@ object HttpTask {
   
   def getCookies(domain: String): List[Cookie] = CookieStore.get(domain) match {
     case null => Nil
-    case map  => map.values.toList
+    case map  => map synchronized {
+      map.values.toList 
+    }
   }
 }
 
@@ -430,7 +432,6 @@ trait HttpTask[A] extends IOTask[A] {
   def storeCookies(conn: HttpURLConnection, headers: Map[String, List[String]]): Unit = {
     if (StoreCookies) {
       val domain = cookieDomain( conn.getURL )
-      
       val newCookies: List[Cookie] = 
         headers.get("Set-Cookie").getOrElse( Nil ).
           map( str => str.split(";") ).

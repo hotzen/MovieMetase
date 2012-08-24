@@ -102,6 +102,8 @@ class DropPanel(val top: UI) extends Component {
         }
       }
     })
+    
+    val scanFilePaths = scanFiles.map( _.toPath )
     val scanDirPaths = scanDirs.map( _.toPath )
     
     def checkPath(p: Path): Boolean = {
@@ -112,15 +114,14 @@ class DropPanel(val top: UI) extends Component {
       if (tokens.find( Config.scanExcludes.contains(_) ).isDefined)
         return false
             
-      if (!Analyzer.isExt(  fileInfo.fileExt ))
+      if (!Analyzer.isExt( fileInfo.fileExt ))
         return false
       
       UI.publish(DropPanel.this)( FoundMovieFile(FileInfo(p)) )
-        
       true
     }
     
-    val q = FileScanner.findFiles(scanDirPaths, checkPath _)
+    val q = FileScanner.findFiles(scanDirPaths, checkPath _, scanFilePaths)
     
     val search = new SearchTask(q) {
       def publish = UI.publish(DropPanel.this) _
@@ -159,11 +160,10 @@ abstract class SearchTask(q: BlockingQueue[Path]) extends Task[Unit] with Dedica
     while (true) {
       val file = q.take() // blocking
       
-      if (file == FileScanner.T) // terminal
+      if (FileScanner.isTerminal(file))
         return ()
-      
+            
       val fileInfo = FileInfo(file)
-
       try {
         trace("searching by file '" + fileInfo + "'")
         onSearching( fileInfo )

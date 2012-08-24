@@ -10,17 +10,22 @@ import java.util.concurrent.LinkedBlockingQueue
 
 object FileScanner {
   
-  val T = Paths.get("/TERMINATED/")
+  val T = Paths.get("/TERMINAL/")
   
-  def findFiles(dirs: List[Path], p: Path => Boolean, terminate: Boolean = true, pauseFindCount: Int = Int.MaxValue): BlockingQueue[Path] = {
-    val q = new LinkedBlockingQueue[Path]( pauseFindCount )
+  def isTerminal(p: Path): Boolean = p eq T
+  
+  def pushFiles(q: BlockingQueue[Path], fs: List[Path]) {
+    new Task[Unit] {
+      def execute(): Unit = fs.foreach(q put _)
+    }.submit()
+  }
+  
+  def findFiles(dirs: List[Path], p: Path => Boolean, forceFiles: List[Path] = Nil): BlockingQueue[Path] = {
+    val q = new LinkedBlockingQueue[Path]( Int.MaxValue )
+    forceFiles.foreach(q put _)
+
     val v = new FileCollector(q, p)
-    
-    val optT =
-      if (terminate) Some(T)
-      else None
-    
-    new FileScannerTask(dirs, v, optT).submit() // async
+    new FileScannerTask(dirs, v, Some(T)).submit()
     q
   }
 }
@@ -31,7 +36,6 @@ trait QueueingFileVisitor extends FileVisitor[Path] {
 
 class FileScannerTask[A](dirs: List[Path], v: QueueingFileVisitor, T: Option[Path]) extends Task[Unit] {
   def execute() {
-    
     for (dir <- dirs)
       Files.walkFileTree(dir, v)
 
