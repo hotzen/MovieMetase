@@ -127,12 +127,12 @@ object MovieInfos {
   case class Tagline(text: String) extends MovieInfo { val order = 30 }
   case class Summary(text: String) extends MovieInfo { val order = 31 }
     
-  case class IMDB(imdbID: String, rating: Option[Float] = None) extends MovieInfo with Website {
+  case class IMDB(imdbID: String, rating: Float = -1) extends MovieInfo with Website {
     val order: Int = 80
     lazy val website: URL = new URL( "http://www.imdb.com/title/" + imdbID + "/" )
   }
   
-  case class TMDB(tmdbID: String, rating: Option[Float] = None) extends MovieInfo with Website {
+  case class TMDB(tmdbID: String, rating: Float = -1) extends MovieInfo with Website {
     val order: Int = 81
     lazy val website: URL = new URL( "http://www.themoviedb.org/movie/" + tmdbID )
   }

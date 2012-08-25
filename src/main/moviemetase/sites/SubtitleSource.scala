@@ -81,9 +81,7 @@ object SubtitleSource {
           
           if (!subInfo.moviePage.isEmpty) {
             val moviePage = subInfo.moviePage.get
-            movieInfos append MovieInfos.IMDB(
-              moviePage.imdbID
-            ) //.withSourceInfo( moviePage.moviePage.toString )
+            movieInfos append MovieInfos.IMDB(moviePage.imdbID)
           }
           
           movieInfos.toList
