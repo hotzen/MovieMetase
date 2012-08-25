@@ -12,9 +12,20 @@ case class ListLabelRenderer[A](f: (JLabel, Int, Boolean) => Unit) extends ListC
   }
 }
 
-case class OnListSelectedEvent(f: ListSelectionEvent => Unit) extends ListSelectionListener {
+case class OnListSelectedIndex(f: Int => Unit) extends ListSelectionListener {
   def valueChanged(evt: ListSelectionEvent) {
-    if (!evt.getValueIsAdjusting)
-      f( evt )
+    if (evt.getValueIsAdjusting)
+      return
+      
+    val lsm = evt.getSource.asInstanceOf[ListSelectionModel]
+    if (lsm.isSelectionEmpty)
+      return
+    
+    val minIdx = lsm.getMinSelectionIndex
+    val maxIdx = lsm.getMaxSelectionIndex
+    
+    for (idx <- minIdx to maxIdx if lsm.isSelectedIndex(idx)) {
+      f(idx)
+    }
   }
 }

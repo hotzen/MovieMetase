@@ -166,14 +166,6 @@ object DSL extends RegexParsers with PackratParsers {
   // ############################################
   // extractors
   
-//  case class ExtractorParamType(token: String) {
-//    def parser: Parser[ExtractorParamType] = token ^^^ this
-//  }
-//  object ExtractorParamType {
-//    val Term = ExtractorParamType("BY")
-//    val Page = ExtractorParamType("ON")
-//  }
-  
   val extractorType = """[A-Z]+""".r
   val extractorId = "ID" ~> value
   val extractorDomain = value
@@ -181,7 +173,7 @@ object DSL extends RegexParsers with PackratParsers {
   
   val extractor: Parser[Extractor[_]] = trace ~ "EXTRACT" ~ extractorType ~ "FROM" ~ extractorDomain ~ extractorParamTy ~ paramName ~ extractorId ~ step ^^ {
     case t ~ _ ~ ty ~ _ ~ dom ~ paramTy ~ paramName ~ id ~ step => {
-      val extr = ty match {
+      val extr = ty match { // XXX refactor
         case "SUBTITLES" => {
           Extractor[MovieInfos.Subtitle](id, dom, paramTy, paramName, step.asInstanceOf[Step[MovieInfos.Subtitle]], new SubtitleFactory)
         }
@@ -194,8 +186,6 @@ object DSL extends RegexParsers with PackratParsers {
   val extractors = rep1(extractor)
   
   
-  // ############################################
-  // utils
   def regexMatch(r: Regex): Parser[Regex.Match] = new Parser[Regex.Match] {
     def apply(in: Input) = {
       val source = in.source
