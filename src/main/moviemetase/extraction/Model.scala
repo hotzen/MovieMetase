@@ -37,7 +37,7 @@ case class Selector(sel: String, idx: Option[Int], max: Option[Int]) extends Tra
         val y =
           if (x > 0) x - 1
           else if (x < 0) selElems.length + x
-          else throw new ExprEvalException("invalid Selector index " + x)
+          else throw new ExprEvalException("invalid Selector index " + x, null)
 
         try selElems(y) :: Nil
         catch { case e:IndexOutOfBoundsException => Nil } 
@@ -72,14 +72,7 @@ case class Selector(sel: String, idx: Option[Int], max: Option[Int]) extends Tra
 // **********************************************
 // Expressions
 
-class ExprEvalException(msg: String) extends Exception {
-  var cause: Option[Throwable] = None
-
-  def causedBy(t: Throwable): this.type = {
-    cause = Some(t)
-    this
-  }
-}
+class ExprEvalException(msg: String, cause: Throwable) extends Exception(msg, cause)
 
 sealed trait Expr {
   def apply(ctx: Context[_]): String
@@ -94,7 +87,7 @@ case class ParamExpr(name: String, default: Option[String]) extends Expr {
     case Some(v) => v
     case None => default match {
       case Some(v) => v
-      case None => throw new ExprEvalException("no default value specified for parameter '" + name + "'") 
+      case None => throw new ExprEvalException("undefined parameter '" + name + "' without default value", null) 
     }
   }
 }
@@ -102,7 +95,7 @@ case class ParamExpr(name: String, default: Option[String]) extends Expr {
 case class VarExpr(name: String) extends Expr {
   def apply(ctx: Context[_]): String = ctx.vars.get(name) match {
     case Some(v) => v
-    case None => throw new ExprEvalException("invalid variable '" + name + "'")
+    case None => throw new ExprEvalException("invalid variable '" + name + "'", null)
   }
 }
 
@@ -134,7 +127,7 @@ case class UrlExpr(e: Expr) extends Expr {
     val s = e.apply(ctx)
     if (s.isEmpty) ""
     else try new URL(ctx.url, s).toExternalForm
-         catch { case e:java.net.MalformedURLException => throw new ExprEvalException(e.getMessage).causedBy(e) }
+         catch { case e:java.net.MalformedURLException => throw new ExprEvalException(e.getMessage, e) }
   }
 }
 
@@ -166,7 +159,7 @@ trait SubstrExpr extends Expr {
 case class SubstrEndExpr(expr: Expr, off: Int) extends SubstrExpr {
   def apply(s: String): String =
     try s.substring(absPos(off, s.length))
-    catch { case e:IndexOutOfBoundsException => throw new ExprEvalException(e.getMessage).causedBy(e) }
+    catch { case e:IndexOutOfBoundsException => throw new ExprEvalException(e.getMessage, e) }
 }
 
 case class SubstrLenExpr(expr: Expr, off: Int, len: Int) extends SubstrExpr {
@@ -174,7 +167,7 @@ case class SubstrLenExpr(expr: Expr, off: Int, len: Int) extends SubstrExpr {
     val a = absPos(off, s.length)
     val b = a + len
     try s.substring(a, b)
-    catch { case e:IndexOutOfBoundsException => throw new ExprEvalException(e.getMessage).causedBy(e) }
+    catch { case e:IndexOutOfBoundsException => throw new ExprEvalException(e.getMessage, e) }
   }
 }
 
@@ -184,7 +177,7 @@ case class SubstrPosExpr(expr: Expr, off: Int, pos: Int) extends SubstrExpr {
     val a = absPos(off, len)
     val b = absPos(pos, len)
     try s.substring(a, b)
-    catch { case e:IndexOutOfBoundsException => throw new ExprEvalException(e.getMessage).causedBy(e) }
+    catch { case e:IndexOutOfBoundsException => throw new ExprEvalException(e.getMessage, e) }
   }
 }
 // TODO RegexExpr
@@ -238,7 +231,7 @@ case class Context[A](
 // Steps: consecutive steps of processing,
 // each calling the next step (continuation)
 
-trait Step[A] {
+sealed trait Step[A] {
   def process(ctx: Context[A]): List[A]
 }
 
@@ -274,7 +267,7 @@ case class BrowseStep[A](expr: Expr, postData: List[(String,String)], forceCtxUr
   def process(ctx: Context[A]): List[A] = {
     val value = expr.apply(ctx)
     val url = new URL(value)
-    
+
     if (tracing)
       trace(url.toExternalForm)
       
@@ -359,7 +352,7 @@ trait Factory[A] extends Traceable {
   def create(extracts: List[(String,String)]): List[A]
 }
 
-trait ExtractorParamType
+sealed trait ExtractorParamType
 object ExtractorParamType {
   case object Term extends ExtractorParamType
   case object Page extends ExtractorParamType

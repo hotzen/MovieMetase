@@ -384,7 +384,7 @@ object DSL_Test extends FunSuite {
   // Extractors
   
   test("GenericSubtitlesQueryExtractor") {
-        val in = """
+    val in = """
 EXTRACT SUBTITLES FROM domain.tld BY <QUERY_PARAM> ID "ExtractorID"
   BROWSE <PAGE>
   SELECT "ul li"
@@ -394,14 +394,14 @@ EXTRACT SUBTITLES FROM domain.tld BY <QUERY_PARAM> ID "ExtractorID"
       EXTRACT AnotherProperty SELECT "a:eq(2)" ATTRIBUTE href 
       EXTRACT PropClazz-PropName SELECT "a:eq(2)"
 END"""
-    DSL(in) match {
+    DSL.parse(in) match {
       case DSL.Success(((_:Extractor[_]) :: xs), _) =>
       case res => fail(res.toString)
     }
   }
   
   test("GenericSubtitlesPageExtractor") {
-        val in = """
+    val in = """
 EXTRACT SUBTITLES FROM domain.tld ON <PAGE_URL_PARAM> ID "ExtractorID"
   BROWSE "http://www.site.net/search/" + <QUERY>
   SELECT "ul li"
@@ -411,91 +411,8 @@ EXTRACT SUBTITLES FROM domain.tld ON <PAGE_URL_PARAM> ID "ExtractorID"
       EXTRACT AnotherProperty SELECT "a:eq(2)" ATTRIBUTE href 
       EXTRACT PropClazz-PropName SELECT "a:eq(2)"
 END"""
-    DSL(in) match {
+    DSL.parse(in) match {
       case DSL.Success(((_:Extractor[_]) :: xs), _) =>
-      case res => fail(res.toString)
-    }
-  }
-   
-  
-  test("SubtitleSourceSearchExtractor") {
-    val in = """
-EXTRACT SUBTITLES FROM subtitlesource.org BY <TERM> ID "SubtitleSourceOrgSearch"
-  BROWSE "http://www.subtitlesource.org/search/" + <TERM>
-  SELECT "#searchPage li a"
-    -- BROWSE "http://www.subtitlesource.org/releaselist/" + ATTRIBUTE "href"[-9] + "%7CDESC%7CAll%7CAll" AS "http://www.subtitlesource.org/title/tt1234567/"
-
-    SET $ID = ATTRIBUTE "href"[-9]
-    BROWSE "http://www.subtitlesource.org/releaselist/" + $ID + "%7CDESC%7CAll%7CAll" AS "http://www.subtitlesource.org/title/tt1234567/"
-    
-    SELECT "#subtitle-container"
-      EXTRACT Subtitle-Label SELECT "a:eq(0)"
-      SELECT "#subtitle-list li"
-        EXTRACT Subtitle-DownloadURL   ( SELECT "a:eq(0)" ATTRIBUTE href ) AS-URL 
-        EXTRACT Subtitle-PageURL       ( SELECT "a:eq(1)" ATTRIBUTE href ) AS-URL
-        EXTRACT Subtitle-LangText      SELECT "a:eq(1)" ATTRIBUTE title
-END"""
-    DSL(in) match {
-      case res@DSL.Success(((extractor:Extractor[_]) :: xs), _) => {
-        println(res)
-      }
-      case res => fail(res.toString)
-    }
-  }
-  
-  test("PodnapisiSearchExtractor") {
-    val in = """
-EXTRACT SUBTITLES FROM podnapisi.net BY <TERM> ID "PodnapisiNetSearch"
-  SET $LANG = ( <PODNAPISI_LANG> DEFAULT "5,2" ) URL-ENCODED -- default: english, german
-  BROWSE "http://www.podnapisi.net/en/ppodnapisi/search?sJ=" + $LANG + "&sK=" + ( <SEARCH> URL-ENCODED )
-  
-  SELECT "td.sort_column"
-    EXTRACT Subtitle-Label SELECT "a.subtitle_page_link"
-    EXTRACT Subtitle-PageURL ( SELECT "a.subtitle_page_link" ATTRIBUTE href ) AS-URL
-    EXTRACT Subtitle-LangText SELECT "div.flag" ATTRIBUTE alt 
-    EXTRACT Subtitle-ReleaseText SELECT ".release"
-END"""
-    DSL(in) match {
-      case res@DSL.Success(((extractor:Extractor[_]) :: xs), _) => {
-        println(res)
-        
-        val term = "Inception.1080p.BluRay.x264-REFiNED"
-        //println( searcher.search(term).mkString("\n") )
-      }
-      case res => fail(res.toString)
-    }
-  }
-  
-  test("PodnapisiPageExtractor") {
-    val in = """
-EXTRACT SUBTITLES FROM podnapisi.net ON <PAGE> ID "PodnapisiNetPage"
-  BROWSE <PAGE>
-  SELECT "#subtitle"
-    EXTRACT Subtitle-PageURL <PAGE>
-    EXTRACT Subtitle-Label SELECT "h1"
-    EXTRACT Subtitle-DownloadURL SELECT a.download ATTRIBUTE href AS-URL    
-  
-    SELECT ".right_side"
-      SELECT fieldset #2
-        SELECT p FIRST
-          SELECT span #2
-            EXTRACT Subtitle-LangText SELECT a
-          DESELECT
-        DESELECT
-      DESELECT
-      -- or DESELECT 3
-      
-      TRACE SELECT fieldset #3
-        EXTRACT Subtitle-ReleaseText SELECT a
-END"""
-    DSL(in) match {
-      case res@DSL.Success(((extractor:Extractor[_]) :: xs), _) => {
-        println(res)
-        
-        val page = "http://www.podnapisi.net/en/inception-2010-subtitles-p814512"
-        val url = new java.net.URL(page)
-        //println( scraper.scrapePage(url).mkString("\n") )
-      }
       case res => fail(res.toString)
     }
   }

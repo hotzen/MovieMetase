@@ -43,9 +43,13 @@ object Config extends Logging {
       info("loading " + f.getAbsolutePath)
       val src = scala.io.Source.fromFile(f)
       val cnt = src.getLines.mkString("\n")
-      DSL.apply( cnt ) match {
-        case DSL.Success(extractors, _) => extractors
-        case failure => error( failure.toString ); Nil
+      
+      try   { DSL.apply(cnt) }
+      catch {
+        case e:Exception => {
+          error(e, "could not parse " + f.getAbsolutePath)
+          Nil
+        }
       }
     })
   }

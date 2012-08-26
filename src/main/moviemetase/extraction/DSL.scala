@@ -7,14 +7,13 @@ import scala.util.matching.Regex
 import java.util.regex.Pattern
 import java.net.MalformedURLException
 
-trait InvalidExtractor extends Exception
-case class InvalidExtractorType(ty: String) extends InvalidExtractor
+class InvalidExtractor(msg: String) extends Exception(msg)
+class InvalidExtractorType(ty: String) extends InvalidExtractor("invalid extractor-type '" + ty + "'")
 
 object DSL extends RegexParsers with PackratParsers {
   
-  // start-of-line comments: "# comment"
   // haskell style comments: "... -- comment"
-  override protected val whiteSpace = """(\s|^#|\Q-- \E.*)+""".r
+  override protected val whiteSpace = """(\s|\Q--\E.*)+""".r
   
   // ############################################
   // basic
@@ -212,5 +211,10 @@ object DSL extends RegexParsers with PackratParsers {
     }
   }
   
-  def apply(s: String): ParseResult[List[Extractor[_]]] = parseAll(extractors, s)
+  def parse(s: String): ParseResult[List[Extractor[_]]] = parseAll(extractors, s)
+  
+  def apply(s: String): List[Extractor[_]] = parse(s) match {
+    case DSL.Success(res, _)   => res
+    case fail@DSL.NoSuccess(msg, _) => throw new InvalidExtractor(fail.toString)
+  }
 }
