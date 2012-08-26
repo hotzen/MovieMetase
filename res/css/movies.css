@@ -9,12 +9,17 @@ body {
 
 a {
 	font-family: sans-serif;
-	color: #383838;
+	color: black;
 	text-decoration: underline;
 }
 
 a:hover {
 	text-decoration: none;
+	color: black;
+}
+
+a:visited {
+  color: black;
 }
 
 img {
@@ -48,6 +53,26 @@ img.main {
 	padding-right: 5px;
 }
 
+.websites .website {
+  font-family: sans-serif;
+  font-size: 10pt;
+  margin-left: 2px;
+}
+
+.genres {
+  font-family: sans-serif;
+  font-size: 10pt;
+}
+
+.actor, .director {
+  display: inline-block;
+  margin: 2px;
+}
+
+.genre.selected, .actor.selected, .director.selected {
+  border-bottom: 1px solid #8BD12E;
+}
+
 .directors-actors {
 	margin: 2px;
 	margin-left: 0;
@@ -67,17 +92,6 @@ img.main {
 	margin: 2px;
 }
 
-/*
-.genre, .actor, .director {
-	display: inline-block;
-	border-bottom: 1px solid #3E6D8E;
-	margin: 2px;
-}
-
-.genre.selected, .actor.selected, .director.selected {
-	border-bottom: 1px solid #8BD12E;
-}
-*/
 
 blockquote {
 	font-family: serif;

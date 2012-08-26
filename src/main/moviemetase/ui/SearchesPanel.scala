@@ -85,8 +85,11 @@ class SearchesPanel(val top: UI) extends ScrollPane {
   
   val table = new JTable(model)
   table setTableHeader null
-  table setSelectionMode ListSelectionModel.SINGLE_SELECTION
-
+  table setSelectionMode ListSelectionModel.SINGLE_INTERVAL_SELECTION //SINGLE_SELECTION
+  //table setRowSelectionAllowed true
+  //table setColumnSelectionAllowed false
+  //table setCellSelectionEnabled false
+  
   cols.zipWithIndex.foreach({ case (col, idx) =>
     val colModel = table.getColumnModel.getColumn(idx) 
     colModel setPreferredWidth col.prefWidth
@@ -123,7 +126,7 @@ class SearchesPanel(val top: UI) extends ScrollPane {
     */
   }))
 
-  val openDirAction = Action({evt =>
+  val openDirAction = new Action({evt =>
     val rowIdx = evt.getActionCommand.toInt
     val search = model.rows( rowIdx )
     val f = new java.io.File( search.fileInfo.dirPath )
@@ -133,9 +136,8 @@ class SearchesPanel(val top: UI) extends ScrollPane {
   
   contents = Component wrap table  
     
-  table.getSelectionModel.addListSelectionListener(OnListSelectedEvent(evt => {
-    val rowIdx = evt.getFirstIndex
-    val selSearch = model.rows( rowIdx )
+  table.getSelectionModel.addListSelectionListener(OnListSelectedIndex(selIdx => {
+    val selSearch = model.rows( selIdx )
     SearchesPanel.this.publish( SearchSelected(selSearch) )
   }))
   

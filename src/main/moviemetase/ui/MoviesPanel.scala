@@ -39,64 +39,58 @@ class MoviesPanel(val top: UI) extends FS_ScrollPane {
       { for (url <- movie.infos.collect({ case MovieInfos.Poster(url, x) => url }).headOption.toList) yield {
         <img class="main" src={ url.toExternalForm } title={ movie.title } />
       }}
-      <h1>
-        { movie.title }{ if (movie.year > 0) " (" + movie.year + ")" }
-      </h1>
-      <span class="websites">
-        { for (info <- movie.infos.collect({ case i:MovieInfos.Website => i })) yield {
-          val url = info.website
-          val host = url.getHost
-          val label = if (host startsWith "www.") host.substring(4)
-                      else host
+      <h1>{ movie.title }{ if (movie.year > 0) " (" + movie.year + ")" }</h1>
+      <span class="websites">{
+        val sites: List[(String,URL,Float,Int)] = movie.infos.flatMap(_ match {
+          case info:MovieInfos.IMDB => Some(("IMDB", info.website, info.rating, 10))
+          case info:MovieInfos.TMDB => Some(("TMDB", info.website, info.rating, 10))
+          case _ => None
+        })
+        
+        for ((name,url,rating,max) <- sites) yield {
+          val ratingText = if (rating > 0) " %1.2f/%2d".format(rating, max)
+                           else ""
 
-          <a href={ url.toExternalForm }>{ label }</a>
-        }}
-      </span>
-      { /*
-      <span class="genres">
-        { val genres = movie.infos.collect({ case i:MovieInfos.Genre => i }).sortBy( _.name )
-          val first = genres.take(3)
-          
-          if (!genres.isEmpty) {
-            <span class="genres">
-              <span class="label">Genres:</span>
-              { for (info <- first) yield {
-                <span class="genre">{ info.name }, </span>
-              }}
-            </span>
-          }
+          <a class="website" href={ url.toExternalForm }>{ name + ratingText }</a>
         }
-      </span>
-      */ }
-      <div class="directors-actors">
-        { val directors = movie.infos.collect({ case i:MovieInfos.Director => i })
-          val first = directors.take(2)
-          
-          if (!directors.isEmpty) {
-            <span class="directors">
+      }</span>
+      <span class="genres">{
+        val genres = movie.infos.collect({ case i:MovieInfos.Genre => i }).sortBy( _.name )
+        val first = genres.take(3)
+        
+        val out = 
+          for (info <- first)
+            yield info.name
+        
+        out.mkString(", ")
+      }</span>
+      <div class="directors-actors">{
+        val directors = movie.infos.collect({ case i:MovieInfos.Director => i })
+        val first = directors.take(2)
+        
+        if (!directors.isEmpty) {
+          <span class="directors">
               <span class="label">by</span>
               { for (info <- first) yield {
-                <span class="director">{ info.name }, </span>
-              }}
+              <span class="director">{ info.name }, </span>
+            }}
             </span>
-          }
         }
-        
-        { val actors = movie.infos.collect({ case i:MovieInfos.Actor => i })
-          val first = actors.take(5)
-           
-          if (!actors.isEmpty) {
-            <span class="actors">
+      } {
+        val actors = movie.infos.collect({ case i:MovieInfos.Actor => i })
+        val first = actors.take(5)
+         
+        if (!actors.isEmpty) {
+          <span class="actors">
               <span class="label">starring</span>
               { for (info <- first) yield {
-                <span class="actor">{ info.name }, </span>
-              }}
+              <span class="actor">{ info.name }, </span>
+            }}
             </span>
-          }
         }
-        
-      </div>
-      { val taglines = movie.infos.collect({ case i:MovieInfos.Tagline => i})
+      }
+      </div>{
+        val taglines = movie.infos.collect({ case i:MovieInfos.Tagline => i})
         val longest = taglines.sortWith( (a,b) => a.text.length > b.text.length).headOption
         
         for (info <- longest.toList) yield {
