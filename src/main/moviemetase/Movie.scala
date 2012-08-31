@@ -152,7 +152,7 @@ object MovieInfos {
     val order = 52
   }
   
-  case class Subtitle(label: String, lang: String, website: URL, download: Option[URL] = None, releaseText: Option[String] = None) extends MovieInfo with Website { val order = 60 }
+  case class Subtitle(label: String, langText: String, website: URL, download: Option[URL] = None, releaseText: Option[String] = None) extends MovieInfo with Website { val order = 60 }
   
   case class Trailer(label: String, website: URL) extends MovieInfo with Website { val order = 70 }
     

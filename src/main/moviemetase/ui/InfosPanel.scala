@@ -5,9 +5,10 @@ import scala.swing._
 import scala.swing.event._
 import java.net.URL
 import javax.swing.BoxLayout
-
-import moviemetase.ui.comp.WrapLayout;
+import moviemetase.ui.comp.WrapLayout
 import comp._
+import javax.swing.JTable
+import javax.swing.ListSelectionModel
 
 class InfosPanel(val top: UI) extends MigPanel("fill") {
   
@@ -33,43 +34,26 @@ class InfosPanel(val top: UI) extends MigPanel("fill") {
 }
 
 class InfoPostersPanel(val top: UI) extends ScrollPane {
-  import language.reflectiveCalls
-    
-  val ImageSize = (250, -1)
-      
-  val panel = new Panel with SequentialContainer.Wrapper {
+  val panel = new SeqPanel {
     peer setLayout new WrapLayout
-    
-    def add(comp: JImage with Publisher): Unit = {
-      contents += Component.wrap( comp )
-      InfoPostersPanel.this listenTo comp
-    }
-    def clear(): Unit = contents.clear()
-  }
-    
-  val backdropPanel = new Panel with SequentialContainer.Wrapper {
-    peer setLayout new WrapLayout
-    
-    def add(comp: JImage with Publisher): Unit = {
-      contents += Component.wrap( comp )
-      InfoPostersPanel.this listenTo comp
-    }
-    def clear(): Unit = contents.clear()
   }
   
   contents = new ScrollablePanel {
     peer.setLayout( new BoxLayout(peer, BoxLayout.Y_AXIS) )
-    
     scrollIncrement = 100
-    
     contents += panel
   }
     
   def render(infos: List[MovieInfo]): Unit = {
     panel.clear()
     
-    for (poster <- infos.collect({ case i:MovieInfos.Poster => i }))
-      panel add new JImage(poster.url, Some(ImageSize)) with JSelectable
+    val ImageSize = (250, -1)
+    
+    for (poster <- infos.collect({ case i:MovieInfos.Poster => i })) {
+      val comp = new JImage(poster.url, Some(ImageSize)) with JSelectable 
+      panel add comp
+      InfoPostersPanel.this listenTo comp
+    }
       
     panel.revalidate()
   }
@@ -104,34 +88,26 @@ class InfoPostersPanel(val top: UI) extends ScrollPane {
 }
 
 class InfoBackdropsPanel(val top: UI) extends ScrollPane {
-  import language.reflectiveCalls
-  
-  val ImageSize = (600, -1)
-      
-  val panel = new Panel with SequentialContainer.Wrapper {
+  val panel = new SeqPanel {
     peer setLayout new WrapLayout
-    
-    def add(comp: JImage with Publisher): Unit = {
-      contents += Component.wrap( comp )
-      InfoBackdropsPanel.this listenTo comp
-    }
-    
-    def clear(): Unit = contents.clear()
   }
   
   contents = new ScrollablePanel {
     peer.setLayout( new BoxLayout(peer, BoxLayout.Y_AXIS) )
-    
     scrollIncrement = 100
-    
     contents += panel
   }
     
   def render(infos: List[MovieInfo]): Unit = {
     panel.clear()
     
-    for (backdrop <- infos.collect({ case i:MovieInfos.Backdrop => i }))
-      panel add new JImage(backdrop.url, Some(ImageSize)) with JSelectable
+    val ImageSize = (600, -1)
+    
+    for (backdrop <- infos.collect({ case i:MovieInfos.Backdrop => i })) {
+      val comp = new JImage(backdrop.url, Some(ImageSize)) with JSelectable
+      panel add comp  
+      InfoBackdropsPanel.this listenTo comp
+    }
       
     panel.revalidate()
   }
@@ -165,7 +141,72 @@ class InfoBackdropsPanel(val top: UI) extends ScrollPane {
   }
 }
 class InfoSubtitlesPanel(val top: UI) extends ScrollPane {
+  
+  import MovieInfos.Subtitle
+  
+  val cols =
+    new TableCol("Label", 200) ::
+    new TableCol("Release", 200) ::
+    new TableCol("Language", 200) ::
+    new TableCol("Page", 100) ::
+    new TableCol("Download", 100)  ::
+    Nil
 
+  val model = new TableModel[Subtitle](cols) {
+    def getValue(sub: Subtitle, col: Int): AnyRef = col match {
+      case 0 => sub.label
+      case 1 => sub.releaseText.getOrElse("")
+      case 2 => sub.langText
+      case 3 => sub.website.toExternalForm
+      case 4 => sub.download.map(_.toExternalForm).getOrElse("")
+    }
+  }
+  
+  val table = new JTable(model)
+  table setTableHeader null
+  table setSelectionMode ListSelectionModel.SINGLE_INTERVAL_SELECTION //SINGLE_SELECTION
+  
+  cols.zipWithIndex.foreach({ case (col, idx) =>
+    val colModel = table.getColumnModel.getColumn(idx) 
+    colModel setPreferredWidth col.prefWidth
+    if (col.maxWidth > 0)
+      colModel setMaxWidth col.maxWidth
+  })
+  table setRowHeight 35
+  
+  val downloadAction = new Action({evt =>
+    val rowIdx = evt.getActionCommand.toInt
+    val search = model.rows( rowIdx )
+    //val f = new java.io.File( search.fileInfo.dirPath )
+    //UI.openFile(f)
+  })
+  new ButtonColumn(table, downloadAction, 3)
+  
+  contents = Component wrap table  
+    
+  table.getSelectionModel.addListSelectionListener(OnListSelectedIndex(selIdx => {
+    val selSearch = model.rows( selIdx )
+    //SubtitlesPanel.this.publish( SearchSelected(selSearch) )
+  }))
+  
+  def updateEq(a: Subtitle, b:Subtitle): Boolean = a.website == b.website
+  def updateModel = model.update(updateEq) _
+
+  listenTo( top.dropPanel )
+//  reactions += {
+//    case FoundMovieFile(fileInfo) => {
+//      updateModel( Search(fileInfo, SearchStatus.Pending) )
+//    }
+//    case SearchingMoviesByFile(fileInfo) => {
+//      updateModel( Search(fileInfo, SearchStatus.Searching) )
+//    }
+//    case FoundMoviesByFile(fileInfo, movies) => {
+//      updateModel( Search(fileInfo, SearchStatus.Completed, movies) )
+//    }
+//    case SearchingMoviesByFileFailed(fileInfo, t) => {
+//      updateModel( Search(fileInfo, SearchStatus.Failed, Nil, Some(t)) )
+//    }
+//  }
 }
 
 class InfoWebsitesPanel(val top: UI) extends ScrollPane {

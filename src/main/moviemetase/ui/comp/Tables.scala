@@ -10,8 +10,7 @@ import javax.swing.table._
 import javax.swing.event._
 import java.awt.LayoutManager
 
-case class TableCol(label: String, prefWidth: Int) {
-  
+class TableCol(val label: String, val prefWidth: Int) {
   var clazz: Class[_] = classOf[String]
   var editable: Boolean = false
   var maxWidth: Int = -1

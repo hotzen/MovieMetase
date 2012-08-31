@@ -18,7 +18,7 @@ object UI {
   
   def show(): Unit = {
     // Look & Feel
-    try   { UIManager setLookAndFeel "javax.swing.plaf.nimbus.NimbusLookAndFeel" } 
+    try UIManager setLookAndFeel "javax.swing.plaf.nimbus.NimbusLookAndFeel" 
     catch { case e:Exception => UIManager setLookAndFeel UIManager.getSystemLookAndFeelClassName }
         
     // Apple

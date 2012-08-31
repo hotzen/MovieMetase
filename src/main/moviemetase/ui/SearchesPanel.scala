@@ -34,7 +34,7 @@ class SearchesPanel(val top: UI) extends ScrollPane {
   val cols =
     new TableCol("Status", 35) { maxWidth = prefWidth } ::
     new TableCol("Count", 20)  { maxWidth = prefWidth } ::
-    TableCol("Dir/File", 200)  ::
+    new TableCol("Dir/File", 200)  ::
     new TableCol("Open", 40)   { maxWidth = prefWidth; editable = true } ::
     Nil
 

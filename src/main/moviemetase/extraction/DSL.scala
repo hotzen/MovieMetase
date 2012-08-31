@@ -141,7 +141,7 @@ object DSL extends RegexParsers with PackratParsers {
       SelectStep(sel, next).trace(t)
   }
   
-  val deselectStep: Parser[Step[_]] = trace ~ "DESELECT" ~ opt(int) ~ step ^^ {
+  val deselectStep: Parser[Step[_]] = trace ~ ( "DESELECT" | "UNSELECT" ) ~ opt(int) ~ step ^^ {
     case t ~ _ ~ num ~ next =>
       DeselectStep(num.getOrElse(1), next).trace(t)
   }

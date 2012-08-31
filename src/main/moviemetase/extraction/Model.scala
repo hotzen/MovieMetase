@@ -7,6 +7,10 @@ import org.jsoup.select.Elements
 import java.net.URL
 import java.net.MalformedURLException
 
+sealed trait ExtractionException extends Throwable
+
+class SelectorException(sel: Selector, msg: String, cause: Throwable) extends Exception(msg, cause) with ExtractionException
+
 case class Selector(sel: String, idx: Option[Int], max: Option[Int]) extends Traceable with Logging {
   import language.implicitConversions
   implicit def JIterToIter[A](jiter: java.util.Iterator[A]): Iterator[A] =
@@ -37,7 +41,7 @@ case class Selector(sel: String, idx: Option[Int], max: Option[Int]) extends Tra
         val y =
           if (x > 0) x - 1
           else if (x < 0) selElems.length + x
-          else throw new ExprEvalException("invalid Selector index " + x, null)
+          else throw new SelectorException(this, "invalid Selector index " + x, null)
 
         try selElems(y) :: Nil
         catch { case e:IndexOutOfBoundsException => Nil } 
@@ -72,7 +76,7 @@ case class Selector(sel: String, idx: Option[Int], max: Option[Int]) extends Tra
 // **********************************************
 // Expressions
 
-class ExprEvalException(msg: String, cause: Throwable) extends Exception(msg, cause)
+class ExprEvalException(expr: Expr, msg: String, cause: Throwable) extends Exception(msg, cause) with ExtractionException
 
 sealed trait Expr {
   def apply(ctx: Context[_]): String
@@ -87,7 +91,7 @@ case class ParamExpr(name: String, default: Option[String]) extends Expr {
     case Some(v) => v
     case None => default match {
       case Some(v) => v
-      case None => throw new ExprEvalException("undefined parameter '" + name + "' without default value", null) 
+      case None => throw new ExprEvalException(this, "undefined parameter '" + name + "' without default value", null) 
     }
   }
 }
@@ -95,7 +99,7 @@ case class ParamExpr(name: String, default: Option[String]) extends Expr {
 case class VarExpr(name: String) extends Expr {
   def apply(ctx: Context[_]): String = ctx.vars.get(name) match {
     case Some(v) => v
-    case None => throw new ExprEvalException("invalid variable '" + name + "'", null)
+    case None => throw new ExprEvalException(this, "invalid variable '" + name + "'", null)
   }
 }
 
@@ -127,7 +131,7 @@ case class UrlExpr(e: Expr) extends Expr {
     val s = e.apply(ctx)
     if (s.isEmpty) ""
     else try new URL(ctx.url, s).toExternalForm
-         catch { case e:java.net.MalformedURLException => throw new ExprEvalException(e.getMessage, e) }
+         catch { case e:java.net.MalformedURLException => throw new ExprEvalException(this, e.getMessage, e) }
   }
 }
 
@@ -159,7 +163,7 @@ trait SubstrExpr extends Expr {
 case class SubstrEndExpr(expr: Expr, off: Int) extends SubstrExpr {
   def apply(s: String): String =
     try s.substring(absPos(off, s.length))
-    catch { case e:IndexOutOfBoundsException => throw new ExprEvalException(e.getMessage, e) }
+    catch { case e:IndexOutOfBoundsException => throw new ExprEvalException(this, e.getMessage, e) }
 }
 
 case class SubstrLenExpr(expr: Expr, off: Int, len: Int) extends SubstrExpr {
@@ -167,7 +171,7 @@ case class SubstrLenExpr(expr: Expr, off: Int, len: Int) extends SubstrExpr {
     val a = absPos(off, s.length)
     val b = a + len
     try s.substring(a, b)
-    catch { case e:IndexOutOfBoundsException => throw new ExprEvalException(e.getMessage, e) }
+    catch { case e:IndexOutOfBoundsException => throw new ExprEvalException(this, e.getMessage, e) }
   }
 }
 
@@ -177,14 +181,16 @@ case class SubstrPosExpr(expr: Expr, off: Int, pos: Int) extends SubstrExpr {
     val a = absPos(off, len)
     val b = absPos(pos, len)
     try s.substring(a, b)
-    catch { case e:IndexOutOfBoundsException => throw new ExprEvalException(e.getMessage, e) }
+    catch { case e:IndexOutOfBoundsException => throw new ExprEvalException(this, e.getMessage, e) }
   }
 }
 // TODO RegexExpr
 
 
 // **********************************************
-// Context during processing of Steps
+// Context during executeing of Steps
+
+class ContextException(ctx: Context[_], msg: String, cause: Throwable) extends Exception(msg) with ExtractionException
 
 object Context {
   def defaultParams: Map[String, String] = {
@@ -205,7 +211,9 @@ case class Context[A](
     factory: Factory[A]
   ) {
   
-  def elem: Element = elems.head
+  def elem: Element =
+    try elems.head
+    catch { case e:NoSuchElementException => throw new ContextException(this, "invalid Context-State, no elements", null) }
   
   def previous: Context[A] =
     Context(elems.tail, url, extracts, params, vars, factory)
@@ -228,15 +236,17 @@ case class Context[A](
 
 
 // **********************************************
-// Steps: consecutive steps of processing,
+// Steps: consecutive steps of executeing,
 // each calling the next step (continuation)
 
+class StepExecException(step: Step[_], msg: String, cause: Throwable) extends Exception(msg, cause) with ExtractionException
+
 sealed trait Step[A] {
-  def process(ctx: Context[A]): List[A]
+  def execute(ctx: Context[A]): List[A]
 }
 
 case class FinalStep[A]() extends Step[A] {
-  def process(ctx: Context[A]): List[A] =
+  def execute(ctx: Context[A]): List[A] =
     ctx.factory.create( ctx.extracts.reverse )
   
   override def toString = "End"
@@ -264,7 +274,7 @@ case class BrowseStep[A](expr: Expr, postData: List[(String,String)], forceCtxUr
     def processDocument(doc: Document): Document = doc
   }.submit().get() // enforce utiliziation of proper pool
 
-  def process(ctx: Context[A]): List[A] = {
+  def execute(ctx: Context[A]): List[A] = {
     val value = expr.apply(ctx)
     val url = new URL(value)
 
@@ -277,7 +287,7 @@ case class BrowseStep[A](expr: Expr, postData: List[(String,String)], forceCtxUr
     }
       
     val doc = loadDoc(url)
-    next.process(ctx.setElem(doc.body).setURL(ctxUrl))
+    next.execute(ctx.setElem(doc.body).setURL(ctxUrl))
   }
   
   override def toString = "Browse(" + expr + ")\n => " + next.toString
@@ -290,11 +300,9 @@ case class SelectStep[A](selector: Selector, next: Step[A]) extends Step[A] with
       
   val logID = "Select(" + selector + ")"
   
-  def process(ctx: Context[A]): List[A] = {
-    if (tracing)
-      trace("current ")
+  def execute(ctx: Context[A]): List[A] = {
     selector.trace(tracing).apply(ctx.elem).
-      flatMap(selElem => next.process(ctx.setElem(selElem)))
+      flatMap(selElem => next.execute(ctx.setElem(selElem)))
   }
   
   override def toString = "Select("+selector+")\n => " + next.toString
@@ -303,7 +311,7 @@ case class SelectStep[A](selector: Selector, next: Step[A]) extends Step[A] with
 case class DeselectStep[A](num: Int, next: Step[A]) extends Step[A] with Traceable with Logging {
   val logID = "Deselect(" + num + ")"
   
-  def process(ctx: Context[A]): List[A] = {
+  def execute(ctx: Context[A]): List[A] = {
     var newCtx = ctx.previous
     if (num > 1)
       for (i <- 2 to num)
@@ -311,7 +319,7 @@ case class DeselectStep[A](num: Int, next: Step[A]) extends Step[A] with Traceab
     
     if (tracing)
       trace("now in scope: " + newCtx.elem.html)
-    next.process(newCtx)
+    next.execute(newCtx)
   }
   
   override def toString = "Deselect(" + num + ")\n => " + next.toString
@@ -320,15 +328,15 @@ case class DeselectStep[A](num: Int, next: Step[A]) extends Step[A] with Traceab
 case class ExtractStep[A](name: String, expr: Expr, next: Step[A]) extends Step[A] with Traceable with Logging {
   val logID = "Extract(" + name + ")"
   
-  def process(ctx: Context[A]): List[A] = {
+  def execute(ctx: Context[A]): List[A] = {
     val value = expr.apply(ctx)
     if (tracing)
       trace("'" + value + "'")
     
     if (value.isEmpty)
-      next.process(ctx)
+      next.execute(ctx)
     else
-      next.process(ctx.addExtract(name, value))
+      next.execute(ctx.addExtract(name, value))
   }
     
   override def toString = "Extract(" + name + ", " + expr + ")\n => " + next.toString
@@ -337,11 +345,11 @@ case class ExtractStep[A](name: String, expr: Expr, next: Step[A]) extends Step[
 case class BindVarStep[A](name: String, expr: Expr, next: Step[A]) extends Step[A] with Traceable with Logging {
   val logID = "BindVar(" + name + ")"
   
-  def process(ctx: Context[A]): List[A] = {
+  def execute(ctx: Context[A]): List[A] = {
     val value = expr.apply(ctx)
     if (tracing)
       trace("'" + value + "'")
-    next.process(ctx setVar (name, value))
+    next.execute(ctx setVar (name, value))
   }
     
   override def toString = "BindVar(" + name + ", " + expr + ")\n => " + next.toString
@@ -376,7 +384,7 @@ case class Extractor[A](id: String, domain: String, paramType: ExtractorParamTyp
     val varsMap = Map[String, String]()
 
     val ctx = Context[A](startElem :: Nil, startURL, Nil, paramsMap, varsMap, factory.trace(tracing))
-    start.process(ctx)
+    start.execute(ctx)
   }
   
   override def toString = "Extractor(" + id + " @ " + domain + "):\n => " + start.toString

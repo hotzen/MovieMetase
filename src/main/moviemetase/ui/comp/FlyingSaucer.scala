@@ -89,12 +89,12 @@ class FS_ReplacedElementFactory(panel: FS_Panel) extends ReplacedElementFactory 
         
     // external image
     if (src startsWith "http://") {
-      def onImageLoaded(img: BufferedImage): Unit = UI run {
+      def onImageLoaded(img: BufferedImage): Unit = {
         loadedImages  += (src -> img)
         loadingImages -= src
-
+        
         if (loadingImages.size == 0 || loadedImages.size % 3 == 0)
-          panel.relayout()
+          UI run panel.relayout()
       }
       
       loadedImages get src match {
