@@ -17,9 +17,9 @@ case class Selector(sel: String, idx: Option[Int], max: Option[Int]) extends Tra
     scala.collection.convert.Wrappers.JIteratorWrapper[A]( jiter )
 
   val logID = "Selector(" + sel + 
-                { idx match { case Some(x) => ", idx="+x case None => "" } } + 
-                { max match { case Some(x) => ", max="+x case None => "" } } +
-                ")"
+              { idx match { case Some(x) => ", idx="+x case None => "" } } + 
+              { max match { case Some(x) => ", max="+x case None => "" } } +
+              ")"
 
   def apply(elem: Element): List[Element] = {
     val jiter = elem.select(sel)
@@ -79,15 +79,15 @@ case class Selector(sel: String, idx: Option[Int], max: Option[Int]) extends Tra
 class ExprEvalException(expr: Expr, msg: String, cause: Throwable) extends Exception(msg, cause) with ExtractionException
 
 sealed trait Expr {
-  def apply(ctx: Context[_]): String
+  def eval(ctx: Context[_]): String
 }
 
 case class LitExpr(s: String) extends Expr {
-  def apply(ctx: Context[_]): String = s
+  def eval(ctx: Context[_]): String = s
 }
 
 case class ParamExpr(name: String, default: Option[String]) extends Expr {
-  def apply(ctx: Context[_]): String = ctx.params.get(name) match {
+  def eval(ctx: Context[_]): String = ctx.params.get(name) match {
     case Some(v) => v
     case None => default match {
       case Some(v) => v
@@ -97,20 +97,20 @@ case class ParamExpr(name: String, default: Option[String]) extends Expr {
 }
 
 case class VarExpr(name: String) extends Expr {
-  def apply(ctx: Context[_]): String = ctx.vars.get(name) match {
+  def eval(ctx: Context[_]): String = ctx.vars.get(name) match {
     case Some(v) => v
     case None => throw new ExprEvalException(this, "invalid variable '" + name + "'", null)
   }
 }
 
 case class SelExpr(selector: Selector, sep: String) extends Expr {
-  def apply(ctx: Context[_]): String = {
-    selector.apply(ctx.elem).map(_.text).mkString(sep)
+  def eval(ctx: Context[_]): String = {
+    selector(ctx.elem).map(_.text).mkString(sep)
   }
 }
 
 case class AttrExpr(name: String) extends Expr {
-  def apply(ctx: Context[_]): String = {
+  def eval(ctx: Context[_]): String = {
     val value = ctx.elem.attr(name)
     if (value == null) ""
     else value
@@ -118,8 +118,8 @@ case class AttrExpr(name: String) extends Expr {
 }
 
 case class SelAttrExpr(selector: Selector, attr: String, sep: String) extends Expr {
-  def apply(ctx: Context[_]): String = {
-    selector.apply(ctx.elem).flatMap(selElem => selElem.attr(attr) match {
+  def eval(ctx: Context[_]): String = {
+    selector(ctx.elem).flatMap(selElem => selElem.attr(attr) match {
       case null => None
       case x => Some(x)
     }).mkString(sep)
@@ -127,8 +127,8 @@ case class SelAttrExpr(selector: Selector, attr: String, sep: String) extends Ex
 }
 
 case class UrlExpr(e: Expr) extends Expr {
-  def apply(ctx: Context[_]): String = {
-    val s = e.apply(ctx)
+  def eval(ctx: Context[_]): String = {
+    val s = e.eval(ctx)
     if (s.isEmpty) ""
     else try new URL(ctx.url, s).toExternalForm
          catch { case e:java.net.MalformedURLException => throw new ExprEvalException(this, e.getMessage, e) }
@@ -136,17 +136,17 @@ case class UrlExpr(e: Expr) extends Expr {
 }
 
 case class UrlEncExpr(e: Expr) extends Expr {
-  def apply(ctx: Context[_]): String = {
-    val s = e.apply(ctx)
+  def eval(ctx: Context[_]): String = {
+    val s = e.eval(ctx)
     java.net.URLEncoder.encode(s, "UTF-8")
   }
 }
 
 case class ConcatExpr(a: Expr, b: Expr) extends Expr {
-  def apply(ctx: Context[_]): String = {
+  def eval(ctx: Context[_]): String = {
     val sb = new StringBuilder
-    sb append a.apply(ctx)
-    sb append b.apply(ctx)
+    sb append a.eval(ctx)
+    sb append b.eval(ctx)
     sb.toString
   }
 }
@@ -154,20 +154,19 @@ case class ConcatExpr(a: Expr, b: Expr) extends Expr {
 trait SubstrExpr extends Expr {
   def expr: Expr
   def absPos(pos: Int, len: Int): Int = if (pos < 0) len + pos else pos
-  def apply(s: String): String
+  def eval(s: String): String
   
-  def apply(ctx: Context[_]): String =
-    apply( expr.apply(ctx) )
+  def eval(ctx: Context[_]): String = eval( expr.eval(ctx) )
 }
 
 case class SubstrEndExpr(expr: Expr, off: Int) extends SubstrExpr {
-  def apply(s: String): String =
+  def eval(s: String): String =
     try s.substring(absPos(off, s.length))
     catch { case e:IndexOutOfBoundsException => throw new ExprEvalException(this, e.getMessage, e) }
 }
 
 case class SubstrLenExpr(expr: Expr, off: Int, len: Int) extends SubstrExpr {
-  def apply(s: String): String = {
+  def eval(s: String): String = {
     val a = absPos(off, s.length)
     val b = a + len
     try s.substring(a, b)
@@ -176,7 +175,7 @@ case class SubstrLenExpr(expr: Expr, off: Int, len: Int) extends SubstrExpr {
 }
 
 case class SubstrPosExpr(expr: Expr, off: Int, pos: Int) extends SubstrExpr {
-  def apply(s: String): String = {
+  def eval(s: String): String = {
     val len = s.length
     val a = absPos(off, len)
     val b = absPos(pos, len)
@@ -252,35 +251,22 @@ case class FinalStep[A]() extends Step[A] {
   override def toString = "End"
 }
 
-case class BrowseStep[A](expr: Expr, postData: List[(String,String)], forceCtxUrl: Option[String], next: Step[A]) extends Step[A] with Traceable with Logging {
-  val logID = "Browse"
+case class GetStep[A](expr: Expr, forceCtxUrl: Option[String], next: Step[A]) extends Step[A] with Traceable with Logging {
+  val logID = "GET"
   
   def loadDoc(theUrl: URL): Document = new HtmlTask[Document] {
     def url = theUrl
-        
-    RequestMethod = if (postData.isEmpty) "GET" else "POST"
-    RequestData = Some(os => {
-      import java.io.OutputStreamWriter
-      import java.net.URLEncoder
-      val osw = new OutputStreamWriter(os)
-      val data =
-        for ((k,v) <- postData)
-          yield URLEncoder.encode(k, "UTF-8") + "=" + URLEncoder.encode(v, "UTF-8")
-      osw.write( data.mkString("&") )
-      osw.flush()
-      osw.close()
-    })
-    
+    RequestMethod = "GET"
     def processDocument(doc: Document): Document = doc
   }.submit().get() // enforce utiliziation of proper pool
 
   def execute(ctx: Context[A]): List[A] = {
-    val value = expr.apply(ctx)
+    val value = expr.eval(ctx)
     val url = new URL(value)
 
     if (tracing)
       trace(url.toExternalForm)
-      
+
     val ctxUrl = forceCtxUrl match {
       case Some(f) => new URL(f)
       case None => url
@@ -290,7 +276,48 @@ case class BrowseStep[A](expr: Expr, postData: List[(String,String)], forceCtxUr
     next.execute(ctx.setElem(doc.body).setURL(ctxUrl))
   }
   
-  override def toString = "Browse(" + expr + ")\n => " + next.toString
+  override def toString = "GET(" + expr + ")\n => " + next.toString
+}
+
+case class PostStep[A](expr: Expr, data: List[(String,String)], forceCtxUrl: Option[String], next: Step[A]) extends Step[A] with Traceable with Logging {
+  val logID = "POST"
+  
+  def loadDoc(theUrl: URL): Document = new HtmlTask[Document] {
+    def url = theUrl
+    
+    RequestMethod = "POST"
+    RequestData = Some(os => {
+      import java.io.OutputStreamWriter
+      import java.net.URLEncoder
+      val osw = new OutputStreamWriter(os)
+      val encData =
+        for ((k,v) <- data)
+          yield URLEncoder.encode(k, "UTF-8") + "=" + URLEncoder.encode(v, "UTF-8")
+      osw.write( encData.mkString("&") )
+      osw.flush()
+      osw.close()
+    })
+    
+    def processDocument(doc: Document): Document = doc
+  }.submit().get() // enforce utiliziation of proper pool
+
+  def execute(ctx: Context[A]): List[A] = {
+    val value = expr.eval(ctx)
+    val url = new URL(value)
+
+    if (tracing)
+      trace(url.toExternalForm)
+
+    val ctxUrl = forceCtxUrl match {
+      case Some(f) => new URL(f)
+      case None => url
+    }
+      
+    val doc = loadDoc(url)
+    next.execute(ctx.setElem(doc.body).setURL(ctxUrl))
+  }
+  
+  override def toString = "POST(" + expr + ", {" + data.mkString(";") + "})\n => " + next.toString
 }
 
 case class SelectStep[A](selector: Selector, next: Step[A]) extends Step[A] with Traceable with Logging {
@@ -301,7 +328,7 @@ case class SelectStep[A](selector: Selector, next: Step[A]) extends Step[A] with
   val logID = "Select(" + selector + ")"
   
   def execute(ctx: Context[A]): List[A] = {
-    selector.trace(tracing).apply(ctx.elem).
+    selector.trace(tracing)(ctx.elem).
       flatMap(selElem => next.execute(ctx.setElem(selElem)))
   }
   
@@ -329,7 +356,7 @@ case class ExtractStep[A](name: String, expr: Expr, next: Step[A]) extends Step[
   val logID = "Extract(" + name + ")"
   
   def execute(ctx: Context[A]): List[A] = {
-    val value = expr.apply(ctx)
+    val value = expr.eval(ctx)
     if (tracing)
       trace("'" + value + "'")
     
@@ -346,7 +373,7 @@ case class BindVarStep[A](name: String, expr: Expr, next: Step[A]) extends Step[
   val logID = "BindVar(" + name + ")"
   
   def execute(ctx: Context[A]): List[A] = {
-    val value = expr.apply(ctx)
+    val value = expr.eval(ctx)
     if (tracing)
       trace("'" + value + "'")
     next.execute(ctx setVar (name, value))

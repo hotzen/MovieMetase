@@ -315,18 +315,18 @@ object DSL_Test extends FunSuite {
     }
   }
     
-  test("BrowseSelectStep") {
-    val in = """ BROWSE SELECT "h1" + "suffix" END """
+  test("GetSelectStep") {
+    val in = """ GET SELECT "h1" + "suffix" END """
     DSL.parseAll(DSL.step, in) match {
-      case DSL.Success(s:BrowseStep[_], _) =>
+      case DSL.Success(s:GetStep[_], _) =>
       case res => fail(res.toString)
     }
   }
   
-  test("BrowseAttributeUnquotedStep") {
-    val in = """ BROWSE ATTRIBUTE foo + bar END """
+  test("GetAttributeUnquotedStep") {
+    val in = """ GET ATTRIBUTE foo + bar END """
     DSL.parseAll(DSL.step, in) match {
-      case DSL.Success(s:BrowseStep[_], _) =>
+      case DSL.Success(s:GetStep[_], _) =>
       case res => fail(res.toString)
     }
   }
@@ -386,9 +386,9 @@ object DSL_Test extends FunSuite {
   test("GenericSubtitlesQueryExtractor") {
     val in = """
 EXTRACT SUBTITLES FROM domain.tld BY <QUERY_PARAM> ID "ExtractorID"
-  BROWSE <PAGE>
+  GET <PAGE>
   SELECT "ul li"
-    BROWSE "http://www.site.net/" + ATTRIBUTE "attr"
+    GET "http://www.site.net/" + ATTRIBUTE "attr"
     SELECT "a"
       EXTRACT Something SELECT "a:eq(1)" ATTRIBUTE "-funky-attribute"
       EXTRACT AnotherProperty SELECT "a:eq(2)" ATTRIBUTE href 
@@ -403,9 +403,9 @@ END"""
   test("GenericSubtitlesPageExtractor") {
     val in = """
 EXTRACT SUBTITLES FROM domain.tld ON <PAGE_URL_PARAM> ID "ExtractorID"
-  BROWSE "http://www.site.net/search/" + <QUERY>
+  GET "http://www.site.net/search/" + <QUERY>
   SELECT "ul li"
-    BROWSE "http://www.site.net/" + ATTRIBUTE "attr"
+    GET "http://www.site.net/" + ATTRIBUTE "attr"
     SELECT "a"
       EXTRACT Something SELECT "a:eq(1)" ATTRIBUTE "-funky-attribute"
       EXTRACT AnotherProperty SELECT "a:eq(2)" ATTRIBUTE href 

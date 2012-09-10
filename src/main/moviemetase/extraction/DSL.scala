@@ -6,6 +6,7 @@ import scala.util.parsing.combinator.PackratParsers
 import scala.util.matching.Regex
 import java.util.regex.Pattern
 import java.net.MalformedURLException
+import scala.util.parsing.combinator.lexical.Lexical
 
 class InvalidExtractor(msg: String) extends Exception(msg)
 class InvalidExtractorType(ty: String) extends InvalidExtractor("invalid extractor-type '" + ty + "'")
@@ -25,6 +26,9 @@ object DSL extends RegexParsers with PackratParsers {
   
   val int = """-?\d+""".r ^^ { d => d.toInt }
   
+  val keyValuePair = value ~ "=" ~ value ^^ {
+    case k ~ _ ~ v => (k, v) 
+  }
   
   // ############################################
   // selector
@@ -123,17 +127,17 @@ object DSL extends RegexParsers with PackratParsers {
   // ############################################
   // steps
   val trace = opt("TRACE") ^^ { _.isDefined }
+  val asURL = "AS" ~> value
   
-  val browseAsUrl = "AS" ~> value
-  val browsePostData = "POST" ~> rep1(value ~ "=" ~ value)
-  val browseStep: Parser[Step[_]] = trace ~ "BROWSE" ~ expr ~ opt(browseAsUrl) ~ opt(browsePostData) ~ step ^^ {
-    case t ~ _ ~ e ~ url ~ pd ~ next => {
-      val postData = pd match {
-        case Some(xs) => for (x <- xs) yield x match { case k ~ _ ~ v => (k, v)  }
-        case None => Nil
-      }
-      BrowseStep(e, postData, url, next).trace(t)
-    }
+  val getStep: Parser[Step[_]] = trace ~ "GET" ~ expr ~ opt(asURL) ~ step ^^ {
+    case t ~ _ ~ e ~ url ~ next =>
+      GetStep(e, url, next).trace(t)
+  } 
+  
+  val postData = "DATA" ~> rep1(keyValuePair)
+  val postStep: Parser[Step[_]] = trace ~ "POST" ~ expr ~ opt(asURL) ~ postData ~ step ^^ {
+    case t ~ _ ~ e ~ url ~ data ~ next =>
+      PostStep(e, data, url, next).trace(t)
   }
   
   val selectStep: Parser[Step[_]] = trace ~ "SELECT" ~ selector ~ step ^^ {
@@ -159,7 +163,7 @@ object DSL extends RegexParsers with PackratParsers {
   
   val finalStep: Parser[Step[_]] = "END" ^^^ FinalStep()
   
-  val step: Parser[Step[_]] = browseStep | selectStep | deselectStep | extractStep | bindVarStep | finalStep  
+  val step: Parser[Step[_]] = getStep | postStep | selectStep | deselectStep | extractStep | bindVarStep | finalStep  
 
   
   // ############################################
@@ -201,7 +205,9 @@ object DSL extends RegexParsers with PackratParsers {
     }
   }
   
-  def parse(s: String): ParseResult[List[Extractor[_]]] = parseAll(extractors, s)
+  def parse(s: String): ParseResult[List[Extractor[_]]] =
+    parseAll(extractors, s)
+    //phrase(extractor)(new Scanner(s))
   
   def apply(s: String): List[Extractor[_]] = parse(s) match {
     case DSL.Success(res, _)   => res
