@@ -24,7 +24,7 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
       val f1 = containsAllTokensFilter(dis.tokens) _
       val f2 = satisfiesDissectedInfos(dis) _
       
-      movies appendAll GoogleTermWithImdbLink(t, Some(f1)).execute().filter(f2)
+      movies appendAll GoogleTermLinkingToImdb(t, Some(f1)).execute().filter(f2)
     }
     
     // contains tags, search for the EXACT name, year and use tag-hints
@@ -40,7 +40,7 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
       
       val f = satisfiesDissectedInfos(dis) _
       
-      movies appendAll GoogleTermWithImdbLink(t3).execute().filter(f)
+      movies appendAll GoogleTermLinkingToImdb(t3).execute().filter(f)
     }
     
     // contains name, search for the name and year
@@ -89,7 +89,7 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
         val f1 = containsAllTokensFilter(dis.file.tokens) _
         val f2 = satisfiesDissectedFileInfos(dis) _
         
-        movies appendAll GoogleTermWithImdbLink(t, Some(f1)).execute().filter(f2)
+        movies appendAll GoogleTermLinkingToImdb(t, Some(f1)).execute().filter(f2)
       }
     }
     
@@ -103,7 +103,7 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
         val f1 = containsAllTokensFilter(dis.dir.tokens) _
         val f2 = satisfiesDissectedFileInfos(dis) _
         
-        movies appendAll GoogleTermWithImdbLink(t, Some(f1)).execute().filter(f2)
+        movies appendAll GoogleTermLinkingToImdb(t, Some(f1)).execute().filter(f2)
       }
     }
     
@@ -127,7 +127,7 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
       
       val f = satisfiesDissectedFileInfos(dis) _
       
-      movies appendAll GoogleTermWithImdbLink( t3 ).execute().filter(f)
+      movies appendAll GoogleTermLinkingToImdb( t3 ).execute().filter(f)
     }
     
     if (movies.isEmpty && !dis.same.names.isEmpty && !dis.same.tags.isEmpty) {
@@ -142,7 +142,7 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
       
       val f = satisfiesDissectedFileInfos(dis) _
       
-      movies appendAll GoogleTermWithImdbLink( t3 ).execute().filter(f)
+      movies appendAll GoogleTermLinkingToImdb( t3 ).execute().filter(f)
     }
     
     if (movies.isEmpty && !dis.file.names.isEmpty && !dis.file.tags.isEmpty) {
@@ -157,7 +157,7 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
       
       val f = satisfiesDissectedFileInfos(dis) _
       
-      movies appendAll GoogleTermWithImdbLink( t3 ).execute().filter(f)
+      movies appendAll GoogleTermLinkingToImdb( t3 ).execute().filter(f)
     }
     
     if (movies.isEmpty && !dis.dir.names.isEmpty && !dis.dir.tags.isEmpty) {
@@ -172,7 +172,7 @@ class MovieSearch() extends SearchManager[Movie] with Logging {
       
       val f = satisfiesDissectedFileInfos(dis) _
       
-      movies appendAll GoogleTermWithImdbLink( t3 ).execute().filter(f)
+      movies appendAll GoogleTermLinkingToImdb( t3 ).execute().filter(f)
     }
     
     // NOTHING FOUND

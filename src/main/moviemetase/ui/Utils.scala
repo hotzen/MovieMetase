@@ -15,10 +15,6 @@ case class Action(f: ActionEvent => Unit) extends AbstractAction {
   def actionPerformed(evt: ActionEvent): Unit =  f(evt)
 }
 
-
-
-
-
 class MovieSelection {
   import scala.collection.mutable.Map
     

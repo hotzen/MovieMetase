@@ -9,19 +9,19 @@ object Config extends Logging {
   
   lazy val releaseTags =
     readFile("reltags.txt").getLines.
-      map(_.trim.toLowerCase).filter(x => !x.isEmpty && !x.startsWith("#")).toSet
+      map(_.trim.toLowerCase).withFilter(x => !x.isEmpty && !x.startsWith("#")).toSet
 
   lazy val videoExts =
     readFile("videoexts.txt").getLines.
-      map(_.trim.toLowerCase).filter(x => !x.isEmpty && !x.startsWith("#")).toSet
+      map(_.trim.toLowerCase).withFilter(x => !x.isEmpty && !x.startsWith("#")).toSet
 
   lazy val stopWords =
     readFile("stopwords.txt").getLines.
-      map(_.trim.toLowerCase).filter(x => !x.isEmpty && !x.startsWith("#")).toSet
+      map(_.trim.toLowerCase).withFilter(x => !x.isEmpty && !x.startsWith("#")).toSet
   
   lazy val scanExcludes =
     readFile("scanexcl.txt").getLines.
-      map(_.trim.toLowerCase).filter(x => !x.isEmpty && !x.startsWith("#")).toSet
+      map(_.trim.toLowerCase).withFilter(x => !x.isEmpty && !x.startsWith("#")).toSet
 
   lazy val tokenRepl =
     readFile("tokenrepl.txt").getLines.

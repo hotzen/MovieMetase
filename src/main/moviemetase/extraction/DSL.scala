@@ -8,8 +8,8 @@ import java.util.regex.Pattern
 import java.net.MalformedURLException
 import scala.util.parsing.combinator.lexical.Lexical
 
-class InvalidExtractor(msg: String) extends Exception(msg)
-class InvalidExtractorType(ty: String) extends InvalidExtractor("invalid extractor-type '" + ty + "'")
+class InvalidExtractor(val msg: String) extends Exception(msg)
+class InvalidExtractorType(val ty: String) extends InvalidExtractor("invalid extractor-type '" + ty + "'")
 
 object DSL extends RegexParsers with PackratParsers {
   
@@ -171,7 +171,7 @@ object DSL extends RegexParsers with PackratParsers {
   
   val extractorType = """[A-Z]+""".r
   val extractorId = "ID" ~> value
-  val extractorDomain = value
+  val extractorDomain = value ^^ { v => v.toLowerCase }
   val extractorParamTy = "BY" ^^^ ExtractorParamType.Term | "ON" ^^^ ExtractorParamType.Page
   
   val extractor: Parser[Extractor[_]] = trace ~ "EXTRACT" ~ extractorType ~ "FROM" ~ extractorDomain ~ extractorParamTy ~ paramName ~ extractorId ~ step ^^ {
