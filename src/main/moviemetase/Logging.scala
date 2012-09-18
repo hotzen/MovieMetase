@@ -4,10 +4,10 @@ import java.io.PrintWriter
 import java.util.Date
 
 object LogLevel {
-  val Trace = LogLevel(1, "trace")
-  val Info  = LogLevel(2, "info")
-  val Warn  = LogLevel(3, "warn")
-  val Error = LogLevel(4, "ERROR")
+  val Trace = LogLevel(1, "T")
+  val Info  = LogLevel(2, "I")
+  val Warn  = LogLevel(3, "W")
+  val Error = LogLevel(4, "E")
 }
 case class LogLevel(id: Int, name: String)
 
@@ -37,9 +37,17 @@ trait Logging {
     buf setLength 0 // reset
 
     //buf append "[" append Thread.currentThread.getName append "] "
-    buf append "[" append lvl.name append "] "
+    //buf append "[" append lvl.name append "] "
+    //buf append lvl.name append " "
     //buf append Logging.TimestampFormat.format( new Date() ) 
-    buf append " " append logID append " " //append "\t"
+    buf append "[" append logID append "] " //append "\t"
+    
+    buf append { lvl match {
+      case LogLevel.Warn  => "Warning: "
+      case LogLevel.Error => "ERROR: "
+      case _ => ""
+    }}
+
     buf append msg
     
     if (!infos.isEmpty) {

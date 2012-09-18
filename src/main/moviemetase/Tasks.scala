@@ -70,13 +70,14 @@ object TaskManager extends Logging {
     }
   }
   
+  def mainPool: ExecutorService = pool(MainPoolID, MainPoolSize, MainPoolLimit)
+  
   def getPoolFor(task: Task[_]): ExecutorService = task match {
     case p:DedicatedPool => {
       val (poolID, poolSize, poolLimit) = p.pool
       pool(poolID, poolSize, poolLimit)
     }
-    case _ =>
-      pool(MainPoolID, MainPoolSize, MainPoolLimit)
+    case _ => mainPool
   }
 
   def shutdown(): Unit = {
@@ -155,6 +156,28 @@ object TaskManager extends Logging {
     def isCancelled(): Boolean = false
     def isDone(): Boolean = true
   }
+  
+  object async {
+    import language.implicitConversions
+    
+    implicit def asyncExecContext = ExecutionContext.fromExecutorService( mainPool )
+    
+    implicit def awaitable[A](fut: Future[A]): AwaitableFuture[A] = new AwaitableFuture[A](fut) 
+    
+    class AwaitableFuture[A](fut: Future[A]) {
+      def await: A = { 
+        import scala.concurrent._
+        blocking(fut, util.Duration.Inf)
+      }
+      
+      def await(millis: Long): A = {
+        import scala.concurrent._
+        import java.util.concurrent.TimeUnit
+        val dur = util.Duration(millis, TimeUnit.MILLISECONDS)
+        blocking(fut, dur)
+      }
+    }
+  }
 }
 
 object Task {
@@ -173,7 +196,7 @@ trait Task[A] {
   // submit for asynchronous processing using the new Scala Futures
   // http://docs.scala-lang.org/sips/pending/futures-promises.html
   private def asyncExecContext = ExecutionContext.fromExecutorService( TaskManager getPoolFor this )   
-  def async(): Future[A] = Future({ execute() })(asyncExecContext)
+  def async(): Future[A] = Future({ execute() })( asyncExecContext )
 }
 
 trait DedicatedPool {
@@ -259,6 +282,20 @@ object HttpTask {
   import scala.collection.mutable
   import java.util.concurrent.ConcurrentHashMap
   
+  import scala.io.Source
+    
+  def GET(theUrl: URL): Future[String] = {
+    val task = new HttpTask[String] {
+      val url = theUrl 
+      
+      def processResponse(is: InputStream): String = {
+        val src = Source.fromInputStream(is, "UTF-8")
+        src.getLines.mkString("\n")
+      }
+    }
+    task.async()
+  }
+ 
   case class Cookie(name: String, value: String, attrs: List[String] = Nil) {
     def toHeader(): String = name+"="+value
   }
@@ -294,6 +331,7 @@ object HttpTask {
     }
   }
 }
+
 
 // Task processing an HTTP-URL
 trait HttpTask[A] extends IOTask[A] {

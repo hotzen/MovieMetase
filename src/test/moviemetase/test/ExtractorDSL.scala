@@ -4,7 +4,7 @@ package test
 import extraction._
 import org.scalatest.FunSuite
 
-object DSL_Test extends FunSuite {
+object ExtractorDSLTest extends FunSuite {
   
   Logging.level = LogLevel.Trace
 
@@ -56,13 +56,13 @@ object DSL_Test extends FunSuite {
     }
   }
   
-  test("IdxSelector") {
-    val in = """ a.href #1 """
-    DSL.parseAll(DSL.selector, in) match {
-      case DSL.Success(Selector("a.href", Some(1), None), _) =>
-      case res => fail(res.toString)
-    }
-  }
+//  test("IdxSelector") {
+//    val in = """ a.href 1 """
+//    DSL.parseAll(DSL.selector, in) match {
+//      case DSL.Success(Selector("a.href", Some(1), None), _) =>
+//      case res => fail(res.toString)
+//    }
+//  }
   
   test("MaxSelector") {
     val in = """ a.href MAX 3 """

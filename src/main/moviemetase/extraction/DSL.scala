@@ -14,9 +14,9 @@ class InvalidExtractorType(val ty: String) extends InvalidExtractor("invalid ext
 object DSL extends RegexParsers with PackratParsers {
   
   // haskell style comments: "... -- comment"
-  override protected val whiteSpace = """(\s|\Q--\E.*)+""".r
+  override protected val whiteSpace = """(\s|\Q--\E.*|\#.*)+""".r
   
-  // ############################################
+  // ********************************************
   // basic
   
   val quotedRegex = """"([^"]*)"""".r
@@ -30,16 +30,16 @@ object DSL extends RegexParsers with PackratParsers {
     case k ~ _ ~ v => (k, v) 
   }
   
-  // ############################################
+  // ********************************************
   // selector
   
   
   val selectorIdxFirst = "FIRST" ^^^ 1
   val selectorIdxLast = "LAST" ^^^ -1
-  val selectorIdxNum = "#" ~> int ^^ {
-    case i => i.toInt
-  }
-  val selectorIdx = selectorIdxFirst | selectorIdxLast | selectorIdxNum
+//  val selectorIdxNum = "#" ~> int ^^ {
+//    case i => i.toInt
+//  }
+  val selectorIdx = selectorIdxFirst | selectorIdxLast // | selectorIdxNum
   
   val selectorMax = "MAX" ~> int
     
@@ -49,7 +49,7 @@ object DSL extends RegexParsers with PackratParsers {
   }
   
   
-  // ############################################
+  // ********************************************
   // expressions
   val literalExpr = value ^^ { case s => LitExpr(s) }
   
@@ -124,7 +124,7 @@ object DSL extends RegexParsers with PackratParsers {
   val expr: PackratParser[Expr] = postfixExpr | binExpr | parensExpr | basicExpr
 
 
-  // ############################################
+  // ********************************************
   // steps
   val trace = opt("TRACE") ^^ { _.isDefined }
   val asURL = "AS" ~> value
@@ -166,7 +166,7 @@ object DSL extends RegexParsers with PackratParsers {
   val step: Parser[Step[_]] = getStep | postStep | selectStep | deselectStep | extractStep | bindVarStep | finalStep  
 
   
-  // ############################################
+  // ********************************************
   // extractors
   
   val extractorType = """[A-Z]+""".r
