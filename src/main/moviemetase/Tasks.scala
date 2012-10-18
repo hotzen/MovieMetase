@@ -165,16 +165,15 @@ object TaskManager extends Logging {
     implicit def awaitable[A](fut: Future[A]): AwaitableFuture[A] = new AwaitableFuture[A](fut) 
     
     class AwaitableFuture[A](fut: Future[A]) {
-      def await: A = { 
-        import scala.concurrent._
-        blocking(fut, util.Duration.Inf)
-      }
-      
-      def await(millis: Long): A = {
-        import scala.concurrent._
-        import java.util.concurrent.TimeUnit
-        val dur = util.Duration(millis, TimeUnit.MILLISECONDS)
-        blocking(fut, dur)
+      import scala.concurrent.Await
+      import scala.concurrent.util.Duration
+      import java.util.concurrent.TimeUnit
+
+      val defaultMillis: Long = 10 * 1000
+
+      def await(millis: Long = defaultMillis): A = {
+        val dur = Duration(millis, TimeUnit.MILLISECONDS)
+        Await.result(fut, dur)
       }
     }
   }

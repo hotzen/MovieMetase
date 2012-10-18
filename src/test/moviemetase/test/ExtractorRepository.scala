@@ -10,7 +10,7 @@ object ExtractorRepositoryTest extends FunSuite {
   
   test("DefaultRepository") {
     val fut = Repository.load()
-    val extractors = fut.await
+    val extractors = fut.await()
     println( extractors.size )
   }
     
