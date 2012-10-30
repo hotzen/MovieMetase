@@ -25,7 +25,7 @@ object GoogleTest extends swing.Reactor {
   
   listenTo( HumanTasks )
   reactions += {
-    case e@sites.GoogleWeb.CaptchaRequired(challenge, _) => {
+    case e@Google.CaptchaRequired(challenge, _) => {
       import java.awt._
       import javax.swing._
       println("EVENT: " + e)
@@ -44,7 +44,7 @@ object GoogleTest extends swing.Reactor {
         prompt = JOptionPane.showInputDialog(panel)
       }
       
-      val resp = sites.GoogleWeb.CaptchaResponse(prompt, challenge)
+      val resp = Google.CaptchaResponse(prompt, challenge)
       println("replying: " + resp)
       e feedback resp        
     }

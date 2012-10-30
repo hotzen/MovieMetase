@@ -131,7 +131,7 @@ class UI extends Frame {
   
   listenTo( HumanTasks )
   reactions += {
-    case e@sites.GoogleWeb.CaptchaRequired(challenge, _) => {
+    case e@sites.Google.CaptchaRequired(challenge, _) => {
       import java.awt._
       import javax.swing._
       
@@ -149,7 +149,7 @@ class UI extends Frame {
         prompt = JOptionPane.showInputDialog(this, panel)
       }
       
-      val resp = sites.GoogleWeb.CaptchaResponse(prompt, challenge)
+      val resp = sites.Google.CaptchaResponse(prompt, challenge)
       println("replying: " + resp)
       e feedback resp        
     }

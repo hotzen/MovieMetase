@@ -1,151 +1,38 @@
 package moviemetase
 package sites
 
-import Util._
 import java.net.URL
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.util.Random
-
-object Google {
-  
-  case class Query(query: String) extends Task[List[GoogleResult]] {
-      
-    def execute(): List[GoogleResult] = GoogleWeb.Query(query).execute()
-    
-//    def executeQuery(): List[GoogleResult] = use.get match {
-//      case id@UseAjax          => tryOrNext(id, GoogleAjax.Query(query)   )
-//      case id@UseWeb           => tryOrNext(id, GoogleWeb.Query(query)    )
-//      case id@UseMetaCrawler   => tryOrNext(id, MetaCrawler.Query(query)  )
-//      case id@UseDogPile       => tryOrNext(id, DogPile.Query(query)      )
-//      
-//      case id if id >= UseNothing => {
-//        warn("No more Query-Methods to try, aborting.")
-//        Nil
-//      }
-//      case id => {
-//        warn("Unknown Query-Method #" + id + ", resetting to AJAX")
-//        use.compareAndSet(id, UseAjax)
-//        Nil
-//      }
-//    }
-//    
-//    def tryOrNext(id: Int, task: Task[List[GoogleResult]]): List[GoogleResult] = {
-//      try {
-//        val label = task match {
-//          case l:Logging => l.logID
-//          case _         => task.toString
-//        }
-//        //trace("trying " + label + " ...")
-//        task.execute()
-//
-//      } catch { case e:Exception => {
-//        warn(task + " failed with " + e.getMessage() + ", switching to next method")
-//        use.compareAndSet(id, id+1)
-//        execute()
-//      }}
-//    }
-  }
-}
+import moviemetase.search.WebResult
 
 case class GoogleResult(query: String, url: URL, title: String, snippet: String) {
-//  override def toString = {
-//    val sb = new StringBuilder
-//    sb append "GoogleResult(" append query append "){\n"
-//    sb append "  url:     " append url.toString append "\n"
-//    sb append "  title:   " append title        append "\n"
-//    sb append "  snippet: " append snippet      append "\n"
-//    sb append "}"
-//    sb.toString
-//  }
+
 }
 
-////XXX very poor result-quality :( 
-//object GoogleAjax {
-//  import import scala.util.parsing.json.JSON
-//  import scala.io.Source
-//
-//  val BASE_URL = "http://ajax.googleapis.com/ajax/services/search/web"
-//  
-//  case class Query(query: String, page: Int = 1) extends HttpTask[List[GoogleResult]] with Logging {
-//    val logID = "GoogleAjax.Query"
-//    
-//    def params: String = "v=1.0&rsz=large&hl=en"
-//    def limit: Int = 8
-//      
-//    lazy val url: URL = {
-//      val sb = new StringBuilder( BASE_URL )
-//      sb append "?"       append params
-//      sb append "&start=" append ((page-1)*limit)
-//      sb append "&q="     append query.urlEncode
-//
-//      val url = sb.toString 
-//      trace("querying '" + query + "' ...", ("url" -> url) :: Nil)
-//      new URL(url)
-//    }
-//    
-//    def processResponse(in: InputStream): List[GoogleResult] = {
-//      import Util._
-//      import JsonType._
-//
-//      val str = Source.fromInputStream(in).mkString
-//      
-//      println(str.replaceAll("}", "}\n"))
-//      
-//      for {
-//        M(map)      <- List( JSON.parseFull(str).get ) // shall fail
-//        M(respData) =  map("responseData")
-//        L(results)  =  respData("results")
-//        M(resMap)   <- results
-//        S(url)      =  resMap("unescapedUrl")
-//        S(title)    =  resMap("titleNoFormatting")
-//        S(snippet)  =  resMap("content")
-//      } yield {
-//        GoogleResult(query, url.toURL, title, snippet.noTags.noEntities)
-//      }
-//    }
-//  }
-//}
+object Google {
+  import language.implicitConversions
+  implicit def google2web(g: GoogleResult): WebResult =
+    WebResult(g.query, g.url, g.title, g.snippet)
 
-object GoogleWeb {
-  val Domains =
-    "nosslsearch.google.com" ::
-    "google.com.au" ::
-    "google.co.uk" ::
-    "google.de" ::
-    Nil
-
-  def baseURL(domain: String): String = 
-    "http://" + domain + "/search" 
-
-  def baseURL: String =
-    baseURL( Domains(0) ) // TODO try to change domains before prompting for CAPTCHAs
+  def baseURL: String = "http://nosslsearch.google.com/search"
   
-  case class Query(query: String) extends Task[List[GoogleResult]] with DedicatedPool with Logging {
+  case class Query(query: String) extends Task[List[GoogleResult]] with DedicatedPool with Throttling with Logging {
     val logID = "Google.Query"
     
-    val pool = ("G", 1, 1) // NO concurrent google-queries
-
-    var ThrottleMin = 100
-    var ThrottleMax = 1000
+    val pool = ("GOGL", 1, 1) // NO concurrent google-queries
+    val throttling = defaultThrottle
     
     val BlockPagePattern = "/sorry/"
     
     def execute(): List[GoogleResult] = {
-      try {
-        if (ThrottleMin > 0 && ThrottleMax > 0) {
-          val rnd = new Random
-          val throttle = ThrottleMin + rnd.nextInt( ThrottleMax - ThrottleMin )
-          Thread sleep throttle.toLong
-        }
-
-        WebQuery(query).execute()
-        
-      } catch {
+      try RawQuery(query).execute()
+      catch {
         case e@HttpRedirectException(code, msg, loc, url) => {
           if (loc contains BlockPagePattern) {
             warn("BLOCKED")
-            unblockRetry( loc.toURL )
+            unblockRetry( new URL(loc) )
           } else {
             warn("unexpected redirection to " + loc)
             throw e
@@ -296,8 +183,8 @@ object GoogleWeb {
       result
   }
     
-  case class WebQuery(query: String) extends HtmlTask[List[GoogleResult]] with Logging {
-    val logID = "Google.WebQuery"
+  case class RawQuery(query: String) extends HtmlTask[List[GoogleResult]] with Logging {
+    val logID = "Google.RawQuery"
     
     StoreCookies = true
       
@@ -332,7 +219,7 @@ object GoogleWeb {
             val title = a.text
             val snippet = li.select(".st").map(_.text).mkString("")
             
-            try   { Some( GoogleResult(query: String, link.toURL, title, snippet) ) }
+            try   { Some( GoogleResult(query: String, new URL(link), title, snippet) ) }
             catch { case e:java.net.MalformedURLException => {
               warn("invalid URL: " + e.toString)
               None
