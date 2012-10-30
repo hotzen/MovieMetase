@@ -143,9 +143,14 @@ object TaskManager extends Logging {
   }
   
   private class ScheduledTask[A](task: Task[A]) extends Callable[A] {
-    def call(): A =
+    def call(): A = {
+      task match {
+        case t:Throttling => Thread sleep t.throttleTime
+        case _ =>
+      }
       try task.execute()
       finally notifyListeners( lessTasks() )
+    }
   }
   
   private class ErrorJFuture[A](t: Throwable) extends JFuture[A] {
@@ -198,8 +203,23 @@ trait Task[A] {
   def async(): Future[A] = Future({ execute() })( asyncExecContext )
 }
 
-trait DedicatedPool {
+trait DedicatedPool { self: Task[_] =>
   def pool: (String, Int, Int) // poolID, min threads, max threads
+}
+
+trait Throttling { self: Task[_] =>
+  
+  def throttling: (Int,Int)
+  
+  def noThrottle = (0, 0)
+  def defaultThrottle = (100, 1000)
+  
+  private lazy val rnd = new java.util.Random
+
+  def throttleTime: Long = {
+    val (min, max) = throttling
+    min + rnd.nextInt( max - min )
+  }
 }
 
 object HumanTasks extends scala.swing.Publisher
@@ -340,9 +360,9 @@ trait HttpTask[A] extends IOTask[A] {
   // url to process
   def url: URL
 
-  // IOTask
+  // IOTask-target for dedicated Pool
   def target: String = url.domainName
-    
+  
   // optional "raw"-processor
   def preProcess(conn: HttpURLConnection, headers: Map[String, List[String]]): Unit = {}
   
@@ -434,7 +454,7 @@ trait HttpTask[A] extends IOTask[A] {
       case c:HttpURLConnection => c
       case _                   => throw new IllegalArgumentException("HttpTask only supports HTTP connections")
     }
-    
+        
     try {
       setup(conn)
       val is = connect( conn )
