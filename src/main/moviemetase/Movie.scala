@@ -173,6 +173,7 @@ object MovieInfos {
   }
   
   trait Website extends MovieInfo {
+    def websiteTitle: String = website.getHost()
     def website: URL
   }
 }

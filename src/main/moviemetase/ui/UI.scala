@@ -63,8 +63,8 @@ object UI {
       None
   
   val UNCRepl =  // Regex-Masked, replaceAll works on Regexes!
-    ("#" -> "%23") ::
-    (" " -> "%20") ::
+    ("#"   -> "%23") ::
+    (" "   -> "%20") ::
     ("\\[" -> "%5B") ::
     ("\\]" -> "%5D") ::
     Nil
@@ -72,7 +72,7 @@ object UI {
   def openFile(f: java.io.File) {
     val path = f.getPath
     desktop.foreach(dsk => {
-      if (path.startsWith("\\")) {
+      if (path.startsWith("\\")) { // UNC network path
         val newPath = "file:" + UNCRepl.foldLeft(path)({ case (path, (from, to)) =>
           path.replaceAll(from, to)
         })
@@ -81,6 +81,11 @@ object UI {
         dsk open f
       }
     })
+  }
+  
+  def openBrowser(uri: java.net.URI) {
+    for (dsk <- desktop)
+      dsk browse uri
   }
       
   val SelectionColor = new Color(139, 209, 46) // #8BD12E

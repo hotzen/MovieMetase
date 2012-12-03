@@ -46,18 +46,18 @@ trait FileCache[A] {
   def get(k: String): Option[A]
 }
 
-class ImageCache(format: String = "JPEG") extends FileCache[BufferedImage] with Logging {
-  val logID = "ImageCache"
+class ImageCache(format: String = "JPEG") extends FileCache[BufferedImage] {
+  //val logID = "ImageCache"
     
   def get(k: String): Option[BufferedImage] =
     tryRead(k).map(f =>
-      try { ImageIO.read(f) }
-      finally { f.close() }
+      try ImageIO.read(f)
+      finally f.close()
     )
   
   def put(k: String, img: BufferedImage): Unit =
     Some( write(k) ).foreach(f =>
-      try { ImageIO.write(img, format, f) }
-      finally { f.close() }
+      try ImageIO.write(img, format, f)
+      finally f.close()
     )
 }

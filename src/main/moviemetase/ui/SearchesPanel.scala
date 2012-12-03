@@ -10,8 +10,6 @@ import javax.swing.event._
 import javax.swing.border._
 import comp._
 
-case class SearchSelected(search: Search) extends Event
-
 sealed trait SearchStatus
 object SearchStatus {
   case object Pending   extends SearchStatus
@@ -20,12 +18,7 @@ object SearchStatus {
   case object Failed    extends SearchStatus
 }
 
-case class Search(fileInfo: FileInfo, status: SearchStatus, result: List[Movie] = Nil, error: Option[Throwable] = None) {
-//  override def equals(other: Any): Boolean = other match {
-//    case Search(otherFileInfo, _, _) => fileInfo == otherFileInfo
-//    case _ => false
-//  }
-}
+case class Search(fileInfo: FileInfo, status: SearchStatus, result: List[Movie] = Nil, error: Option[Throwable] = None)
 
 class SearchesPanel(val top: UI) extends ScrollPane {
   import language.reflectiveCalls
@@ -55,7 +48,7 @@ class SearchesPanel(val top: UI) extends ScrollPane {
           ("/img/ok.png", "completed with one result, yay!")
 
         case (Completed, _, _) =>
-          ("/img/plus.png", "completed with multiple results")
+          ("/img/plus.png", "completed with multiple results...")
 
         case (Failed, _, Some(t)) =>
           ("/img/fail.png", "failed: " + t.getMessage)
@@ -76,7 +69,6 @@ class SearchesPanel(val top: UI) extends ScrollPane {
         sb append search.fileInfo.fileName
         sb append "</pre></html>"
         sb.toString
-        //(search.fileInfo.dirName, search.fileInfo.fileName)
       }
       case 3 =>
         new ImageIcon(App.resource("/img/open-dir.png"))
@@ -146,17 +138,16 @@ class SearchesPanel(val top: UI) extends ScrollPane {
 
   listenTo( top.dropPanel )
   reactions += {
-    case FoundMovieFile(fileInfo) => {
+    case MovieFileScanned(fileInfo) =>
       updateModel( Search(fileInfo, SearchStatus.Pending) )
-    }
-    case SearchingMoviesByFile(fileInfo) => {
+    
+    case SearchingMoviesByFile(fileInfo) =>
       updateModel( Search(fileInfo, SearchStatus.Searching) )
-    }
-    case FoundMoviesByFile(fileInfo, movies) => {
+    
+    case FoundMoviesByFile(fileInfo, movies) =>
       updateModel( Search(fileInfo, SearchStatus.Completed, movies) )
-    }
-    case SearchingMoviesByFileFailed(fileInfo, t) => {
+    
+    case SearchingMoviesByFileFailed(fileInfo, t) =>
       updateModel( Search(fileInfo, SearchStatus.Failed, Nil, Some(t)) )
-    }
   }
 }

@@ -3,9 +3,7 @@ package moviemetase.search
 import scala.concurrent.Future
 import java.net.URL
 
-sealed trait WebQuery {
-  
-}
+sealed trait WebQuery { }
 object WebQuery {
   case class Term(term: String) extends WebQuery
   case class TermLinkingTo(term: String, linkTo: String) extends WebQuery

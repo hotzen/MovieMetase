@@ -16,6 +16,12 @@ class TableCol(val label: String, val prefWidth: Int) {
   var maxWidth: Int = -1
 }
 
+class CheckboxCol(label: String, prefWidth: Int = 20) extends TableCol(label, prefWidth) {
+  clazz    = classOf[Boolean]
+  editable = true
+  maxWidth = prefWidth
+}
+
 //object SmartTableModel {
 //  def apply[A <: TSmartTableRow](cols: Iterable[TSmartTableCol] = Nil, rows: Iterable[TSmartTableRow] = Nil): SmartTableModel[A] = {
 //    val mdl = new SmartTableModel[A]
@@ -87,9 +93,9 @@ abstract class TableModel[A](_cols: Traversable[TableCol]) extends AbstractTable
     }
   }
   
-  def update(f: (A,A) => Boolean)(newRow: A) {
+  def update(eq: (A,A) => Boolean)(newRow: A) {
     val updIdx = 
-      for ((oldRow,idx) <- rows.zipWithIndex.toList if f(oldRow, newRow)) yield {
+      for ((oldRow,idx) <- rows.zipWithIndex.toList if eq(oldRow, newRow)) yield {
         rows(idx) = newRow
         fireTableRowsUpdated(idx, idx)
         idx

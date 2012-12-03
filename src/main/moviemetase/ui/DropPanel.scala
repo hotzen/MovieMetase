@@ -11,11 +11,6 @@ import moviemetase.search.MovieSearch
 import comp._
 import java.util.concurrent.BlockingQueue
 
-case class FoundMovieFile(file: FileInfo) extends Event
-case class SearchingMoviesByFile(file: FileInfo) extends Event
-case class FoundMoviesByFile(file: FileInfo, movies: List[Movie]) extends Event
-case class SearchingMoviesByFileFailed(file: FileInfo, t: Throwable) extends Event
-
 class DropPanel(val top: UI) extends Component {
 
   override lazy val peer = new JImage( App.resource("/img/drop.png"), JImage.OriginalWidth, JImage.Blocking, JImage.NoCaching )
@@ -117,7 +112,7 @@ class DropPanel(val top: UI) extends Component {
       if (!Analyzer.isExt( fileInfo.fileExt ))
         return false
       
-      UI.publish(DropPanel.this)( FoundMovieFile(FileInfo(p)) )
+      UI.publish(DropPanel.this)( MovieFileScanned(FileInfo(p)) )
       true
     }
     

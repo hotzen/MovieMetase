@@ -17,8 +17,6 @@ import scala.xml.Elem
 import org.w3c.dom.Element
 import comp._
 
-case class MovieSelected(movie: Movie) extends Event
-
 class MoviesPanel(val top: UI) extends FS_ScrollPane {
   
   verticalScrollBarPolicy   = ScrollPane.BarPolicy.AsNeeded
